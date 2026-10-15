@@ -1,0 +1,27 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 28, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "rig",
+      "displayName": "HEM Rig — i7-14700HX / MSVC x64",
+      "generator": "Visual Studio 17 2022",
+      "architecture": { "value": "x64", "strategy": "set" },
+      "toolset": { "value": "host=x64", "strategy": "set" },
+      "binaryDir": "${sourceDir}/build/rig",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
+    },
+    {
+      "name": "rig-asio",
+      "displayName": "HEM Rig — ASIO SDK required",
+      "inherits": "rig",
+      "binaryDir": "${sourceDir}/build/rig-asio",
+      "cacheVariables": { "HC_REQUIRE_ASIO_SDK": "ON" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "rig-debug",        "configurePreset": "rig",      "configuration": "Debug" },
+    { "name": "rig-release",      "configurePreset": "rig",      "configuration": "Release" },
+    { "name": "rig-asio-release", "configurePreset": "rig-asio", "configuration": "Release" }
+  ]
+}

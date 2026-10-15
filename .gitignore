@@ -1,0 +1,7 @@
+/build/
+/out/
+/.vs/
+*.user
+# Steinberg ASIO SDK is licensed; never commit it.
+/external/asiosdk/*
+!/external/asiosdk/README.md
