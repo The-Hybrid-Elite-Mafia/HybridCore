@@ -174,11 +174,11 @@ std::expected<StreamConfig, BackendError> AsioDuplex::open(const Options& option
     if (e != ASE_OK) return fail(e, "ASIOInit");
 
     if ((e = ASIOCanSampleRate(static_cast<ASIOSampleRate>(hc::kSampleRate))) != ASE_OK)
-        return fail(e, "ASIOCanSampleRate(48000)");
+        return fail(e, "ASIOCanSampleRate(kSampleRate)");
     ASIOSampleRate current = 0;
     if (ASIOGetSampleRate(&current) != ASE_OK || current != static_cast<ASIOSampleRate>(hc::kSampleRate)) {
         if ((e = ASIOSetSampleRate(static_cast<ASIOSampleRate>(hc::kSampleRate))) != ASE_OK)
-            return fail(e, "ASIOSetSampleRate(48000)");
+            return fail(e, "ASIOSetSampleRate(kSampleRate)");
     }
 
     long hwIn = 0, hwOut = 0;

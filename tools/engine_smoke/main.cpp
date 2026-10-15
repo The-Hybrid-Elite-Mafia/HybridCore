@@ -172,7 +172,7 @@ void listRenderDevices() {
 } // namespace
 
 int wmain(int argc, wchar_t** argv) {
-    ::_setmode(::_fileno(stdout), _O_U16TEXT);
+    hc::io::configureWideConsole();
 
     Args args;
     if (!parse(argc, argv, args)) {

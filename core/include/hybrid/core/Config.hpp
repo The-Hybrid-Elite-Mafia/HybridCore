@@ -1,19 +1,27 @@
 #pragma once
 // =============================================================================
-//  Rig constants. Values come from cmake/HybridCorePlatform.cmake definitions.
+//  THE HYBRID CORE — single source of truth for rig-wide constants.
+//  Change sample rate, stem count or engine limits HERE and nowhere else.
+//  Nothing in CMake or any other file may redefine these values.
 // =============================================================================
 #include <cstddef>
 #include <cstdint>
 
 namespace hc {
 
-inline constexpr std::uint32_t kSampleRate     = HC_SAMPLE_RATE;   // 48 kHz, locked
-inline constexpr std::uint32_t kStemCount      = HC_STEM_COUNT;    // 13
-inline constexpr std::size_t   kCacheLine      = 64;               // Raptor Lake L1/L2 line
-inline constexpr std::size_t   kSimdAlign      = 32;               // AVX2 register width
+// ---- Audio format -----------------------------------------------------------
+inline constexpr std::uint32_t kSampleRate = 48000;   // locked rig rate
+inline constexpr std::uint32_t kStemCount  = 13;      // HEM stem matrix width
+
+// ---- Engine limits ----------------------------------------------------------
 inline constexpr std::uint32_t kMaxChannels    = 64;
 inline constexpr std::uint32_t kMaxBlockFrames = 8192;
 
+// ---- Target silicon: Intel Core i7-14700HX (Raptor Lake-HX) -----------------
+inline constexpr std::size_t kCacheLine = 64;   // L1/L2 line size
+inline constexpr std::size_t kSimdAlign = 32;   // AVX2 register width (no AVX-512 on this part)
+
 static_assert(kSampleRate == 48000, "HybridCore is locked to 48 kHz.");
+static_assert(kStemCount > 0 && kStemCount <= kMaxChannels);
 
 } // namespace hc

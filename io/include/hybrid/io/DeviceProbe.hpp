@@ -9,6 +9,9 @@
 
 namespace hc::io {
 
+// Wide-char stdout that reads correctly in a console and in redirected/CI logs.
+void configureWideConsole() noexcept;
+
 // RAII COM apartment. MTA for WASAPI threads; STA on the thread that hosts an ASIO driver.
 enum class Apartment : std::uint8_t { MultiThreaded, SingleThreaded };
 

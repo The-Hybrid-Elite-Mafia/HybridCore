@@ -1,0 +1,51 @@
+name: Windows build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  wasapi:
+    name: MSVC Release (WASAPI only)
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain versions
+        run: |
+          cmake --version
+          & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property catalog_productDisplayVersion
+
+      - name: Configure
+        run: cmake --preset rig
+
+      - name: Build Release
+        run: cmake --build --preset rig-release
+
+      - name: Unit tests
+        run: ctest --test-dir build/rig -C Release --output-on-failure
+
+      - name: Device probe
+        run: .\build\rig\tools\device_probe\Release\hc_device_probe.exe --no-audio-ok
+
+  asio-compile:
+    name: MSVC Release (ASIO SDK fetched at build time, never committed)
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch ASIO SDK
+        run: powershell -ExecutionPolicy Bypass -File tools\fetch-asio-sdk.ps1
+
+      - name: Configure (ASIO required)
+        run: cmake --preset rig-asio
+
+      - name: Build Release
+        run: cmake --build --preset rig-asio-release
+
+      - name: Unit tests
+        run: ctest --test-dir build/rig-asio -C Release --output-on-failure
+
+      - name: Device probe
+        run: .\build\rig-asio\tools\device_probe\Release\hc_device_probe.exe --no-audio-ok

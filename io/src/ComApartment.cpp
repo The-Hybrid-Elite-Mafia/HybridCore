@@ -3,7 +3,18 @@
 #include <windows.h>
 #include <objbase.h>
 
+#include <cstdio>
+#include <fcntl.h>
+#include <io.h>
+
 namespace hc::io {
+
+void configureWideConsole() noexcept {
+    // Console -> UTF-16 via WriteConsoleW; pipe/file (CI logs) -> UTF-8 bytes.
+    const HANDLE h       = ::GetStdHandle(STD_OUTPUT_HANDLE);
+    const bool   console = h && h != INVALID_HANDLE_VALUE && ::GetFileType(h) == FILE_TYPE_CHAR;
+    ::_setmode(::_fileno(stdout), console ? _O_U16TEXT : _O_U8TEXT);
+}
 
 ComApartment::ComApartment(Apartment kind) noexcept {
     const DWORD mode = (kind == Apartment::SingleThreaded) ? COINIT_APARTMENTTHREADED

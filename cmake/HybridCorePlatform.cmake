@@ -64,10 +64,7 @@ target_compile_definitions(hc_build_flags INTERFACE
     _WIN32_WINNT=0x0A00     # Windows 10/11 API surface (IAudioClient3, MMCSS, EfficiencyClass)
     WINVER=0x0A00
     NTDDI_VERSION=0x0A000008   # Win10 2004+: EcoQoS / power-throttling + CPU-set APIs
-    HC_RIG_CPU_I7_14700HX=1
-    HC_RIG_SIMD_AVX2=1
-    HC_SAMPLE_RATE=48000
-    HC_STEM_COUNT=13
+    # Sample rate, stem count and engine limits live ONLY in core/include/hybrid/core/Config.hpp
     $<$<CONFIG:Release>:NDEBUG>
 )
 

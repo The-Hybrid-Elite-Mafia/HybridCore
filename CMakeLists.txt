@@ -38,4 +38,7 @@ add_subdirectory(engine)
 add_subdirectory(tools/device_probe)
 add_subdirectory(tools/engine_smoke)
 
+enable_testing()
+add_subdirectory(tests)
+
 set_property(DIRECTORY ${PROJECT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT hc_device_probe)

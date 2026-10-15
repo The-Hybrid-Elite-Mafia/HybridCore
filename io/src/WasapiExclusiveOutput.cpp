@@ -202,7 +202,11 @@ WasapiExclusiveOutput::open(const Options& options, AudioCallback& callback) {
     cfg.blockFrames     = bufferFrames;
     cfg.numInputs       = 0;
     cfg.numOutputs      = channels;
-    cfg.outputLatencyMs = 1000.0 * bufferFrames / hc::kSampleRate;
+    // Driver-reported stream latency when available; otherwise one buffer period.
+    REFERENCE_TIME streamLatency = 0;
+    cfg.outputLatencyMs = (SUCCEEDED(s.client->GetStreamLatency(&streamLatency)) && streamLatency > 0)
+                              ? static_cast<double>(streamLatency) / 10'000.0
+                              : 1000.0 * bufferFrames / hc::kSampleRate;
 
     callback.prepare(cfg);
     return cfg;

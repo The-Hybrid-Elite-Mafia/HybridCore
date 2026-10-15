@@ -62,7 +62,7 @@ if(ASIOSDK_FOUND AND NOT TARGET hc_asio_sdk)
     target_compile_definitions(hc_asio_sdk
         PRIVATE _CRT_SECURE_NO_WARNINGS NOMINMAX
         PUBLIC  HC_HAS_ASIO_SDK=1)
-    target_link_libraries(hc_asio_sdk PUBLIC ole32 advapi32 user32)
+    target_link_libraries(hc_asio_sdk PUBLIC ole32 advapi32 user32 uuid)
 
     message(STATUS "[HybridCore] ASIO SDK: ${ASIOSDK_ROOT}")
 endif()

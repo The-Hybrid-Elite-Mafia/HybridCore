@@ -1,11 +1,17 @@
-# Steinberg ASIO SDK — drop zone
+# Steinberg ASIO SDK — drop zone (never committed)
 
-The ASIO SDK is Steinberg's licensed code and is not committed to this repo.
+The ASIO SDK is Steinberg's code, dual-licensed GPLv3 or Steinberg proprietary.
+It is kept out of this repo; `.gitignore` blocks everything here except this file.
 
-1. Download the ASIO SDK from Steinberg's developer portal: https://www.steinberg.net/developers/
-2. Extract the zip into this folder. Either layout works:
-   - `external/asiosdk/common/asio.h`
-   - `external/asiosdk/asiosdk_<version>/common/asio.h`
-3. Re-run configure. CMake prints `[HybridCore] ASIO SDK: <path>` when it is found.
+## Install (one command, from the repo folder)
+```
+powershell -ExecutionPolicy Bypass -File tools\fetch-asio-sdk.ps1
+```
+Downloads ASIO SDK 2.3.4 from download.steinberg.net, checks its SHA-512, applies
+the asiolist.cpp delete[] fix, and installs it to `external/asiosdk/sdk/`.
 
-To make a missing SDK a hard error, configure with the `rig-asio` preset.
+Then build the ASIO-enabled version:
+```
+cmake --preset rig-asio
+cmake --build --preset rig-asio-release
+```
