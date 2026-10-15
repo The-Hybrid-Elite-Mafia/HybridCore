@@ -23,13 +23,13 @@ foreach ($f in 'bin\hc_device_probe.exe','bin\hc_engine_smoke.exe','bin\hc_tests
     Check (Test-Path (Join-Path $app $f)) "installed $f"
 }
 Check (Test-Path (Join-Path $desktop 'Hybrid Core - Rig Check.lnk')) 'desktop shortcut'
-Check (Test-Path $settings) 'settings folder created'
 
 $out = & (Join-Path $app 'bin\hc_tests.exe') 2>&1 | Out-String
 Check ($LASTEXITCODE -eq 0 -and $out -match '0 failed -> PASS') 'installed hc_tests.exe passes'
 ($out -split "`n" | Select-Object -Last 2) -join ' ' | Write-Host
 
 # Settings must survive reinstall (upgrade path) and uninstall.
+New-Item -ItemType Directory -Force -Path $settings | Out-Null   # what the app does on first run
 $marker = Join-Path $settings 'ci-marker.txt'
 'keep me' | Out-File $marker -Encoding ascii
 Check ((Install) -eq 0) 'reinstall over existing (upgrade path) exit code 0'

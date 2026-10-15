@@ -31,9 +31,8 @@ WizardStyle=modern
 UninstallDisplayName=The Hybrid Core
 CloseApplications=yes
 
-[Dirs]
-; Settings live here and survive upgrades AND uninstall.
-Name: "{userappdata}\HybridCore"; Flags: uninsneveruninstall
+; Settings: the app keeps them in %APPDATA%\HybridCore. This installer never creates, overwrites
+; or deletes that folder, so settings survive upgrades and uninstall.
 
 [Files]
 Source: "{#BinDir}\tools\device_probe\Release\hc_device_probe.exe"; DestDir: "{app}\bin"; Flags: ignoreversion

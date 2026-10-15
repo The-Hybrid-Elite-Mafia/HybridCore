@@ -112,7 +112,7 @@ void testKernels() {
 
 void testMatrix() {
     std::printf("[matrix] %u stems x %u buses\n", kStems, kBuses);
-    CHECK(kStems == 13);
+    static_assert(kStems == 13, "rig stem count");
     CHECK(dsp::StemMatrix::dbToGain(dsp::StemMatrix::kOffDb) == 0.f);
     CHECK(dsp::StemMatrix::dbToGain(NAN) == 0.f);
     CHECK(near(dsp::StemMatrix::dbToGain(-6.f), 0.5011872f));

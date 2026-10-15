@@ -11,7 +11,7 @@ Rig-wide constants (sample rate, 13 stems, limits) live in ONE file:
 |---|---|---|
 | 1 | Windows/MSVC build, ASIO + WASAPI device probe | Builds + runs in CI. Not yet run on the rig. |
 | 2 | Lock-free audio callback, WASAPI exclusive + ASIO streams | Builds in CI, unit tests pass. Not yet run on real audio hardware. |
-| 3 | AVX2 13-stem DSP matrix | Not started |
+| 3 | AVX2 DSP kernels + 13-stem × 4-bus routing matrix | Builds in CI, 109 unit-test checks pass, 0 heap allocations on the audio path. Not yet heard on real hardware. |
 | 4 | GPU UI canvas (see `docs/UI_TEXTURE_PLAN.md`) | Planned |
 | 5 | Parameter tree, standalone .exe + .vst3 switch | Not started |
 
@@ -27,8 +27,14 @@ runs `hc_tests` and `hc_device_probe --no-audio-ok` (the runner has no sound car
    cmake --build --preset rig-release   (or rig-asio-release)
    ```
 
+## Installer
+Every push to `main` builds `HybridCore-Setup-<version>.exe` (CI artifact). Tags `v*` publish it as a
+GitHub Release. CI installs it silently, runs the installed self-test, reinstalls (upgrade path) and
+uninstalls, checking files, shortcuts and that `%APPDATA%\HybridCore` settings survive.
+
 ## Tools
 - `hc_device_probe.exe` — CPU check, then opens every 48 kHz-capable output (and ASIO driver),
   plays 1 s of silence, and reports the real buffer size, latency and measured callback timing.
-- `hc_engine_smoke.exe` — plays a -18 dBFS 440 Hz tone through the engine.
+- `hc_engine_smoke.exe` — plays a -18 dBFS 440 Hz tone through the engine; `--mixer` runs the 13-stem
+  matrix with 13 test tones (solo + pan exercised mid-run), `--mixer --inputs` feeds it from hardware inputs.
 - `hc_tests.exe` — hardware-free unit tests.
