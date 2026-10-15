@@ -49,6 +49,8 @@ enum class Sprite : std::uint8_t {
     IconNext,
     IconSine,
     IconInput,
+    IconFolder,
+    IconWave,
     Count
 };
 inline constexpr std::size_t kSpriteCount = static_cast<std::size_t>(Sprite::Count);

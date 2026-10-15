@@ -5,6 +5,7 @@
 //  A hidden window is used for off-screen rendering (tests, snapshots).
 // =============================================================================
 #include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <string>
 #include <vector>
@@ -12,13 +13,14 @@
 namespace hc::ui {
 
 struct InputEvent {
-    enum class Type : std::uint8_t { MouseDown, MouseUp, MouseMove, Wheel, Resize, Close };
+    enum class Type : std::uint8_t { MouseDown, MouseUp, MouseMove, Wheel, Resize, Close, RightDown, Drop };
     Type  type        = Type::MouseMove;
     float x           = 0.0f;   // client pixels
     float y           = 0.0f;
     float wheel       = 0.0f;   // notches (+ = away from user)
     bool  doubleClick = false;
     bool  fine        = false;  // Shift or Ctrl held
+    std::vector<std::filesystem::path> files;   // Drop: files dragged in from Explorer
 };
 
 class GlWindow {

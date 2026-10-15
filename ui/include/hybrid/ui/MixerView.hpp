@@ -44,13 +44,25 @@ struct EngineReadout {
     std::uint64_t dropouts     = 0;
 };
 
+enum class SourceView : std::uint8_t { Tones, Inputs, Stems };
+
+// What a stem strip shows in its title area.
+struct StemSlotView {
+    std::string name;              // loaded file name ("" = empty slot)
+    std::string info;              // e.g. "MP3 44.1k 3:42"
+    float       progress = -1.0f;  // 0..1 while loading
+    bool        failed   = false;
+};
+
 struct ViewState {
     std::string   deviceName;      // name panel, line 1
     std::string   deviceFormat;    // name panel, line 2
     std::string   status;          // bottom bar
     bool          alert   = false;
     bool          running = false;
-    bool          tonesOn = true;
+    SourceView    source  = SourceView::Tones;
+    bool          loading = false; // any stem loading
+    std::array<StemSlotView, hc::kStemCount> slots{};
     EngineReadout engine;
     int           hover   = -1;    // widget indices from Interaction
     int           active  = -1;

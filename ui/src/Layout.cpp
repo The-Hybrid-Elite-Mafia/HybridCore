@@ -32,9 +32,9 @@ Rgba busAccent(std::uint32_t b) noexcept { return rgb8(kBusColours[b % std::size
 
 Layout::Layout(const params::ParameterTree& tree, float extraH) : extraH_(std::max(0.0f, extraH)) {
     // ---- transport sockets and tabs ----
-    static const UiAction kSocketActions[6] = {UiAction::PrevDevice, UiAction::NextDevice, UiAction::SourceTones,
-                                               UiAction::SourceInputs, UiAction::ClearSolo, UiAction::ClearMute};
-    static const char* const kSocketCaps[6] = {"DEVICE", "DEVICE", "TONES", "INPUTS", "SOLO", "MUTE"};
+    static const UiAction kSocketActions[6] = {UiAction::PrevDevice, UiAction::NextDevice, UiAction::LoadStems,
+                                               UiAction::CycleSource, UiAction::ClearSolo, UiAction::ClearMute};
+    static const char* const kSocketCaps[6] = {"DEVICE", "DEVICE", "LOAD", "SOURCE", "CLR SOLO", "CLR MUTE"};
     for (std::uint32_t i = 0; i < plate::kSockets.size(); ++i) {
         const Circle c = plate::kSockets[i];
         const float R = plate::kSocketOuterRadius;
@@ -63,26 +63,26 @@ Layout::Layout(const params::ParameterTree& tree, float extraH) : extraH_(std::m
         for (std::uint32_t b = 0; b < kFaderBanks; ++b)
             stemFader_[s][b] = paramIndex(tree, params::stemParamId(s, b == 0 ? "main" : (b == 1 ? "aux1" : b == 2 ? "aux2" : "aux3")));
 
-        widgets_.push_back({WidgetKind::Knob, {cx - kKnobD / 2, y0 + 200 - kKnobD / 2, kKnobD, kKnobD},
+        widgets_.push_back({WidgetKind::Knob, {cx - kKnobD / 2, y0 + 222 - kKnobD / 2, kKnobD, kKnobD},
                             paramIndex(tree, params::stemParamId(s, "trim")), s, UiAction::None, "TRIM"});
-        widgets_.push_back({WidgetKind::Knob, {cx - kKnobD / 2, y0 + 360 - kKnobD / 2, kKnobD, kKnobD},
+        widgets_.push_back({WidgetKind::Knob, {cx - kKnobD / 2, y0 + 382 - kKnobD / 2, kKnobD, kKnobD},
                             paramIndex(tree, params::stemParamId(s, "pan")), s, UiAction::None, "PAN"});
         static const char* const kAux[3] = {"aux1", "aux2", "aux3"};
         static const char* const kAuxCap[3] = {"A1", "A2", "A3"};
         for (int a = 0; a < 3; ++a) {
             const float kx = cx + static_cast<float>(a - 1) * kSendPitch;
-            widgets_.push_back({WidgetKind::SendKnob, {kx - kSendD / 2, y0 + 500 - kSendD / 2, kSendD, kSendD},
+            widgets_.push_back({WidgetKind::SendKnob, {kx - kSendD / 2, y0 + 520 - kSendD / 2, kSendD, kSendD},
                                 paramIndex(tree, params::stemParamId(s, kAux[a])), s, UiAction::None, kAuxCap[a]});
         }
         static const char* const kBtn[3] = {"mute", "solo", "invert"};
         static const char* const kBtnCap[3] = {"M", "S", "\xC3\x98"};   // UTF-8 "Ø"
         for (int b = 0; b < 3; ++b) {
             const float bx = cx + static_cast<float>(b - 1) * kButtonPitch;
-            widgets_.push_back({WidgetKind::Button, {bx - kButtonW / 2, y0 + 560, kButtonW, kButtonH},
+            widgets_.push_back({WidgetKind::Button, {bx - kButtonW / 2, y0 + 580, kButtonW, kButtonH},
                                 paramIndex(tree, params::stemParamId(s, kBtn[b])), s, UiAction::None, kBtnCap[b]});
         }
 
-        const float fTop = y0 + 632, fBottom = y0 + stripH - kValueBoxH - 30;
+        const float fTop = y0 + 652, fBottom = y0 + stripH - kValueBoxH - 30;
         st.capW = 100.0f;
         st.capH = 53.0f;
         st.faderTrack = {cx - 54 - 13, fTop, 26, fBottom - fTop};
@@ -146,6 +146,12 @@ int Layout::hitTest(float x, float y) const noexcept {
         }
         return static_cast<int>(i);
     }
+    return -1;
+}
+
+int Layout::stemStripAt(float x, float y) const noexcept {
+    for (const StripLayout& st : strips_)
+        if (!st.isBus && st.bed.contains(x, y)) return static_cast<int>(st.index);
     return -1;
 }
 

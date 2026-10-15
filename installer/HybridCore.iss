@@ -48,10 +48,12 @@ Source: "{#BinDir}\tools\device_probe\Release\hc_device_probe.exe"; DestDir: "{a
 Source: "{#BinDir}\tools\engine_smoke\Release\hc_engine_smoke.exe"; DestDir: "{app}\bin"; Flags: ignoreversion
 Source: "{#BinDir}\tests\Release\hc_tests.exe";                     DestDir: "{app}\bin"; Flags: ignoreversion
 Source: "{#BinDir}\tools\ui_snapshot\Release\hc_ui_snapshot.exe";   DestDir: "{app}\bin"; Flags: ignoreversion
+Source: "..\tests\data\*";                                         DestDir: "{app}\bin\testdata"; Flags: ignoreversion
 Source: "..\assets\*";                                             DestDir: "{app}\assets"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\assets\fonts\OFL.txt";                                  DestDir: "{app}\licenses"; DestName: "Poppins-OFL.txt"; Flags: ignoreversion
 Source: "HOW-TO-TEST.txt";                                          DestDir: "{app}"; Flags: ignoreversion
 Source: "THIRD-PARTY-NOTICES.txt";                                  DestDir: "{app}"; Flags: ignoreversion
+Source: "..\external\dr_libs\LICENSE";                             DestDir: "{app}\licenses"; DestName: "dr_libs-LICENSE.txt"; Flags: ignoreversion
 Source: "..\external\stb\LICENSE";                                  DestDir: "{app}\licenses"; DestName: "stb-LICENSE.txt"; Flags: ignoreversion
 #ifdef AsioLicense
 Source: "{#AsioLicense}"; DestDir: "{app}\licenses"; DestName: "Steinberg-ASIO-SDK-LICENSE.txt"; Flags: ignoreversion

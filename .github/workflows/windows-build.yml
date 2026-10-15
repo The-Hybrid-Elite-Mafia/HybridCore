@@ -77,6 +77,8 @@ jobs:
           GALLIUM_DRIVER: llvmpipe
         run: |
           tools\ci\run-and-report.ps1 -Title "ui: snapshot" -Exe .\build\rig-full\tools\ui_snapshot\Release\hc_ui_snapshot.exe -ArgList '--out','shots','--sizes','3840x2160,1389x868','--seconds','2'
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          tools\ci\run-and-report.ps1 -Title "ui: snapshot with stems" -Exe .\build\rig-full\tools\ui_snapshot\Release\hc_ui_snapshot.exe -ArgList '--out','shots','--sizes','1389x868','--seconds','2','--stems','tests\data','--name','HybridCore-stems'
 
       - name: Start the real app (HybridCore.exe) and capture its window
         env:

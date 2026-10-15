@@ -2,6 +2,7 @@
 #include "hybrid/ui/Gl.hpp"
 
 #include <windowsx.h>
+#include <shellapi.h>
 
 #include <algorithm>
 
@@ -80,6 +81,30 @@ struct GlWindow::Impl {
             e.y     = static_cast<float>(pt.y);
             e.wheel = static_cast<float>(GET_WHEEL_DELTA_WPARAM(wp)) / WHEEL_DELTA;
             events.push_back(e);
+            return 0;
+        }
+        case WM_RBUTTONDOWN:
+            e.type = InputEvent::Type::RightDown;
+            e.x = static_cast<float>(GET_X_LPARAM(lp));
+            e.y = static_cast<float>(GET_Y_LPARAM(lp));
+            events.push_back(e);
+            return 0;
+        case WM_DROPFILES: {
+            auto* drop = reinterpret_cast<HDROP>(wp);
+            POINT pt{};
+            ::DragQueryPoint(drop, &pt);
+            e.type = InputEvent::Type::Drop;
+            e.x = static_cast<float>(pt.x);
+            e.y = static_cast<float>(pt.y);
+            const UINT n = ::DragQueryFileW(drop, 0xFFFFFFFF, nullptr, 0);
+            for (UINT i = 0; i < n; ++i) {
+                const UINT len = ::DragQueryFileW(drop, i, nullptr, 0);
+                std::wstring name(len, L'\0');
+                ::DragQueryFileW(drop, i, name.data(), len + 1);
+                e.files.emplace_back(name);
+            }
+            ::DragFinish(drop);
+            events.push_back(std::move(e));
             return 0;
         }
         case WM_CAPTURECHANGED:
@@ -179,6 +204,7 @@ bool GlWindow::create(const std::wstring& title, int clientW, int clientH, bool 
     }
     impl_->swapInterval = reinterpret_cast<gl::PFN_wglSwapIntervalEXT>(::wglGetProcAddress("wglSwapIntervalEXT"));
     setVsync(true);
+    ::DragAcceptFiles(impl_->hwnd, TRUE);   // stems can be dropped onto the console
     if (visible) { ::ShowWindow(impl_->hwnd, SW_SHOWNORMAL); ::UpdateWindow(impl_->hwnd); }
     return true;
 }

@@ -498,6 +498,26 @@ Raster iconInput() {
     });
 }
 
+Raster iconFolder() {
+    return icon([](float x, float y) {
+        const float body = sdRoundRect(x - 48.0f, y - 54.0f, 34.0f, 22.0f, 5.0f);
+        const float tab  = sdRoundRect(x - 30.0f, y - 30.0f, 16.0f, 7.0f, 4.0f);
+        const float outline = std::fabs(std::min(body, tab)) - 3.4f;
+        return outline;
+    });
+}
+Raster iconWave() {   // stem waveform: bars of varying height
+    return icon([](float x, float y) {
+        static const float h[] = {10, 22, 34, 18, 28, 40, 24, 14, 30, 20, 8};
+        float d = 1e9f;
+        for (int i = 0; i < 11; ++i) {
+            const float cx = 18.0f + 6.0f * static_cast<float>(i);
+            d = std::min(d, sdSegment(x, y, cx, 48.0f - h[i] * 0.5f, cx, 48.0f + h[i] * 0.5f) - 2.2f);
+        }
+        return d;
+    });
+}
+
 // ---- packing ----------------------------------------------------------------------------
 struct Item {
     Sprite      id;
@@ -545,6 +565,8 @@ PartsAtlas buildPartsAtlas(const Image& fp) {
     add(Sprite::IconNext, iconTriangle(false));
     add(Sprite::IconSine, iconSine());
     add(Sprite::IconInput, iconInput());
+    add(Sprite::IconFolder, iconFolder());
+    add(Sprite::IconWave, iconWave());
 
     // Shelf packing, tallest first, 4 px transparent gutters.
     constexpr int kAtlasW = 1024, kPad = 4;

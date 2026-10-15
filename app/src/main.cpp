@@ -5,6 +5,7 @@
 //  atomics and wait-free rings; the audio thread never touches graphics, files or the UI.
 // =============================================================================
 #include "AudioHost.hpp"
+#include "StemDeck.hpp"
 
 #include "hybrid/core/RealtimeThread.hpp"
 #include "hybrid/io/DeviceProbe.hpp"
@@ -16,6 +17,7 @@
 
 #include <windows.h>
 #include <shellapi.h>
+#include <shobjidl.h>
 
 #include <algorithm>
 #include <chrono>
@@ -74,10 +76,49 @@ Options parseOptions() {
     return o;
 }
 
+using Source = engine::MixerProcessor::Source;
+
+const char* sourceName(Source s) { return s == Source::TestTones ? "tones" : s == Source::Stems ? "stems" : "inputs"; }
+Source sourceFromName(const std::string& n) { return n == "inputs" ? Source::Hardware : n == "stems" ? Source::Stems : Source::TestTones; }
+std::string slotKey(std::uint32_t s) { char b[16]; std::snprintf(b, sizeof b, "slot%02u", s + 1); return b; }
+
+// Windows file dialog, multi-select, WAV/MP3/FLAC. Empty when cancelled.
+std::vector<std::filesystem::path> askForStems(HWND owner) {
+    std::vector<std::filesystem::path> out;
+    IFileOpenDialog* dlg = nullptr;
+    if (FAILED(::CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&dlg)))) return out;
+    const COMDLG_FILTERSPEC filters[] = {{L"Audio (WAV, MP3, FLAC)", L"*.wav;*.wave;*.mp3;*.flac"}, {L"All files", L"*.*"}};
+    dlg->SetFileTypes(2, filters);
+    dlg->SetTitle(L"Load stems (up to 13, in name order)");
+    FILEOPENDIALOGOPTIONS o = 0;
+    dlg->GetOptions(&o);
+    dlg->SetOptions(o | FOS_ALLOWMULTISELECT | FOS_FILEMUSTEXIST | FOS_FORCEFILESYSTEM);
+    if (SUCCEEDED(dlg->Show(owner))) {
+        IShellItemArray* items = nullptr;
+        if (SUCCEEDED(dlg->GetResults(&items))) {
+            DWORD n = 0;
+            items->GetCount(&n);
+            for (DWORD i = 0; i < n; ++i) {
+                IShellItem* it = nullptr;
+                PWSTR path = nullptr;
+                if (SUCCEEDED(items->GetItemAt(i, &it)) && SUCCEEDED(it->GetDisplayName(SIGDN_FILESYSPATH, &path))) {
+                    out.emplace_back(path);
+                    ::CoTaskMemFree(path);
+                }
+                if (it) it->Release();
+            }
+            items->Release();
+        }
+    }
+    dlg->Release();
+    return out;
+}
+
 struct App {
     params::Settings      settings;
     params::ParameterTree tree;
     app::AudioHost        audio;
+    app::StemDeck         stems{audio};
     std::vector<app::DeviceChoice> devices;
     int                   deviceIndex = 0;
 
@@ -86,9 +127,19 @@ struct App {
         const auto& d = audio.current();
         settings.set("app", "device.kind", kindName(d.kind));
         settings.set("app", "device.id", app::toUtf8(d.id));
-        settings.set("app", "source", audio.source() == engine::MixerProcessor::Source::TestTones ? "tones" : "inputs");
+        settings.set("app", "source", sourceName(audio.source()));
         settings.set("app", "faderBank", std::to_string(bank));
+        for (std::uint32_t s = 0; s < kStemCount; ++s) settings.set("stems", slotKey(s), app::toUtf8(stems.slot(s).file.wstring()));
         settings.save(params::Settings::defaultFile());
+    }
+    void restoreStems() {
+        std::error_code ec;
+        for (std::uint32_t s = 0; s < kStemCount; ++s) {
+            const std::string p = settings.get("stems", slotKey(s));
+            if (p.empty()) continue;
+            const std::filesystem::path f(app::fromUtf8(p));
+            if (std::filesystem::is_regular_file(f, ec)) stems.load(s, {f});
+        }
     }
     void selectDevice(int delta) {
         devices = app::AudioHost::listDevices();
@@ -101,11 +152,19 @@ struct App {
     }
 };
 
-std::string formatLine(const app::HostStatus& st, bool tones) {
-    char buf[200];
-    if (!st.running) return tones ? "NO STREAM  \xC2\xB7  13 STEMS  \xC2\xB7  TEST TONES" : "NO STREAM  \xC2\xB7  13 STEMS  \xC2\xB7  HARDWARE INPUTS";
-    std::snprintf(buf, sizeof buf, "%s  \xC2\xB7  %.1f kHz  \xC2\xB7  %u SMP  \xC2\xB7  13 STEMS  \xC2\xB7  %s", st.driver.c_str(), st.sampleRate / 1000.0,
-                  st.blockFrames, tones ? "TEST TONES" : "HARDWARE INPUTS");
+std::string sourceLine(Source src, const app::StemDeck& deck) {
+    if (src == Source::TestTones) return "TEST TONES";
+    if (src == Source::Hardware) return "HARDWARE INPUTS";
+    char b[96];
+    std::snprintf(b, sizeof b, "STEMS %u/13  (%.0f MB RAM)", deck.loadedCount(), static_cast<double>(deck.loadedBytes()) / 1048576.0);
+    return b;
+}
+
+std::string formatLine(const app::HostStatus& st, const std::string& source) {
+    char buf[240];
+    if (!st.running) return "NO STREAM  \xC2\xB7  " + source;
+    std::snprintf(buf, sizeof buf, "%s  \xC2\xB7  %.1f kHz  \xC2\xB7  %u SMP  \xC2\xB7  %s", st.driver.c_str(), st.sampleRate / 1000.0,
+                  st.blockFrames, source.c_str());
     return buf;
 }
 
@@ -131,8 +190,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     params::bindMixerParameters(a.tree, bindings, a.audio.matrix());
     a.tree.dispatchChanges();   // push every value into the matrix before audio starts
 
-    a.audio.setSource(a.settings.get("app", "source", "tones") == "inputs" ? engine::MixerProcessor::Source::Hardware
-                                                                           : engine::MixerProcessor::Source::TestTones);
+    a.restoreStems();   // background loads; the saved source below wins over the "switch to stems" a load does
+    a.audio.setSource(sourceFromName(a.settings.get("app", "source", "tones")));
     a.devices = app::AudioHost::listDevices();
     a.deviceIndex = opts.offline ? static_cast<int>(a.devices.size()) - 1
                                  : findDevice(a.devices, a.settings.get("app", "device.kind", "wasapi"), a.settings.get("app", "device.id"));
@@ -174,8 +233,17 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                 switch (console.interaction().mouseDown(x, y, e.doubleClick, e.fine, &idx)) {
                 case ui::UiAction::PrevDevice:   a.selectDevice(-1); break;
                 case ui::UiAction::NextDevice:   a.selectDevice(+1); break;
-                case ui::UiAction::SourceTones:  a.audio.setSource(engine::MixerProcessor::Source::TestTones); break;
-                case ui::UiAction::SourceInputs: a.audio.setSource(engine::MixerProcessor::Source::Hardware); break;
+                case ui::UiAction::LoadStems: {
+                    const auto files = askForStems(static_cast<HWND>(window.nativeHandle()));
+                    if (!files.empty()) a.stems.replaceAll(files);
+                    console.interaction().mouseUp();
+                    break;
+                }
+                case ui::UiAction::CycleSource: {
+                    const Source s = a.audio.source();
+                    a.audio.setSource(s == Source::TestTones ? Source::Hardware : s == Source::Hardware ? Source::Stems : Source::TestTones);
+                    break;
+                }
                 case ui::UiAction::ClearSolo:    a.clearAll("solo"); break;
                 case ui::UiAction::ClearMute:    a.clearAll("mute"); break;
                 case ui::UiAction::FaderBank:    console.setFaderBank(idx); break;
@@ -186,6 +254,18 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             case ui::InputEvent::Type::MouseMove: console.interaction().mouseMove(x, y, e.fine); break;
             case ui::InputEvent::Type::MouseUp:   console.interaction().mouseUp(); break;
             case ui::InputEvent::Type::Wheel:     console.interaction().wheel(x, y, e.wheel, e.fine); break;
+            case ui::InputEvent::Type::Drop: {   // onto a stem strip: from that slot; elsewhere: first empty slot
+                const int at = console.layout().stemStripAt(x, y);
+                const int first = at >= 0 ? at : std::max(0, a.stems.firstEmptySlot());
+                a.stems.load(static_cast<std::uint32_t>(first), e.files);
+                break;
+            }
+            case ui::InputEvent::Type::RightDown: {   // right-click a stem title: empty that slot
+                const int at = console.layout().stemStripAt(x, y);
+                if (at >= 0 && ui::Layout::titleArea(console.layout().strips()[static_cast<std::size_t>(at)]).contains(x, y))
+                    a.stems.clear(static_cast<std::uint32_t>(at));
+                break;
+            }
             case ui::InputEvent::Type::Resize:
             case ui::InputEvent::Type::Close:     break;
             }
@@ -193,6 +273,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
 
         a.tree.dispatchChanges();
         a.audio.poll();
+        a.stems.pump();
 
         const auto  now = std::chrono::steady_clock::now();
         const float dt  = std::chrono::duration<float>(now - lastFrame).count();
@@ -207,7 +288,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         // Persist settings at most every 5 s, only when something changed (crash-safe file replace).
         if (now - lastSave > std::chrono::seconds(5)) {
             lastSave = now;
-            if (a.tree.version() != savedVersion || console.faderBank() != savedBank) {
+            if (a.tree.version() != savedVersion || console.faderBank() != savedBank || a.stems.loading()) {
                 a.saveSettings(console.faderBank());
                 savedVersion = a.tree.version();
                 savedBank    = console.faderBank();
@@ -217,14 +298,23 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         if (window.minimized()) { ::Sleep(kMinFrameMsWhenHidden); continue; }
 
         const app::HostStatus& st = a.audio.status();
-        const bool tones = a.audio.source() == engine::MixerProcessor::Source::TestTones;
+        const Source src = a.audio.source();
         ui::ViewState vs;
         vs.deviceName   = st.deviceName.empty() ? "No device" : st.deviceName;
-        vs.deviceFormat = formatLine(st, tones);
-        vs.status       = (st.alert ? st.line2 : st.line1) + "   \xC2\xB7   faceplate " + console.faceplateInfo();
+        vs.deviceFormat = formatLine(st, sourceLine(src, a.stems));
+        const std::string notice = a.stems.notice();
+        vs.status       = !notice.empty() ? notice : (st.alert ? st.line2 : st.line1) + "   \xC2\xB7   faceplate " + console.faceplateInfo();
         vs.alert        = st.alert;
         vs.running      = st.running;
-        vs.tonesOn      = tones;
+        vs.source       = src == Source::TestTones ? ui::SourceView::Tones : src == Source::Stems ? ui::SourceView::Stems : ui::SourceView::Inputs;
+        vs.loading      = a.stems.loading();
+        for (std::uint32_t s = 0; s < kStemCount; ++s) {
+            const app::StemSlot& sl = a.stems.slot(s);
+            vs.slots[s].name     = sl.name;
+            vs.slots[s].info     = sl.info;
+            vs.slots[s].progress = a.stems.progress(s);
+            vs.slots[s].failed   = !sl.error.empty();
+        }
         vs.engine.valid        = st.running;
         vs.engine.driver       = st.driver;
         vs.engine.sampleRate   = st.sampleRate;

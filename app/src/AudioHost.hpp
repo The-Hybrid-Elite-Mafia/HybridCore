@@ -53,6 +53,12 @@ public:
     [[nodiscard]] engine::MixerProcessor::Source source() const noexcept { return mixer_->source(); }
     void setSource(engine::MixerProcessor::Source s) noexcept { mixer_->setSource(s); }
 
+    // Stems: hand a loaded stem to the audio thread (nullptr clears the slot). False = queue full, retry.
+    [[nodiscard]] bool submitStem(std::uint32_t slot, std::unique_ptr<engine::StemAudio>& audio) noexcept { return mixer_->submitStem(slot, audio); }
+    void restartStems() noexcept { mixer_->restartStems(); }
+    [[nodiscard]] std::uint64_t stemPlayhead() const noexcept { return mixer_->stemPlayhead(); }
+    [[nodiscard]] std::uint64_t stemLoopFrames() const noexcept { return mixer_->stemLoopFrames(); }
+
     [[nodiscard]] static std::vector<DeviceChoice> listDevices();
 
     bool open(const DeviceChoice& choice);   // closes the current stream first

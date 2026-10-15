@@ -5,7 +5,7 @@
 //  sits on a measured faceplate region (Faceplate.hpp):
 //    top bar      : status lamp in the logo socket, engraved title
 //    name panel   : device + format (engraved)
-//    6 sockets    : ◀ device, device ▶, TONES, INPUTS, clear SOLO, clear MUTE
+//    6 sockets    : ◀ device, device ▶, LOAD stems, SOURCE (tones / inputs / stems), clear SOLO, clear MUTE
 //    glass display: live engine numbers (latency, DSP load, buffer, dropouts)
 //    4 tabs       : fader bank — MAIN MIX / AUX 1 / AUX 2 / AUX 3 sends on the stem faders
 //    left panel   : 4 bus strips (Main, Aux 1–3)
@@ -27,7 +27,7 @@
 namespace hc::ui {
 
 enum class WidgetKind : std::uint8_t { Knob, SendKnob, Fader, Button, StemMeter, BusMeter, MasterMeter, Transport, Tab };
-enum class UiAction : std::uint8_t { None, PrevDevice, NextDevice, SourceTones, SourceInputs, ClearSolo, ClearMute, FaderBank };
+enum class UiAction : std::uint8_t { None, PrevDevice, NextDevice, LoadStems, CycleSource, ClearSolo, ClearMute, FaderBank };
 
 inline constexpr std::uint32_t kFaderBanks = hc::kBusCount;   // MAIN + AUX 1..3
 
@@ -65,6 +65,10 @@ public:
     [[nodiscard]] const std::vector<Widget>&      widgets() const noexcept { return widgets_; }
     [[nodiscard]] const std::vector<StripLayout>& strips() const noexcept { return strips_; }
     [[nodiscard]] int   hitTest(float x, float y) const noexcept;   // widget index or -1
+    // Stem strip under a point (0-based stem), or -1. Used for drag-and-drop and right-click.
+    [[nodiscard]] int   stemStripAt(float x, float y) const noexcept;
+    // The title area at the top of a stem strip (name, load state).
+    [[nodiscard]] static Rect titleArea(const StripLayout& st) noexcept { return {st.bed.x, st.bed.y, st.bed.w, 140}; }
     [[nodiscard]] float extraH() const noexcept { return extraH_; }
 
     // Which send the 13 stem faders control (0 = MAIN mix, 1..3 = AUX sends).

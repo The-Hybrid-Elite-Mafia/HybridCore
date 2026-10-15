@@ -20,4 +20,4 @@ target_include_directories(hc_ui PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_include_directories(hc_ui SYSTEM PUBLIC "${PROJECT_SOURCE_DIR}/external/stb")
 target_link_libraries(hc_ui
     PUBLIC  hc::build_flags hc::core hc::params
-    PRIVATE opengl32 user32 gdi32)
+    PRIVATE opengl32 user32 gdi32 shell32)

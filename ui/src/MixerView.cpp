@@ -121,7 +121,6 @@ void MixerView::drawStrip(Renderer& r, const StripLayout& st) const {
     // Title + accent light.
     const float cx = st.bed.cx();
     r.fillRound({cx - st.bed.w * 0.28f, st.bed.y + 22, st.bed.w * 0.56f, 7}, 3.5f, st.accent, Blend::Over);
-    r.text(TextStyle::Title, st.title, cx, st.bed.y + 84, kLightText, Align::Center, TextFx::Shadowed);
 
     // Fader slot + scale.
     r.nineSlice(Sprite::Glass, st.faderTrack, 0.22f);
@@ -334,8 +333,8 @@ void MixerView::drawTransport(Renderer& r, const Widget& w, const ViewState& v) 
     bool active = false;
     Rgba lit = kLitGreen;
     switch (w.action) {
-    case UiAction::SourceTones:  active = v.tonesOn; break;
-    case UiAction::SourceInputs: active = !v.tonesOn; break;
+    case UiAction::LoadStems:    active = v.loading; lit = kLitAmber; break;
+    case UiAction::CycleSource:  active = true; break;
     case UiAction::ClearSolo:    active = anySolo; lit = kLitAmber; break;
     case UiAction::ClearMute:    active = anyMute; lit = kLitRed; break;
     default: break;
@@ -355,8 +354,12 @@ void MixerView::drawTransport(Renderer& r, const Widget& w, const ViewState& v) 
     switch (w.action) {
     case UiAction::PrevDevice:   r.sprite(Sprite::IconPrev, {ix - is / 2, iy - is / 2, is, is}, ic, Blend::Over, active); break;
     case UiAction::NextDevice:   r.sprite(Sprite::IconNext, {ix - is / 2, iy - is / 2, is, is}, ic, Blend::Over, active); break;
-    case UiAction::SourceTones:  r.sprite(Sprite::IconSine, {ix - is / 2, iy - is / 2, is, is}, ic, Blend::Over, active); break;
-    case UiAction::SourceInputs: r.sprite(Sprite::IconInput, {ix - is / 2, iy - is / 2, is, is}, ic, Blend::Over, active); break;
+    case UiAction::LoadStems:    r.sprite(Sprite::IconFolder, {ix - is / 2, iy - is / 2, is, is}, ic, Blend::Over, active); break;
+    case UiAction::CycleSource: {
+        const Sprite icon = v.source == SourceView::Tones ? Sprite::IconSine : v.source == SourceView::Inputs ? Sprite::IconInput : Sprite::IconWave;
+        r.sprite(icon, {ix - is / 2, iy - is / 2, is, is}, ic, Blend::Over, active);
+        break;
+    }
     case UiAction::ClearSolo:
     case UiAction::ClearMute:
         r.text(TextStyle::Panel, w.action == UiAction::ClearSolo ? "S" : "M", ix, iy + r.capHeight(TextStyle::Panel) * 0.5f, ic, Align::Center,
@@ -364,7 +367,8 @@ void MixerView::drawTransport(Renderer& r, const Widget& w, const ViewState& v) 
         break;
     default: break;
     }
-    const char* cap = w.action == UiAction::ClearSolo ? "CLR SOLO" : w.action == UiAction::ClearMute ? "CLR MUTE" : w.caption.c_str();
+    const char* cap = w.caption.c_str();
+    if (w.action == UiAction::CycleSource) cap = v.source == SourceView::Tones ? "TONES" : v.source == SourceView::Inputs ? "INPUTS" : "STEMS";
     r.text(TextStyle::Caption, cap, ix, cy + 44 + push, active ? lit : rgb8(0x9DA3AB), Align::Center, active ? TextFx::Neon : TextFx::Plain);
 }
 
@@ -456,6 +460,25 @@ void MixerView::drawDynamic(Renderer& r, const ViewState& v, const MeterState& m
     }
 
     for (const StripLayout& st : layout_.strips()) {
+        // Title area: stem name (or "STEM n"), and its load state.
+        const float cx = st.bed.cx(), tw = st.bed.w - 24;
+        if (st.isBus) {
+            r.text(TextStyle::Title, st.title, cx, st.bed.y + 76, kLightText, Align::Center, TextFx::Shadowed);
+        } else {
+            const StemSlotView& sv = v.slots[st.index];
+            const std::string title = sv.name.empty() ? st.title : sv.name;
+            r.text(TextStyle::Title, fit(r, TextStyle::Title, title, tw), cx, st.bed.y + 76, kLightText, Align::Center, TextFx::Shadowed);
+            if (sv.progress >= 0.0f) {
+                char b[32];
+                std::snprintf(b, sizeof b, "LOADING %d%%", static_cast<int>(sv.progress * 100.0f));
+                r.text(TextStyle::Caption, b, cx, st.bed.y + 106, kLitAmber, Align::Center, TextFx::Neon);
+            } else if (sv.failed) {
+                r.text(TextStyle::Caption, "LOAD FAILED", cx, st.bed.y + 106, kLitRed, Align::Center, TextFx::Neon);
+            } else {
+                const std::string info = sv.name.empty() ? "EMPTY" : sv.info;
+                r.text(TextStyle::Caption, fit(r, TextStyle::Caption, info, tw), cx, st.bed.y + 106, kDimText, Align::Center, TextFx::Shadowed);
+            }
+        }
         const Rgba line = (!st.isBus && bank > 0) ? busAccent(bank) : st.accent;
         drawFader(r, st, line);
         if (st.isBus) {

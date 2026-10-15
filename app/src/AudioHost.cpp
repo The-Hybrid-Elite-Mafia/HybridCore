@@ -175,7 +175,9 @@ void AudioHost::refreshLine2() {
     }
     std::snprintf(buf, sizeof(buf), "CPU %.1f%% avg \xC2\xB7 %.1f%% peak \xC2\xB7 overruns %u \xC2\xB7 driver dropouts %u \xC2\xB7 source: %s",
                   lastTelemetry_.loadAvg * 100.0f, peakLoad_ * 100.0f, lastTelemetry_.overruns, driverOverloads_,
-                  mixer_->source() == engine::MixerProcessor::Source::TestTones ? "13 test tones" : "hardware inputs");
+                  mixer_->source() == engine::MixerProcessor::Source::TestTones ? "13 test tones"
+                  : mixer_->source() == engine::MixerProcessor::Source::Stems  ? "loaded stems"
+                                                                                : "hardware inputs");
     status_.line2 = buf;
 }
 
@@ -188,6 +190,7 @@ void AudioHost::poll() {
         got = true;
     }
     engine_.collectGarbage();
+    mixer_->collectRetired();   // stems the audio thread let go of are freed here, never on the audio thread
 
     std::uint32_t ev = 0;
     if (wasapi_) ev |= wasapi_->takeEvents();

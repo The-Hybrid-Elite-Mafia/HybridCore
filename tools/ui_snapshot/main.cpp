@@ -3,6 +3,8 @@
 // faceplate art. Used by CI (software OpenGL) and works on the rig.
 //
 //   hc_ui_snapshot [--out <folder>] [--sizes 3840x2160,1389x868] [--seconds 2] [--device offline|default]
+//                  [--stems <folder>]   load the audio files in <folder> into the stem slots and play them
+//                  [--name <prefix>]    file name prefix (default HybridCore)
 //   (default folder: "HybridCore Snapshots" on the current user's Desktop)
 //
 // Live data: the real Engine + 13-stem MixerProcessor (13 test tones) run on the offline clock
@@ -13,6 +15,7 @@
 // Checks (exit 3 on failure): GL errors, chassis pixels equal Main-Faceplate.png where nothing is
 // drawn on top, meters lit by the engine, glass display populated.
 #include "AudioHost.hpp"
+#include "StemDeck.hpp"
 
 #include "hybrid/io/DeviceProbe.hpp"
 #include "hybrid/params/MixerParams.hpp"
@@ -134,11 +137,15 @@ int wmain(int argc, wchar_t** argv) {
     std::vector<Size> sizes = {{3840, 2160}, {1389, 868}};
     double seconds = 2.0;
     bool   offline = true;
+    std::filesystem::path stemsDir;
+    std::string           prefix = "HybridCore";
     for (int i = 1; i < argc; ++i) {
         const std::wstring k = argv[i];
         if (k == L"--out" && i + 1 < argc) out = argv[++i];
         else if (k == L"--seconds" && i + 1 < argc) seconds = std::wcstod(argv[++i], nullptr);
         else if (k == L"--device" && i + 1 < argc) offline = std::wstring(argv[++i]) != L"default";
+        else if (k == L"--stems" && i + 1 < argc) stemsDir = argv[++i];
+        else if (k == L"--name" && i + 1 < argc) { prefix.clear(); for (const wchar_t* c = argv[++i]; *c; ++c) prefix.push_back(*c < 128 ? static_cast<char>(*c) : '_'); }
         else if (k == L"--sizes" && i + 1 < argc) {
             sizes.clear();
             std::wstring s = argv[++i];
@@ -154,7 +161,7 @@ int wmain(int argc, wchar_t** argv) {
                 pos = comma + 1;
             }
         } else {
-            std::wprintf(L"usage: hc_ui_snapshot [--out <folder>] [--sizes 3840x2160,1389x868] [--seconds 2] [--device offline|default]\n");
+            std::wprintf(L"usage: hc_ui_snapshot [--out <folder>] [--sizes 3840x2160,1389x868] [--seconds 2] [--device offline|default] [--stems <folder>] [--name <prefix>]\n");
             return 1;
         }
     }
@@ -173,6 +180,23 @@ int wmain(int argc, wchar_t** argv) {
     tree.dispatchChanges();
     const auto devices = app::AudioHost::listDevices();
     host.open(offline ? devices.back() : devices.front());
+    app::StemDeck deck(host);
+    if (!stemsDir.empty()) {
+        const auto t0 = std::chrono::steady_clock::now();
+        const std::size_t n = deck.load(0, {stemsDir});
+        while (deck.loading() && std::chrono::steady_clock::now() - t0 < std::chrono::seconds(120)) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            host.poll();
+            deck.pump();
+        }
+        const double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+        std::wprintf(L"Stems   : %zu file(s) from %ls loaded in %.2f s (%.1f MB RAM)\n", n, stemsDir.c_str(), secs,
+                     static_cast<double>(deck.loadedBytes()) / 1048576.0);
+        for (std::uint32_t s2 = 0; s2 < kStemCount; ++s2) {
+            const app::StemSlot& sl = deck.slot(s2);
+            if (!sl.file.empty()) std::wprintf(L"          slot %2u: %hs  %hs%hs\n", s2 + 1, sl.name.empty() ? "(failed)" : sl.name.c_str(), sl.info.c_str(), sl.error.c_str());
+        }
+    }
     std::wprintf(L"Engine  : %hs\n          %hs\n", host.status().line1.c_str(), host.status().line2.c_str());
     std::wprintf(L"Controls set before the shots: stem 2 fader -6 dB, stem 3 mute, stem 5 phase, stem 6 pan L60, stem 7 pan R80,\n"
                  L"          stem 8 trim +9 dB, stem 9 aux1 -3 dB, stem 10 aux2 -8 dB, stem 11 fader -12 dB, stem 12 trim -6 dB, aux 1 mute.\n");
@@ -185,6 +209,7 @@ int wmain(int argc, wchar_t** argv) {
             std::this_thread::sleep_for(std::chrono::milliseconds(16));
             tree.dispatchChanges();
             host.poll();
+            deck.pump();
             const auto now = std::chrono::steady_clock::now();
             float sp[kStemCount], bl[kBusCount], br[kBusCount];
             for (std::uint32_t s = 0; s < kStemCount; ++s) sp[s] = host.matrix().stemPeak(s);
@@ -216,10 +241,17 @@ int wmain(int argc, wchar_t** argv) {
         const app::HostStatus& st = host.status();
         ui::ViewState vs;
         vs.deviceName   = st.deviceName;
-        vs.deviceFormat = st.driver + "  \xC2\xB7  " + std::to_string(st.blockFrames) + " SMP  \xC2\xB7  13 STEMS  \xC2\xB7  TEST TONES";
+        const bool stemsOn = host.source() == engine::MixerProcessor::Source::Stems;
+        vs.deviceFormat = st.driver + "  \xC2\xB7  " + std::to_string(st.blockFrames) + " SMP  \xC2\xB7  " +
+                          (stemsOn ? "STEMS " + std::to_string(deck.loadedCount()) + "/13" : std::string("TEST TONES"));
         vs.running      = st.running;
         vs.alert        = st.alert;
-        vs.tonesOn      = true;
+        vs.source       = stemsOn ? ui::SourceView::Stems : ui::SourceView::Tones;
+        for (std::uint32_t s2 = 0; s2 < kStemCount; ++s2) {
+            vs.slots[s2].name   = deck.slot(s2).name;
+            vs.slots[s2].info   = deck.slot(s2).info;
+            vs.slots[s2].failed = !deck.slot(s2).error.empty();
+        }
 
         constexpr int kFrames = 12;
         double cpuMs = 0, totalMs = 0, recordMs = 0;
@@ -239,7 +271,7 @@ int wmain(int argc, wchar_t** argv) {
             }
         }
         const ui::Image shot = console.capture();
-        const std::string base = "HybridCore-" + std::to_string(sz.w) + "x" + std::to_string(sz.h);
+        const std::string base = prefix + "-" + std::to_string(sz.w) + "x" + std::to_string(sz.h);
         ui::writePng(out / (base + ".png"), shot);
         ui::writePng(out / (base + "-vs-faceplate.png"), sideBySide(art->master, shot, std::min<std::uint32_t>(1080, static_cast<std::uint32_t>(sz.h))));
 

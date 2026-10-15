@@ -36,10 +36,16 @@ void testUiLayout();
 void testUiFaceplate();
 void testUiFont();
 void testUiParts();
+void testMediaFiles();
+void testResampler();
+void testStemLoader();
+void testStemPlayback();
 
 // Folder with faceplates/ and fonts/: <exe dir>/assets (build tree) or <exe dir>/../assets (installed).
 void setExePath(const char* argv0);
 [[nodiscard]] std::filesystem::path assetDir();
+// Encoded test vectors (tests/data): <exe dir>/testdata.
+[[nodiscard]] std::filesystem::path testDataDir();
 void benchmark();
 
 } // namespace hc::test
