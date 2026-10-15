@@ -47,6 +47,11 @@ add_subdirectory(tools/device_probe)
 add_subdirectory(tools/engine_smoke)
 add_subdirectory(tools/ui_snapshot)
 
+option(HC_BUILD_VST3 "Also build the VST3 plug-in (fetches the MIT-licensed Steinberg VST3 SDK)" OFF)
+if(HC_BUILD_VST3)
+    add_subdirectory(plugin)
+endif()
+
 enable_testing()
 add_subdirectory(tests)
 

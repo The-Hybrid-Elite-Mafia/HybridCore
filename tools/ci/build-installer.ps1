@@ -1,11 +1,11 @@
 <#
-  CI: builds the Inno Setup installer from the rig-asio Release build.
-  Version comes from the VERSION file at the repo root. Builds of main use it as-is
-  (and become a GitHub Release the first time that version is seen); any other
-  branch gets a "-dev.<run number>" suffix.
+  CI: builds the Inno Setup installer from the rig-full Release build (app, tools,
+  VST3 plug-in when present). Version comes from the VERSION file at the repo root.
+  Builds of main use it as-is; any other branch gets a "-dev.<run number>" suffix.
 #>
 $ErrorActionPreference = 'Stop'
 $root = Resolve-Path (Join-Path $PSScriptRoot '..\..')
+$bin  = Join-Path $root 'build\rig-full'
 
 $base = (Get-Content (Join-Path $root 'VERSION') -Raw).Trim()
 if ($base -notmatch '^\d+\.\d+\.\d+$') { throw "VERSION must be x.y.z, got '$base'" }
@@ -19,9 +19,18 @@ if (-not (Test-Path $iscc)) {
 }
 if (-not (Test-Path $iscc)) { throw "ISCC.exe not found at $iscc" }
 
-$defs = @("/DAppVersion=$ver", "/DBinDir=$root\build\rig-asio")
+$defs = @("/DAppVersion=$ver", "/DBinDir=$bin")
 $lic  = Join-Path $root 'external\asiosdk\sdk\LICENSE.txt'
-if (Test-Path $lic) { $defs += "/DAsioLicense=$lic" } else { Write-Host 'WARNING: ASIO SDK LICENSE.txt not found; not bundled.' }
+if (Test-Path $lic) { $defs += "/DAsioLicense=$lic" } else { Write-Host 'NOTE: ASIO SDK LICENSE.txt not found; not bundled.' }
+
+$bundle = Get-ChildItem $bin -Recurse -Directory -Filter 'The Hybrid Core.vst3' -ErrorAction SilentlyContinue | Select-Object -First 1
+$vstLic = Get-ChildItem (Join-Path $bin '_deps') -Recurse -Filter 'LICENSE.txt' -ErrorAction SilentlyContinue |
+          Where-Object { $_.Directory.Name -eq 'vst3sdk-src' } | Select-Object -First 1
+if ($bundle -and $vstLic) {
+    $defs += "/DVst3Bundle=$($bundle.FullName)"
+    $defs += "/DVst3License=$($vstLic.FullName)"
+    Write-Host "VST3 bundle: $($bundle.FullName)"
+} else { Write-Host 'NOTE: no VST3 bundle found; installer will not contain the plug-in.' }
 
 & $iscc @defs (Join-Path $root 'installer\HybridCore.iss') | Out-Host
 if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE" }

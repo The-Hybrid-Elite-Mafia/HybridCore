@@ -7,5 +7,5 @@ add_executable(HybridCore WIN32
     src/AudioHost.cpp
     "${CMAKE_CURRENT_BINARY_DIR}/HybridCore.rc")
 target_include_directories(HybridCore PRIVATE src)
-target_link_libraries(HybridCore PRIVATE hc::engine hc::params hc::ui hc::io)
+target_link_libraries(HybridCore PRIVATE hc::engine hc::params hc::ui hc::io opengl32 shell32)
 set_target_properties(HybridCore PROPERTIES OUTPUT_NAME "HybridCore")

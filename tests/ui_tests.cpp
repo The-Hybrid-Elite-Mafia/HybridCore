@@ -14,6 +14,7 @@
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
+#include <fstream>
 #include <set>
 
 namespace hc::test {
@@ -90,7 +91,7 @@ void testUiImage() {
     CHECK(ui::saveTextureCache(dir / "a.hctx", tex));
     const auto loaded = ui::loadTextureCache(dir / "a.hctx");
     CHECK(loaded && loaded->width == tex.width && loaded->levels.size() == tex.levels.size() && loaded->levels[3] == tex.levels[3]);
-    { std::FILE* f = std::fopen((dir / "b.hctx").string().c_str(), "wb"); if (f) { std::fputs("HCTXjunk", f); std::fclose(f); } }
+    { std::ofstream junk(dir / "b.hctx", std::ios::binary); junk << "HCTXjunk"; }
     CHECK(!ui::loadTextureCache(dir / "b.hctx"));
     std::filesystem::remove_all(dir, ec);
 

@@ -27,9 +27,9 @@ Layout::Layout(const params::ParameterTree& tree) {
     const std::uint32_t buses = hc::kBusCount;
 
     // Header buttons (right side).
-    const Rect theme{kDesignWidth - 24 - 110, 19, 110, 34};
-    const Rect source{theme.x - 10 - 130, 19, 130, 34};
-    const Rect device{source.x - 10 - 380, 19, 380, 34};
+    const Rect theme{kDesignWidth - 24 - 190, 19, 190, 34};
+    const Rect source{theme.x - 10 - 160, 19, 160, 34};
+    const Rect device{source.x - 10 - 360, 19, 360, 34};
     widgets_.push_back({WidgetKind::HeaderButton, device, -1, 0, HeaderAction::CycleDevice, "DEVICE"});
     widgets_.push_back({WidgetKind::HeaderButton, source, -1, 0, HeaderAction::ToggleSource, "SOURCE"});
     widgets_.push_back({WidgetKind::HeaderButton, theme, -1, 0, HeaderAction::CycleTheme, "THEME"});
@@ -48,11 +48,11 @@ Layout::Layout(const params::ParameterTree& tree) {
         strips_.push_back(st);
 
         widgets_.push_back({WidgetKind::Knob, {cx - 22, y0 + 40, 44, 44}, paramIndex(tree, params::stemParamId(s, "trim")), s, HeaderAction::None, "TRIM"});
-        widgets_.push_back({WidgetKind::Knob, {cx - 22, y0 + 108, 44, 44}, paramIndex(tree, params::stemParamId(s, "pan")), s, HeaderAction::None, "PAN"});
+        widgets_.push_back({WidgetKind::Knob, {cx - 22, y0 + 112, 44, 44}, paramIndex(tree, params::stemParamId(s, "pan")), s, HeaderAction::None, "PAN"});
         const char* auxIds[]  = {"aux1", "aux2", "aux3"};
         const char* auxCaps[] = {"A1", "A2", "A3"};
         for (int a = 0; a < 3; ++a)
-            widgets_.push_back({WidgetKind::SmallKnob, {cx - 44 + static_cast<float>(a) * 30, y0 + 182, 28, 28},
+            widgets_.push_back({WidgetKind::SmallKnob, {cx - 44 + static_cast<float>(a) * 30, y0 + 186, 28, 28},
                                 paramIndex(tree, params::stemParamId(s, auxIds[a])), s, HeaderAction::None, auxCaps[a]});
         const char* btnIds[]  = {"mute", "solo", "invert"};
         const char* btnCaps[] = {"M", "S", "\xC3\x98"};   // UTF-8 "Ø"

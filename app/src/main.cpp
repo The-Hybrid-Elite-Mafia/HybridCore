@@ -18,10 +18,15 @@
 #include "hybrid/ui/Renderer.hpp"
 #include "hybrid/ui/Theme.hpp"
 
-#include <windows.h>
+#include "hybrid/ui/Gl.hpp"
 
+#include <windows.h>
+#include <shellapi.h>
+
+#include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <filesystem>
 #include <string>
 
 using namespace hc;
@@ -40,6 +45,40 @@ int findDevice(const std::vector<app::DeviceChoice>& list, const std::string& ki
         if (k && app::toUtf8(list[i].id) == id) return static_cast<int>(i);
     }
     return 0;
+}
+
+// Command line (used by CI and for support): --exit-after <seconds> [--screenshot <file.png>]
+struct Options {
+    double                exitAfter = 0.0;
+    std::filesystem::path screenshot;
+};
+
+Options parseOptions() {
+    Options o;
+    int argc = 0;
+    wchar_t** argv = ::CommandLineToArgvW(::GetCommandLineW(), &argc);
+    for (int i = 1; argv && i < argc; ++i) {
+        const std::wstring k = argv[i];
+        if (k == L"--exit-after" && i + 1 < argc) o.exitAfter = std::wcstod(argv[++i], nullptr);
+        else if (k == L"--screenshot" && i + 1 < argc) o.screenshot = argv[++i];
+    }
+    if (argv) ::LocalFree(argv);
+    return o;
+}
+
+ui::Image readBackBuffer(int w, int h) {
+    ui::Image img;
+    img.width  = static_cast<std::uint32_t>(w);
+    img.height = static_cast<std::uint32_t>(h);
+    img.rgba.resize(static_cast<std::size_t>(w) * h * 4);
+    ::glReadBuffer(GL_BACK);
+    ::glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    ::glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, img.rgba.data());
+    for (int y = 0; y < h / 2; ++y)
+        std::swap_ranges(img.rgba.begin() + static_cast<std::ptrdiff_t>(y) * w * 4, img.rgba.begin() + static_cast<std::ptrdiff_t>(y + 1) * w * 4,
+                         img.rgba.begin() + static_cast<std::ptrdiff_t>(h - 1 - y) * w * 4);
+    for (std::size_t i = 3; i < img.rgba.size(); i += 4) img.rgba[i] = 255;
+    return img;
 }
 
 struct App {
@@ -66,6 +105,7 @@ struct App {
 
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     ::SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+    const Options opts = parseOptions();
     rt::configureProcessForAudio();
     io::ComApartment com(io::Apartment::SingleThreaded);   // ASIO drivers want an STA with a message pump
 
@@ -121,7 +161,9 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         tier = t;
     };
 
-    auto lastFrame = std::chrono::steady_clock::now();
+    const auto started = std::chrono::steady_clock::now();
+    bool shotTaken = false;
+    auto lastFrame = started;
     auto lastSave  = lastFrame;
     std::uint64_t savedVersion = a.tree.version();
 
@@ -202,7 +244,14 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         renderer.begin(fbW, fbH, vp, {pal.plateBottom.r * 0.6f, pal.plateBottom.g * 0.6f, pal.plateBottom.b * 0.6f, 1});
         view.draw(renderer, vs, meters);
         renderer.end();
+        const double alive = std::chrono::duration<double>(now - started).count();
+        if (!opts.screenshot.empty() && !shotTaken && alive >= std::max(1.0, opts.exitAfter - 1.0)) {
+            ::glFinish();
+            ui::writePng(opts.screenshot, readBackBuffer(fbW, fbH));
+            shotTaken = true;
+        }
         window.swap();   // vsync paces the UI; the audio thread is unaffected
+        if (opts.exitAfter > 0.0 && alive >= opts.exitAfter) break;
     }
 
     a.audio.close();

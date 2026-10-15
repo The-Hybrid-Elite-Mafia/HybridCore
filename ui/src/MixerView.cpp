@@ -16,6 +16,17 @@ Rgba mixc(Rgb a, Rgb b, float t, float alpha = 1.0f) {
 }
 float lum(Rgb c) { return 0.2126f * c.r + 0.7152f * c.g + 0.0722f * c.b; }
 
+// Shortens text with "..." until it fits maxWidth design units.
+std::string fit(const Renderer& r, TextSize size, std::string s, float maxWidth) {
+    if (r.textWidth(size, s) <= maxWidth) return s;
+    while (s.size() > 4 && r.textWidth(size, s + "...") > maxWidth) {
+        s.pop_back();
+        while (!s.empty() && (static_cast<unsigned char>(s.back()) & 0xC0) == 0x80) s.pop_back();   // keep UTF-8 whole
+        if (!s.empty() && static_cast<unsigned char>(s.back()) >= 0xC0) s.pop_back();
+    }
+    return s + "...";
+}
+
 void decay(float& level, float& hold, float& age, float in, float dt) {
     const float fall = std::pow(10.0f, -24.0f * dt / 20.0f);   // 24 dB/s
     level = std::max(in, level * fall);
@@ -47,8 +58,11 @@ void MixerView::drawKnob(Renderer& r, const Palette& p, const Widget& w, bool ho
     const float R  = w.rect.w * 0.5f;
     const float n  = prm.normalized();
     const float ang = kKnobMin + (kKnobMax - kKnobMin) * n;
-    const bool  bipolar = prm.spec().kind == params::Kind::Pan;
-    const float a0 = bipolar ? 0.0f : kKnobMin;
+    const auto& sp = prm.spec();
+    const bool  bipolar = sp.kind == params::Kind::Pan ||
+                         (sp.kind == params::Kind::Decibel && !sp.minIsOff && sp.min < 0.0f && sp.max > 0.0f);
+    const float centreN = bipolar ? prm.toNormalized(0.0f) : 0.0f;
+    const float a0 = kKnobMin + (kKnobMax - kKnobMin) * centreN;
 
     // Track ring + value ring (neon) + glow.
     r.arc(cx, cy, R + 4.0f, 2.5f, kKnobMin, kKnobMax, rgba(p.groove, 0.55f));
@@ -137,8 +151,12 @@ void MixerView::draw(Renderer& r, const ViewState& v, const MeterState& meters) 
     // Header.
     r.text(TextSize::Large, "THE HYBRID CORE", 30, 42, rgba(p.text));
     r.text(TextSize::Small, "HYBRID ELITE MAFIA  \xC2\xB7  13-STEM MATRIX", 32, 62, rgba(p.neon));
-    r.text(TextSize::Medium, v.status, 330, 34, rgba(p.text));
-    r.text(TextSize::Small, v.detail, 330, 56, rgba(v.alert ? p.neonAlt : p.textDim));
+    float statusRight = kDesignWidth;
+    for (const auto& w : layout_.widgets())
+        if (w.kind == WidgetKind::HeaderButton) statusRight = std::min(statusRight, w.rect.x);
+    const float statusW = statusRight - 330.0f - 16.0f;
+    r.text(TextSize::Medium, fit(r, TextSize::Medium, v.status, statusW), 330, 34, rgba(p.text));
+    r.text(TextSize::Small, fit(r, TextSize::Small, v.detail, statusW), 330, 56, rgba(v.alert ? p.neonAlt : p.textDim));
 
     const auto& ws = layout_.widgets();
     for (std::size_t i = 0; i < ws.size(); ++i) {
@@ -152,10 +170,7 @@ void MixerView::draw(Renderer& r, const ViewState& v, const MeterState& meters) 
             if (hot) r.glow(w.rect, 5.0f, rgba(p.neon, 0.35f));
             r.text(TextSize::Small, w.caption, w.rect.x + 10, w.rect.y + 22, rgba(p.neon));
             const float capW = r.textWidth(TextSize::Small, w.caption) + 18.0f;
-            std::string shown = value;
-            while (shown.size() > 4 && r.textWidth(TextSize::Medium, shown) > w.rect.w - capW - 10)
-                shown = shown.substr(0, shown.size() - 4) + "...";
-            r.text(TextSize::Medium, shown, w.rect.x + capW, w.rect.y + 23, rgba(p.text));
+            r.text(TextSize::Medium, fit(r, TextSize::Medium, value, w.rect.w - capW - 10), w.rect.x + capW, w.rect.y + 23, rgba(p.text));
         }
     }
 
