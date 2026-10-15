@@ -1,12 +1,16 @@
 <#
   CI: builds the Inno Setup installer from the rig-asio Release build.
-  Version = tag without the leading "v" on tag builds, else 0.0.0-dev.<run number>.
+  Version comes from the VERSION file at the repo root. Builds of main use it as-is
+  (and become a GitHub Release the first time that version is seen); any other
+  branch gets a "-dev.<run number>" suffix.
 #>
 $ErrorActionPreference = 'Stop'
 $root = Resolve-Path (Join-Path $PSScriptRoot '..\..')
 
-if ($env:GITHUB_REF -like 'refs/tags/v*') { $ver = $env:GITHUB_REF_NAME.Substring(1) }
-else { $ver = "0.0.0-dev.$($env:GITHUB_RUN_NUMBER)" }
+$base = (Get-Content (Join-Path $root 'VERSION') -Raw).Trim()
+if ($base -notmatch '^\d+\.\d+\.\d+$') { throw "VERSION must be x.y.z, got '$base'" }
+if ($env:GITHUB_REF -eq 'refs/heads/main') { $ver = $base }
+else { $ver = "$base-dev.$($env:GITHUB_RUN_NUMBER)" }
 
 $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
 if (-not (Test-Path $iscc)) {

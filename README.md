@@ -28,8 +28,8 @@ runs `hc_tests` and `hc_device_probe --no-audio-ok` (the runner has no sound car
    ```
 
 ## Installer
-Every push to `main` builds `HybridCore-Setup-<version>.exe` (CI artifact). Tags `v*` publish it as a
-GitHub Release. CI installs it silently, runs the installed self-test, reinstalls (upgrade path) and
+Every push builds `HybridCore-Setup-<version>.exe` (CI artifact). The version is in the `VERSION` file;
+the first `main` build of a new version is published as GitHub Release `v<VERSION>`. CI installs it silently, runs the installed self-test, reinstalls (upgrade path) and
 uninstalls, checking files, shortcuts and that `%APPDATA%\HybridCore` settings survive.
 
 ## Tools
