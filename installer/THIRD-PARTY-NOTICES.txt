@@ -9,4 +9,13 @@ ASIO
   anyone else, a licence route must be chosen: sign Steinberg's ASIO licensing
   agreement, or release the program under GPLv3.
 
+VST
+  VST is a trademark of Steinberg Media Technologies GmbH. The optional VST3 plug-in
+  is built with the Steinberg VST3 SDK 3.8.1, licensed under the MIT licence
+  (licenses\Steinberg-VST3-SDK-LICENSE.txt).
+
+stb
+  stb_image, stb_image_resize2, stb_image_write, stb_truetype and stb_dxt by Sean Barrett
+  and contributors — public domain or MIT (licenses\stb-LICENSE.txt).
+
 Everything else in The Hybrid Core is proprietary to Hybrid Elite Mafia.
