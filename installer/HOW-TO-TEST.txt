@@ -1,32 +1,42 @@
 THE HYBRID CORE — HOW TO TEST ON YOUR PC
 =========================================
 
-Turn your speakers/headphones DOWN before the mixer tests. Close any app that is
-playing audio (DAW, browser, Suno): the tests take exclusive control of the device.
+Turn your speakers/headphones DOWN first. Close any app that is playing audio
+(DAW, browser, Suno): The Hybrid Core takes exclusive control of the device.
 
-1) Desktop: "Hybrid Core - Rig Check"
-   Checks your CPU, lists your sound devices and ASIO drivers, then plays 2 seconds
-   of SILENCE through each one and measures the real buffer size and timing.
-   Last line should say: RIG READY.
-   >> Take a photo/screenshot of the whole window and send it to Claude.
+1) Desktop: "The Hybrid Core"  (the main app)
+   - The console opens: 13 stem strips + Main / Aux 1-3 buses.
+   - Top bar shows the audio device, buffer size in ms and live CPU %.
+   - SOURCE = TEST TONES by default: you hear a soft chord and the meters move.
+   - Click DEVICE to step through your outputs (WASAPI) and ASIO drivers.
+   - Click THEME to switch Pearl White / Obsidian / Titanium.
+   - Knobs: drag up/down. Hold Shift for fine moves. Double-click = reset. Mouse wheel works too.
+   - Faders: drag the cap. M = mute, S = solo, Ø = phase invert.
+   - Your settings are saved automatically and come back next time.
+   >> Screenshot the window and send it to Claude.
 
-2) Start menu > The Hybrid Core > "2 - Mixer Test (WASAPI)"
-   15 seconds through your default Windows output. You should hear a soft chord
-   (13 test tones through the 13-stem matrix).
-   - After 5 s: only ONE low note (stem 1 solo).
-   - After 10 s: chord returns, the low note only in the LEFT ear.
-   Last line should say: STREAM OK.
+   Your own faceplate art: put pearl.png / obsidian.png / titanium.png (any size, 8K is
+   fine) into %APPDATA%\HybridCore\skins\ and restart. It is scaled to your screen and
+   compressed before it reaches the graphics card.
 
-3) Start menu > "3 - Mixer Test (ASIO)"   (needs an ASIO driver, e.g. your audio interface)
-   Same test through ASIO. Last line should say: STREAM OK.
+2) Start menu > The Hybrid Core > Diagnostics > "1 - Rig Check"
+   Checks your CPU, lists your sound devices and ASIO drivers, plays 2 seconds of
+   SILENCE through each one and measures the real buffer size and timing.
+   Last line should say: RIG READY.   >> Screenshot it.
 
-4) Start menu > "4 - Engine Self-Test"
-   Runs the built-in tests (no sound). Last line should say: ... 0 failed -> PASS
+3) Diagnostics > "2 - Mixer Test (WASAPI)" and "3 - Mixer Test (ASIO)"
+   15 seconds each. After 5 s only ONE low note (solo); after 10 s the chord returns
+   with that note in the LEFT ear. Last line: STREAM OK.   >> Screenshot them.
 
-Send Claude screenshots of 1, 2 and 3 (and 4 if it fails).
+4) Diagnostics > "4 - Engine Self-Test" — runs the built-in tests (no sound).
+   Last line should say: ... 0 failed -> PASS
 
-If a window says "open failed": another app is using the device, or the device
-does not allow exclusive mode. That message is useful — screenshot it too.
+5) VST3 (optional): in your DAW, rescan plug-ins and look for "The Hybrid Core"
+   (vendor Hybrid Elite Mafia). It has 13 stereo inputs (Stem 1 + 12 side-chain inputs)
+   and 4 stereo outputs. It uses the DAW's own generic controls (no custom screen yet).
 
-Windows may show "Windows protected your PC" on install because the installer is
-not code-signed. Click "More info" then "Run anyway".
+If something says "open failed": another app is using the device, or the device does
+not allow exclusive mode. Screenshot that message too.
+
+Windows may show "Windows protected your PC" on install because the installer is not
+code-signed. Click "More info" then "Run anyway".

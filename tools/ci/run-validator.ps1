@@ -9,5 +9,11 @@ if (-not $validator) { throw 'validator.exe not found' }
 if (-not $bundle)    { throw 'The Hybrid Core.vst3 bundle not found' }
 Write-Host "validator: $($validator.FullName)"
 Write-Host "plug-in  : $($bundle.FullName)"
-& $validator.FullName $bundle.FullName
-exit $LASTEXITCODE
+$out  = & $validator.FullName $bundle.FullName 2>&1 | ForEach-Object { "$_" }
+$code = $LASTEXITCODE
+$out | ForEach-Object { Write-Host $_ }
+$ok   = ($out | Select-String -SimpleMatch '[Succeeded]').Count
+$bad  = ($out | Select-String -SimpleMatch '[Failed]').Count
+Write-Host ""
+Write-Host "VALIDATOR SUMMARY: $ok test(s) succeeded, $bad failed, exit code $code"
+exit $code

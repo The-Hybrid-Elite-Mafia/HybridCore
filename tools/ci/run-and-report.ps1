@@ -16,7 +16,8 @@ param(
 $ErrorActionPreference = 'Continue'
 
 function Publish([string]$title, [string]$text) {
-    if ($text.Length -gt 60000) { $text = $text.Substring(0, 60000) + "`n...(truncated)" }
+    # Annotation messages are capped at ~4 KB: keep the start and the (usually decisive) end.
+    if ($text.Length -gt 3900) { $text = $text.Substring(0, 900) + "`n...(middle trimmed; full output in the job log)...`n" + $text.Substring($text.Length - 2900) }
     $enc = $text.Replace('%', '%25').Replace("`r", '').Replace("`n", '%0A')
     $t   = $title.Replace('%', '%25').Replace(':', '%3A').Replace(',', '%2C')
     Write-Host "::notice title=$t::$enc"

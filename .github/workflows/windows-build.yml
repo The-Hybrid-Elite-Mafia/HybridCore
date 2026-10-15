@@ -70,7 +70,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tools\ci\run-and-report.ps1 -Title "ui: fetch mesa" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\fetch-mesa.ps1','-TargetDirs','build\rig-full\tools\ui_snapshot\Release','build\rig-full\app\Release'
+          tools\ci\run-and-report.ps1 -Title "ui: fetch mesa" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\fetch-mesa.ps1','-TargetDirs','build\rig-full\tools\ui_snapshot\Release,build\rig-full\app\Release'
 
       - name: GPU UI snapshot (render every theme, check pixels)
         env:

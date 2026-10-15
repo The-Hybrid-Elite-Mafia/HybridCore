@@ -4,7 +4,7 @@
   Copies its x64 DLLs next to the given executable(s) so they load instead of the
   system opengl32.dll. Never shipped in the installer.
 #>
-param([Parameter(Mandatory = $true)][string[]]$TargetDirs)
+param([Parameter(Mandatory = $true)][string]$TargetDirs)   # comma-separated folders
 $ErrorActionPreference = 'Stop'
 
 $work = Join-Path ([IO.Path]::GetTempPath()) 'hc-mesa'
@@ -23,7 +23,7 @@ if ($LASTEXITCODE -ne 0) { throw "7z extraction failed" }
 
 $dlls = Get-ChildItem (Join-Path $work 'x\x64') -Filter '*.dll'
 if (-not ($dlls | Where-Object Name -eq 'opengl32.dll')) { throw 'opengl32.dll not found in the Mesa x64 folder' }
-foreach ($dir in $TargetDirs) {
+foreach ($dir in ($TargetDirs -split ',')) {
     foreach ($d in $dlls) { Copy-Item $d.FullName -Destination $dir -Force }
     Write-Host "Copied $($dlls.Count) Mesa DLLs to $dir"
 }
