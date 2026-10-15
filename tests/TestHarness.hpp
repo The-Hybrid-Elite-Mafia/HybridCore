@@ -27,6 +27,13 @@ void testKernels();
 void testMatrix();
 void testMixer();
 void testZeroAllocation();
+void testParams();
+void testSettings();
+void testMixerBinding();
+void testUiImage();
+void testUiLayout();
+void testUiFaceplate();
+void testUiFont();
 void benchmark();
 
 } // namespace hc::test

@@ -8,8 +8,10 @@ on:
 
 jobs:
   wasapi:
-    name: MSVC Release (WASAPI only)
+    name: MSVC Release (WASAPI only) + GPU UI snapshot
     runs-on: windows-2022
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v5
 
@@ -33,6 +35,27 @@ jobs:
       - name: Device probe
         run: |
           tools\ci\run-and-report.ps1 -Title "wasapi: device probe" -Exe .\build\rig\tools\device_probe\Release\hc_device_probe.exe -ArgList '--no-audio-ok'
+
+      - name: Software OpenGL for the UI test (Mesa llvmpipe, CI only)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tools\ci\run-and-report.ps1 -Title "ui: fetch mesa" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\fetch-mesa.ps1','-TargetDirs','build\rig\tools\ui_snapshot\Release'
+
+      - name: GPU UI snapshot (render every theme, check pixels)
+        env:
+          GALLIUM_DRIVER: llvmpipe
+        run: |
+          tools\ci\run-and-report.ps1 -Title "ui: snapshot 1x" -Exe .\build\rig\tools\ui_snapshot\Release\hc_ui_snapshot.exe -ArgList '--out','shots','--scale','1'
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          tools\ci\run-and-report.ps1 -Title "ui: snapshot 2x" -Exe .\build\rig\tools\ui_snapshot\Release\hc_ui_snapshot.exe -ArgList '--out','shots2x','--scale','2'
+
+      - name: Publish screenshots to the ci-screenshots branch
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tools\ci\run-and-report.ps1 -Title "ui: publish screenshots" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\publish-screenshots.ps1','-Folder','shots'
 
   asio-compile:
     name: MSVC Release (ASIO SDK fetched at build time, never committed) + installer

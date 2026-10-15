@@ -12,10 +12,14 @@ endif()
 # Only the two configs this rig ever ships.
 set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "HybridCore configurations" FORCE)
 
+# Single version source: the VERSION file (also used by the installer and releases).
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" HC_VERSION)
+string(STRIP "${HC_VERSION}" HC_VERSION)
+
 project(HybridCore
-    VERSION 0.1.0
+    VERSION ${HC_VERSION}
     DESCRIPTION "Hybrid Elite Mafia proprietary real-time audio framework"
-    LANGUAGES CXX)
+    LANGUAGES CXX RC)
 
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 
@@ -35,11 +39,15 @@ endif()
 add_subdirectory(core)
 add_subdirectory(io)
 add_subdirectory(dsp)
+add_subdirectory(params)
 add_subdirectory(engine)
+add_subdirectory(ui)
+add_subdirectory(app)
 add_subdirectory(tools/device_probe)
 add_subdirectory(tools/engine_smoke)
+add_subdirectory(tools/ui_snapshot)
 
 enable_testing()
 add_subdirectory(tests)
 
-set_property(DIRECTORY ${PROJECT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT hc_device_probe)
+set_property(DIRECTORY ${PROJECT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT HybridCore)

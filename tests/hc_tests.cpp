@@ -204,6 +204,13 @@ int main() {
     testMatrix();
     testMixer();
     testZeroAllocation();
+    testParams();
+    testSettings();
+    testMixerBinding();
+    testUiImage();
+    testUiLayout();
+    testUiFaceplate();
+    testUiFont();
     benchmark();
     std::printf("\n%d checks, %d failed -> %s\n", gChecks, gFails, gFails ? "FAIL" : "PASS");
     return gFails ? 1 : 0;
