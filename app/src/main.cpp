@@ -1,8 +1,8 @@
 // =============================================================================
 //  HybridCore.exe — the standalone 13-stem console.
 //  Threads: UI/message thread (this file, GPU rendering) and the audio thread
-//  (owned by the WASAPI stream or the ASIO driver). They share only atomics and
-//  wait-free rings; the audio thread never touches graphics, files or the UI.
+//  (owned by the WASAPI stream, the ASIO driver or the offline clock). They share only
+//  atomics and wait-free rings; the audio thread never touches graphics, files or the UI.
 // =============================================================================
 #include "AudioHost.hpp"
 
@@ -11,22 +11,18 @@
 #include "hybrid/params/MixerParams.hpp"
 #include "hybrid/params/ParameterTree.hpp"
 #include "hybrid/params/Settings.hpp"
-#include "hybrid/ui/FontAtlas.hpp"
+#include "hybrid/ui/Console.hpp"
 #include "hybrid/ui/GlWindow.hpp"
-#include "hybrid/ui/Layout.hpp"
-#include "hybrid/ui/MixerView.hpp"
-#include "hybrid/ui/Renderer.hpp"
-#include "hybrid/ui/Theme.hpp"
-
-#include "hybrid/ui/Gl.hpp"
 
 #include <windows.h>
 #include <shellapi.h>
 
 #include <algorithm>
 #include <chrono>
-#include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <filesystem>
+#include <iterator>
 #include <string>
 
 using namespace hc;
@@ -34,23 +30,34 @@ using namespace hc;
 namespace {
 
 constexpr int kMinFrameMsWhenHidden = 50;
+constexpr int kMsaaSamples          = 8;
 
 void fatal(const std::string& msg) {
     ::MessageBoxW(nullptr, app::fromUtf8(msg).c_str(), L"The Hybrid Core", MB_ICONERROR | MB_OK);
 }
 
+std::filesystem::path exeDir() {
+    wchar_t buf[MAX_PATH * 4];
+    const DWORD n = ::GetModuleFileNameW(nullptr, buf, static_cast<DWORD>(std::size(buf)));
+    return std::filesystem::path(std::wstring(buf, n)).parent_path();
+}
+
+const char* kindName(app::DeviceChoice::Kind k) {
+    return k == app::DeviceChoice::Kind::Asio ? "asio" : k == app::DeviceChoice::Kind::Offline ? "offline" : "wasapi";
+}
+
 int findDevice(const std::vector<app::DeviceChoice>& list, const std::string& kind, const std::string& id) {
-    for (std::size_t i = 0; i < list.size(); ++i) {
-        const bool k = (kind == "asio") == (list[i].kind == app::DeviceChoice::Kind::Asio);
-        if (k && app::toUtf8(list[i].id) == id) return static_cast<int>(i);
-    }
+    for (std::size_t i = 0; i < list.size(); ++i)
+        if (kind == kindName(list[i].kind) && (list[i].kind == app::DeviceChoice::Kind::Offline || app::toUtf8(list[i].id) == id))
+            return static_cast<int>(i);
     return 0;
 }
 
-// Command line (used by CI and for support): --exit-after <seconds> [--screenshot <file.png>]
+// Command line (CI and support): --exit-after <s> [--screenshot <file.png>] [--device offline]
 struct Options {
     double                exitAfter = 0.0;
     std::filesystem::path screenshot;
+    bool                  offline   = false;
 };
 
 Options parseOptions() {
@@ -61,24 +68,10 @@ Options parseOptions() {
         const std::wstring k = argv[i];
         if (k == L"--exit-after" && i + 1 < argc) o.exitAfter = std::wcstod(argv[++i], nullptr);
         else if (k == L"--screenshot" && i + 1 < argc) o.screenshot = argv[++i];
+        else if (k == L"--device" && i + 1 < argc) o.offline = std::wstring(argv[++i]) == L"offline";
     }
     if (argv) ::LocalFree(argv);
     return o;
-}
-
-ui::Image readBackBuffer(int w, int h) {
-    ui::Image img;
-    img.width  = static_cast<std::uint32_t>(w);
-    img.height = static_cast<std::uint32_t>(h);
-    img.rgba.resize(static_cast<std::size_t>(w) * h * 4);
-    ::glReadBuffer(GL_BACK);
-    ::glPixelStorei(GL_PACK_ALIGNMENT, 1);
-    ::glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, img.rgba.data());
-    for (int y = 0; y < h / 2; ++y)
-        std::swap_ranges(img.rgba.begin() + static_cast<std::ptrdiff_t>(y) * w * 4, img.rgba.begin() + static_cast<std::ptrdiff_t>(y + 1) * w * 4,
-                         img.rgba.begin() + static_cast<std::ptrdiff_t>(h - 1 - y) * w * 4);
-    for (std::size_t i = 3; i < img.rgba.size(); i += 4) img.rgba[i] = 255;
-    return img;
 }
 
 struct App {
@@ -87,19 +80,34 @@ struct App {
     app::AudioHost        audio;
     std::vector<app::DeviceChoice> devices;
     int                   deviceIndex = 0;
-    ui::ThemeId           theme = ui::ThemeId::Pearl;
-    std::string           plateInfo;
 
-    void saveSettings() {
+    void saveSettings(std::uint32_t bank) {
         settings.setSectionText("params", tree.serialize());
-        settings.set("app", "theme", ui::palette(theme).fileStem);
         const auto& d = audio.current();
-        settings.set("app", "device.kind", d.kind == app::DeviceChoice::Kind::Asio ? "asio" : "wasapi");
+        settings.set("app", "device.kind", kindName(d.kind));
         settings.set("app", "device.id", app::toUtf8(d.id));
         settings.set("app", "source", audio.source() == engine::MixerProcessor::Source::TestTones ? "tones" : "inputs");
+        settings.set("app", "faderBank", std::to_string(bank));
         settings.save(params::Settings::defaultFile());
     }
+    void selectDevice(int delta) {
+        devices = app::AudioHost::listDevices();
+        const int n = static_cast<int>(devices.size());
+        deviceIndex = ((deviceIndex + delta) % n + n) % n;
+        audio.open(devices[static_cast<std::size_t>(deviceIndex)]);
+    }
+    void clearAll(const char* field) {
+        for (std::uint32_t s = 0; s < kStemCount; ++s) tree.find(params::stemParamId(s, field))->setPlain(0.0f);
+    }
 };
+
+std::string formatLine(const app::HostStatus& st, bool tones) {
+    char buf[200];
+    if (!st.running) return tones ? "NO STREAM  \xC2\xB7  13 STEMS  \xC2\xB7  TEST TONES" : "NO STREAM  \xC2\xB7  13 STEMS  \xC2\xB7  HARDWARE INPUTS";
+    std::snprintf(buf, sizeof buf, "%s  \xC2\xB7  %.1f kHz  \xC2\xB7  %u SMP  \xC2\xB7  13 STEMS  \xC2\xB7  %s", st.driver.c_str(), st.sampleRate / 1000.0,
+                  st.blockFrames, tones ? "TEST TONES" : "HARDWARE INPUTS");
+    return buf;
+}
 
 } // namespace
 
@@ -125,85 +133,59 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
 
     a.audio.setSource(a.settings.get("app", "source", "tones") == "inputs" ? engine::MixerProcessor::Source::Hardware
                                                                            : engine::MixerProcessor::Source::TestTones);
-    a.theme   = ui::themeFromName(a.settings.get("app", "theme", "pearl"));
     a.devices = app::AudioHost::listDevices();
-    a.deviceIndex = findDevice(a.devices, a.settings.get("app", "device.kind", "wasapi"), a.settings.get("app", "device.id"));
+    a.deviceIndex = opts.offline ? static_cast<int>(a.devices.size()) - 1
+                                 : findDevice(a.devices, a.settings.get("app", "device.kind", "wasapi"), a.settings.get("app", "device.id"));
     a.audio.open(a.devices[static_cast<std::size_t>(a.deviceIndex)]);
 
     ui::GlWindow window;
     std::string err;
-    if (!window.create(L"The Hybrid Core", static_cast<int>(ui::kDesignWidth), static_cast<int>(ui::kDesignHeight), true, &err)) {
+    if (!window.create(L"The Hybrid Core", 1600, 900, true, &err)) {
         fatal("Could not start the GPU display: " + err + "\nUpdate your graphics driver (OpenGL 3.3 is required).");
         return 3;
     }
 
-    ui::Renderer renderer;
-    if (!renderer.init(&err)) { fatal("GPU renderer failed: " + err); return 3; }
+    ui::Console console(a.tree);
+    const std::filesystem::path assets = exeDir() / "assets";
+    if (!console.init(assets, params::Settings::appDataDir(), kMsaaSamples, &err)) {
+        fatal("The console could not load its art: " + err + "\nReinstall The Hybrid Core (assets folder: " + assets.string() + ").");
+        return 3;
+    }
+    console.setFaderBank(static_cast<std::uint32_t>(std::clamp(std::atoi(a.settings.get("app", "faderBank", "0").c_str()), 0, 3)));
 
-    const ui::Layout layout(a.tree);
-    ui::Interaction interaction(layout, a.tree);
-    const ui::MixerView view(layout, a.tree);
     ui::MeterState meters;
-
-    const auto fontBytes = ui::FontAtlas::loadSystemFont();
-    if (!fontBytes) { fatal("No usable system font found (Segoe UI / Arial)."); return 3; }
-    ui::FontAtlas font;
-
-    const std::filesystem::path dataDir = params::Settings::appDataDir();
-    ui::Tier tier{};
-    float    fontScale = 0.0f;
-
-    auto loadPlate = [&](ui::Tier t) {
-        a.plateInfo.clear();
-        const ui::CompressedTexture tex = ui::loadFaceplate(a.theme, t, layout, dataDir, &a.plateInfo);
-        std::string e;
-        if (!renderer.setFaceplate(tex, &e)) a.plateInfo = "faceplate error: " + e;
-        tier = t;
-    };
-
     const auto started = std::chrono::steady_clock::now();
     bool shotTaken = false;
     auto lastFrame = started;
     auto lastSave  = lastFrame;
     std::uint64_t savedVersion = a.tree.version();
+    std::uint32_t savedBank    = console.faderBank();
 
     while (window.pump()) {
-        const int   fbW = window.pixelWidth(), fbH = window.pixelHeight();
-        const auto  vp  = ui::Viewport::fit(static_cast<float>(fbW), static_cast<float>(fbH));
-
-        // Faceplate tier follows the window size; text is re-baked when the scale moves.
-        const ui::Tier want = ui::chooseTier(static_cast<std::uint32_t>(fbW), static_cast<std::uint32_t>(fbH));
-        if (want.width != tier.width) loadPlate(want);
-        if (std::fabs(vp.scale - fontScale) > 0.15f * std::max(fontScale, 0.01f)) {
-            if (font.bake(*fontBytes, vp.scale)) renderer.setFont(font, &err);
-            fontScale = vp.scale;
-        }
+        const int fbW = window.pixelWidth(), fbH = window.pixelHeight();
+        if (!console.resize(fbW, fbH, &err)) { fatal("GPU error: " + err); break; }
+        const ui::Canvas& cv = console.canvas();
 
         for (const auto& e : window.takeEvents()) {
-            const float x = vp.toDesignX(e.x), y = vp.toDesignY(e.y);
+            const float x = cv.toDesignX(e.x), y = cv.toDesignY(e.y);
             switch (e.type) {
-            case ui::InputEvent::Type::MouseDown:
-                switch (interaction.mouseDown(x, y, e.doubleClick, e.fine)) {
-                case ui::HeaderAction::CycleDevice:
-                    a.devices = app::AudioHost::listDevices();
-                    a.deviceIndex = (a.deviceIndex + 1) % static_cast<int>(a.devices.size());
-                    a.audio.open(a.devices[static_cast<std::size_t>(a.deviceIndex)]);
-                    break;
-                case ui::HeaderAction::ToggleSource:
-                    a.audio.setSource(a.audio.source() == engine::MixerProcessor::Source::TestTones
-                                          ? engine::MixerProcessor::Source::Hardware
-                                          : engine::MixerProcessor::Source::TestTones);
-                    break;
-                case ui::HeaderAction::CycleTheme:
-                    a.theme = ui::nextTheme(a.theme);
-                    loadPlate(tier);
-                    break;
-                case ui::HeaderAction::None: break;
+            case ui::InputEvent::Type::MouseDown: {
+                std::uint32_t idx = 0;
+                switch (console.interaction().mouseDown(x, y, e.doubleClick, e.fine, &idx)) {
+                case ui::UiAction::PrevDevice:   a.selectDevice(-1); break;
+                case ui::UiAction::NextDevice:   a.selectDevice(+1); break;
+                case ui::UiAction::SourceTones:  a.audio.setSource(engine::MixerProcessor::Source::TestTones); break;
+                case ui::UiAction::SourceInputs: a.audio.setSource(engine::MixerProcessor::Source::Hardware); break;
+                case ui::UiAction::ClearSolo:    a.clearAll("solo"); break;
+                case ui::UiAction::ClearMute:    a.clearAll("mute"); break;
+                case ui::UiAction::FaderBank:    console.setFaderBank(idx); break;
+                case ui::UiAction::None:         break;
                 }
                 break;
-            case ui::InputEvent::Type::MouseMove: interaction.mouseMove(x, y, e.fine); break;
-            case ui::InputEvent::Type::MouseUp:   interaction.mouseUp(); break;
-            case ui::InputEvent::Type::Wheel:     interaction.wheel(x, y, e.wheel, e.fine); break;
+            }
+            case ui::InputEvent::Type::MouseMove: console.interaction().mouseMove(x, y, e.fine); break;
+            case ui::InputEvent::Type::MouseUp:   console.interaction().mouseUp(); break;
+            case ui::InputEvent::Type::Wheel:     console.interaction().wheel(x, y, e.wheel, e.fine); break;
             case ui::InputEvent::Type::Resize:
             case ui::InputEvent::Type::Close:     break;
             }
@@ -225,36 +207,48 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         // Persist settings at most every 5 s, only when something changed (crash-safe file replace).
         if (now - lastSave > std::chrono::seconds(5)) {
             lastSave = now;
-            if (a.tree.version() != savedVersion) { a.saveSettings(); savedVersion = a.tree.version(); }
+            if (a.tree.version() != savedVersion || console.faderBank() != savedBank) {
+                a.saveSettings(console.faderBank());
+                savedVersion = a.tree.version();
+                savedBank    = console.faderBank();
+            }
         }
 
         if (window.minimized()) { ::Sleep(kMinFrameMsWhenHidden); continue; }
 
+        const app::HostStatus& st = a.audio.status();
+        const bool tones = a.audio.source() == engine::MixerProcessor::Source::TestTones;
         ui::ViewState vs;
-        vs.theme       = a.theme;
-        vs.deviceLabel = a.audio.status().device;
-        vs.sourceLabel = a.audio.source() == engine::MixerProcessor::Source::TestTones ? "TEST TONES" : "INPUTS";
-        vs.status      = a.audio.status().line1;
-        vs.detail      = a.audio.status().line2 + "  \xC2\xB7  " + a.plateInfo;
-        vs.alert       = a.audio.status().alert;
-        vs.hover       = interaction.hoverWidget();
-        vs.active      = interaction.activeWidget();
+        vs.deviceName   = st.deviceName.empty() ? "No device" : st.deviceName;
+        vs.deviceFormat = formatLine(st, tones);
+        vs.status       = (st.alert ? st.line2 : st.line1) + "   \xC2\xB7   faceplate " + console.faceplateInfo();
+        vs.alert        = st.alert;
+        vs.running      = st.running;
+        vs.tonesOn      = tones;
+        vs.engine.valid        = st.running;
+        vs.engine.driver       = st.driver;
+        vs.engine.sampleRate   = st.sampleRate;
+        vs.engine.bufferFrames = st.blockFrames;
+        vs.engine.latencyMs    = st.outLatencyMs;
+        vs.engine.loadPct      = st.loadAvg * 100.0f;
+        vs.engine.peakLoadPct  = st.loadPeak * 100.0f;
+        vs.engine.dropouts     = st.dropouts;
+        vs.hover   = console.interaction().hoverWidget();
+        vs.active  = console.interaction().activeWidget();
+        vs.pressed = console.interaction().pressedWidget();
 
-        const ui::Palette& pal = ui::palette(a.theme);
-        renderer.begin(fbW, fbH, vp, {pal.plateBottom.r * 0.6f, pal.plateBottom.g * 0.6f, pal.plateBottom.b * 0.6f, 1});
-        view.draw(renderer, vs, meters);
-        renderer.end();
         const double alive = std::chrono::duration<double>(now - started).count();
         if (!opts.screenshot.empty() && !shotTaken && alive >= std::max(1.0, opts.exitAfter - 1.0)) {
-            ::glFinish();
-            ui::writePng(opts.screenshot, readBackBuffer(fbW, fbH));
+            console.renderToCapture(vs, meters);
+            ui::writePng(opts.screenshot, console.capture());
             shotTaken = true;
         }
+        console.render(vs, meters, 0);
         window.swap();   // vsync paces the UI; the audio thread is unaffected
         if (opts.exitAfter > 0.0 && alive >= opts.exitAfter) break;
     }
 
     a.audio.close();
-    a.saveSettings();
+    a.saveSettings(console.faderBank());
     return 0;
 }

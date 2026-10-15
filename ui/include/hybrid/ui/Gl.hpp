@@ -32,7 +32,6 @@ inline constexpr GLenum kClampToEdge            = 0x812F;
 inline constexpr GLenum kTextureBaseLevel       = 0x813C;
 inline constexpr GLenum kTextureMaxLevel        = 0x813D;
 inline constexpr GLenum kR8                     = 0x8229;
-inline constexpr GLenum kCompressedRgbaDxt5     = 0x83F3;   // EXT_texture_compression_s3tc
 inline constexpr GLenum kNumExtensions          = 0x821D;
 inline constexpr GLenum kMajorVersion           = 0x821B;
 inline constexpr GLenum kMinorVersion           = 0x821C;
@@ -41,6 +40,15 @@ inline constexpr GLenum kFramebuffer            = 0x8D40;
 inline constexpr GLenum kRenderbuffer           = 0x8D41;
 inline constexpr GLenum kColorAttachment0       = 0x8CE0;
 inline constexpr GLenum kFramebufferComplete    = 0x8CD5;
+inline constexpr GLenum kReadFramebuffer        = 0x8CA8;
+inline constexpr GLenum kDrawFramebuffer        = 0x8CA9;
+inline constexpr GLenum kFramebufferSrgb        = 0x8DB9;
+inline constexpr GLenum kSrgb8Alpha8            = 0x8C43;
+inline constexpr GLenum kRg                     = 0x8227;
+inline constexpr GLenum kRg8                    = 0x822B;
+inline constexpr GLenum kRgba16f                = 0x881A;
+inline constexpr GLenum kHalfFloat              = 0x140B;
+inline constexpr GLenum kMaxSamples             = 0x8D57;
 
 // WGL_ARB_create_context
 inline constexpr int kWglContextMajorVersion = 0x2091;
@@ -90,7 +98,11 @@ inline constexpr int kWglContextCoreProfile  = 0x0001;
     X(void, glGenRenderbuffers, (GLsizei, GLuint*))                                                      \
     X(void, glBindRenderbuffer, (GLenum, GLuint))                                                        \
     X(void, glRenderbufferStorage, (GLenum, GLenum, GLsizei, GLsizei))                                   \
-    X(void, glDeleteRenderbuffers, (GLsizei, const GLuint*))
+    X(void, glDeleteRenderbuffers, (GLsizei, const GLuint*))                                             \
+    X(void, glRenderbufferStorageMultisample, (GLenum, GLsizei, GLenum, GLsizei, GLsizei))               \
+    X(void, glBlitFramebuffer, (GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLbitfield, GLenum)) \
+    X(void, glFramebufferTexture2D, (GLenum, GLenum, GLenum, GLuint, GLint))                             \
+    X(void, glUniform1f, (GLint, GLfloat))
 
 #define HC_GL_DECLARE(ret, name, args) using PFN_##name = ret(APIENTRY*) args; extern PFN_##name name;
 HC_GL_FUNCS(HC_GL_DECLARE)

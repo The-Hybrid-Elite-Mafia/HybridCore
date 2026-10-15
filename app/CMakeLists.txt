@@ -1,11 +1,16 @@
 # =============================================================================
 #  HybridCore.exe — standalone 13-stem console (GUI subsystem)
+#  hc_apphost   — the audio host (engine + device streams), shared with hc_ui_snapshot
 # =============================================================================
+add_library(hc_apphost STATIC src/AudioHost.cpp)
+target_include_directories(hc_apphost PUBLIC src)
+target_link_libraries(hc_apphost PUBLIC hc::build_flags hc::engine hc::io)
+
 configure_file(resources/HybridCore.rc.in "${CMAKE_CURRENT_BINARY_DIR}/HybridCore.rc" @ONLY)
 add_executable(HybridCore WIN32
     src/main.cpp
-    src/AudioHost.cpp
     "${CMAKE_CURRENT_BINARY_DIR}/HybridCore.rc")
 target_include_directories(HybridCore PRIVATE src)
-target_link_libraries(HybridCore PRIVATE hc::engine hc::params hc::ui hc::io opengl32 shell32)
+target_link_libraries(HybridCore PRIVATE hc_apphost hc::params hc::ui opengl32 shell32)
 set_target_properties(HybridCore PROPERTIES OUTPUT_NAME "HybridCore")
+hc_copy_assets(HybridCore)

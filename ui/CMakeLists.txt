@@ -1,16 +1,18 @@
 # =============================================================================
-#  hc::ui — GPU UI: image pipeline, faceplates, layout, font, OpenGL 3.3 renderer
+#  hc::ui — GPU UI: faceplate chassis, parts atlas, Poppins, layout, OpenGL 3.3 renderer
 # =============================================================================
 add_library(hc_ui STATIC
     src/StbImpl.cpp
     src/Image.cpp
-    src/Theme.cpp
+    src/Faceplate.cpp
+    src/Parts.cpp
     src/Layout.cpp
     src/FontAtlas.cpp
     src/Gl.cpp
     src/GlWindow.cpp
     src/Renderer.cpp
-    src/MixerView.cpp)
+    src/MixerView.cpp
+    src/Console.cpp)
 add_library(hc::ui ALIAS hc_ui)
 
 target_include_directories(hc_ui PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")

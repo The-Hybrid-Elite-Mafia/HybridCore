@@ -1,69 +1,118 @@
-// hc_ui_snapshot — renders the real GPU UI off-screen (hidden window + framebuffer object)
-// for every theme, saves PNG screenshots and checks the pixels. Used by CI (with a
-// software OpenGL driver) and works on the rig too.
+// hc_ui_snapshot — renders the real console (ui::Console, the same code HybridCore.exe runs)
+// off-screen with LIVE engine data and saves PNGs plus side-by-side comparisons with the
+// faceplate art. Used by CI (software OpenGL) and works on the rig.
 //
-//   hc_ui_snapshot --out <folder> [--scale 1|2]
+//   hc_ui_snapshot --out <folder> [--sizes 3840x2160,1389x868] [--seconds 2] [--device offline|default]
 //
-// Exit codes: 0 pass, 1 bad args, 2 GPU init failed, 3 pixel checks failed.
+// Live data: the real Engine + 13-stem MixerProcessor (13 test tones) run on the offline clock
+// (no sound card needed) or on the default WASAPI output; meters, DSP load and buffer numbers
+// come from the running engine, exactly as in the app. A few controls are set first, the way a
+// user would, so on/off states are visible (listed in the output).
+//
+// Checks (exit 3 on failure): GL errors, chassis pixels equal Main-Faceplate.png where nothing is
+// drawn on top, meters lit by the engine, glass display populated.
+#include "AudioHost.hpp"
+
 #include "hybrid/io/DeviceProbe.hpp"
 #include "hybrid/params/MixerParams.hpp"
 #include "hybrid/params/ParameterTree.hpp"
-#include "hybrid/ui/FontAtlas.hpp"
+#include "hybrid/ui/Console.hpp"
 #include "hybrid/ui/Gl.hpp"
 #include "hybrid/ui/GlWindow.hpp"
-#include "hybrid/ui/Image.hpp"
-#include "hybrid/ui/Layout.hpp"
-#include "hybrid/ui/MixerView.hpp"
-#include "hybrid/ui/Renderer.hpp"
-#include "hybrid/ui/Theme.hpp"
 
+#include <windows.h>
+
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
-#include <cstdlib>
 #include <filesystem>
+#include <iterator>
 #include <string>
+#include <thread>
+#include <vector>
 
 using namespace hc;
 
 namespace {
+
+struct Size { int w, h; };
+
+std::filesystem::path exeDir() {
+    wchar_t buf[MAX_PATH * 4];
+    const DWORD n = ::GetModuleFileNameW(nullptr, buf, static_cast<DWORD>(std::size(buf)));
+    return std::filesystem::path(std::wstring(buf, n)).parent_path();
+}
+
+// Mean absolute difference (0..255) between two images over a rectangle.
+double meanAbsDiff(const ui::Image& a, const ui::Image& b, int x0, int y0, int x1, int y1) {
+    double sum = 0;
+    std::size_t n = 0;
+    for (int y = y0; y < y1; ++y)
+        for (int x = x0; x < x1; ++x) {
+            const std::uint8_t* p = a.at(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
+            const std::uint8_t* q = b.at(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
+            for (int c = 0; c < 3; ++c) sum += std::abs(static_cast<int>(p[c]) - static_cast<int>(q[c]));
+            n += 3;
+        }
+    return n ? sum / static_cast<double>(n) : 0.0;
+}
 
 double regionStdDev(const ui::Image& img, int x0, int y0, int x1, int y1) {
     double sum = 0, sq = 0;
     std::size_t n = 0;
     for (int y = y0; y < y1; ++y)
         for (int x = x0; x < x1; ++x) {
-            const std::uint8_t* p = &img.rgba[(static_cast<std::size_t>(y) * img.width + x) * 4];
+            const std::uint8_t* p = img.at(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
             const double l = 0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2];
             sum += l; sq += l * l; ++n;
         }
-    const double m = sum / static_cast<double>(n);
-    return std::sqrt(std::max(0.0, sq / static_cast<double>(n) - m * m));
+    const double m = sum / static_cast<double>(std::max<std::size_t>(n, 1));
+    return std::sqrt(std::max(0.0, sq / static_cast<double>(std::max<std::size_t>(n, 1)) - m * m));
 }
 
-std::size_t countNear(const ui::Image& img, ui::Rgb c, int tol) {
-    const int r = static_cast<int>(c.r * 255), g = static_cast<int>(c.g * 255), b = static_cast<int>(c.b * 255);
+// Pixels that look like lit meter LEDs (saturated green/yellow/red) inside a rectangle.
+std::size_t litPixels(const ui::Image& img, int x0, int y0, int x1, int y1) {
     std::size_t n = 0;
-    for (std::size_t i = 0; i < img.rgba.size(); i += 4)
-        if (std::abs(img.rgba[i] - r) <= tol && std::abs(img.rgba[i + 1] - g) <= tol && std::abs(img.rgba[i + 2] - b) <= tol) ++n;
+    for (int y = std::max(0, y0); y < std::min<int>(y1, static_cast<int>(img.height)); ++y)
+        for (int x = std::max(0, x0); x < std::min<int>(x1, static_cast<int>(img.width)); ++x) {
+            const std::uint8_t* p = img.at(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
+            const int mx = std::max({p[0], p[1], p[2]}), mn = std::min({p[0], p[1], p[2]});
+            if (mx > 150 && mx - mn > 90) ++n;
+        }
     return n;
 }
 
-void setDemoState(params::ParameterTree& t) {
-    t.find("stem01.main")->setPlain(0.0f);
+// Two images side by side on a dark strip, each scaled to `h` pixels tall.
+ui::Image sideBySide(const ui::Image& left, const ui::Image& right, std::uint32_t h) {
+    const auto lw = static_cast<std::uint32_t>(std::lround(static_cast<double>(left.width) * h / left.height));
+    const auto rw = static_cast<std::uint32_t>(std::lround(static_cast<double>(right.width) * h / right.height));
+    const ui::Image l = ui::resizeSrgb(left, lw, h), r = ui::resizeSrgb(right, rw, h);
+    const std::uint32_t gap = 24;
+    ui::Image out;
+    out.width  = lw + gap + rw;
+    out.height = h;
+    out.rgba.assign(static_cast<std::size_t>(out.width) * h * 4, 0);
+    for (std::size_t i = 3; i < out.rgba.size(); i += 4) out.rgba[i] = 255;
+    for (std::uint32_t y = 0; y < h; ++y) {
+        std::copy_n(l.at(0, y), static_cast<std::size_t>(lw) * 4, &out.rgba[(static_cast<std::size_t>(y) * out.width) * 4]);
+        std::copy_n(r.at(0, y), static_cast<std::size_t>(rw) * 4, &out.rgba[(static_cast<std::size_t>(y) * out.width + lw + gap) * 4]);
+    }
+    return out;
+}
+
+void setUserControls(params::ParameterTree& t) {
     t.find("stem02.main")->setPlain(-6.0f);
     t.find("stem03.mute")->setPlain(1.0f);
-    t.find("stem04.solo")->setPlain(1.0f);
     t.find("stem05.invert")->setPlain(1.0f);
     t.find("stem06.pan")->setPlain(-0.6f);
     t.find("stem07.pan")->setPlain(0.8f);
     t.find("stem08.trim")->setPlain(9.0f);
     t.find("stem09.aux1")->setPlain(-3.0f);
-    t.find("stem10.aux2")->setPlain(0.0f);
-    t.find("stem11.main")->setNormalized(0.0f);
-    t.find("stem12.main")->setPlain(4.0f);
+    t.find("stem10.aux2")->setPlain(-8.0f);
+    t.find("stem11.main")->setPlain(-12.0f);
+    t.find("stem12.trim")->setPlain(-6.0f);
     t.find("aux1.mute")->setPlain(1.0f);
-    t.find("main.gain")->setPlain(-2.0f);
 }
 
 } // namespace
@@ -71,124 +120,144 @@ void setDemoState(params::ParameterTree& t) {
 int wmain(int argc, wchar_t** argv) {
     io::configureWideConsole();
     std::filesystem::path out = ".";
-    float scale = 1.0f;
+    std::vector<Size> sizes = {{3840, 2160}, {1389, 868}};
+    double seconds = 2.0;
+    bool   offline = true;
     for (int i = 1; i < argc; ++i) {
         const std::wstring k = argv[i];
         if (k == L"--out" && i + 1 < argc) out = argv[++i];
-        else if (k == L"--scale" && i + 1 < argc) scale = static_cast<float>(std::wcstod(argv[++i], nullptr));
-        else { std::wprintf(L"usage: hc_ui_snapshot --out <folder> [--scale 1|2]\n"); return 1; }
+        else if (k == L"--seconds" && i + 1 < argc) seconds = std::wcstod(argv[++i], nullptr);
+        else if (k == L"--device" && i + 1 < argc) offline = std::wstring(argv[++i]) != L"default";
+        else if (k == L"--sizes" && i + 1 < argc) {
+            sizes.clear();
+            std::wstring s = argv[++i];
+            std::size_t pos = 0;
+            while (pos < s.size()) {
+                const std::size_t comma = s.find(L',', pos);
+                const std::wstring item = s.substr(pos, comma == std::wstring::npos ? std::wstring::npos : comma - pos);
+                int w = 0, h = 0;
+                if (std::swscanf(item.c_str(), L"%dx%d", &w, &h) == 2 && w >= 320 && h >= 200 && w <= 4096 && h <= 4096) sizes.push_back({w, h});
+                if (comma == std::wstring::npos) break;
+                pos = comma + 1;
+            }
+        } else {
+            std::wprintf(L"usage: hc_ui_snapshot --out <folder> [--sizes 3840x2160,1389x868] [--seconds 2] [--device offline|default]\n");
+            return 1;
+        }
     }
-    if (!(scale >= 0.5f && scale <= 2.0f)) return 1;
+    if (sizes.empty()) return 1;
     std::error_code ec;
     std::filesystem::create_directories(out, ec);
 
-    ui::GlWindow window;
-    std::string err;
-    if (!window.create(L"hc_ui_snapshot", 320, 200, false, &err)) {
-        std::wprintf(L"GPU init failed: %hs\n", err.c_str());
-        return 2;
-    }
-    ui::Renderer renderer;
-    if (!renderer.init(&err)) { std::wprintf(L"renderer init failed: %hs\n", err.c_str()); return 2; }
-    std::wprintf(L"OpenGL  : %hs\nRenderer: %hs\nS3TC/DXT5 upload: %ls\n", renderer.glVersion().c_str(),
-                 renderer.glRenderer().c_str(), renderer.s3tcSupported() ? L"native (compressed in VRAM)" : L"fallback (decoded to RGBA8)");
-
-    const int W = static_cast<int>(std::lround(ui::kDesignWidth * scale));
-    const int H = static_cast<int>(std::lround(ui::kDesignHeight * scale));
-    GLuint fbo = 0, rb = 0;
-    gl::glGenFramebuffers(1, &fbo);
-    gl::glBindFramebuffer(gl::kFramebuffer, fbo);
-    gl::glGenRenderbuffers(1, &rb);
-    gl::glBindRenderbuffer(gl::kRenderbuffer, rb);
-    gl::glRenderbufferStorage(gl::kRenderbuffer, GL_RGBA8, W, H);
-    gl::glFramebufferRenderbuffer(gl::kFramebuffer, gl::kColorAttachment0, gl::kRenderbuffer, rb);
-    if (gl::glCheckFramebufferStatus(gl::kFramebuffer) != gl::kFramebufferComplete) {
-        std::wprintf(L"framebuffer incomplete\n");
-        return 2;
-    }
-
+    // ---- live engine -----------------------------------------------------------------------
     params::ParameterTree tree;
     params::addMixerParameters(tree);
-    setDemoState(tree);
-    const ui::Layout layout(tree);
-    const ui::MixerView view(layout, tree);
-    const auto vp = ui::Viewport::fit(static_cast<float>(W), static_cast<float>(H));
-
-    const auto fontBytes = ui::FontAtlas::loadSystemFont();
-    ui::FontAtlas font;
-    if (!fontBytes || !font.bake(*fontBytes, vp.scale) || !renderer.setFont(font, &err)) {
-        std::wprintf(L"font failed: %hs\n", err.c_str());
-        return 2;
-    }
+    app::AudioHost host;
+    const params::MixerBindings bindings(tree);
+    params::bindMixerParameters(tree, bindings, host.matrix());
+    setUserControls(tree);
+    tree.dispatchChanges();
+    const auto devices = app::AudioHost::listDevices();
+    host.open(offline ? devices.back() : devices.front());
+    std::wprintf(L"Engine  : %hs\n          %hs\n", host.status().line1.c_str(), host.status().line2.c_str());
+    std::wprintf(L"Controls set before the shots: stem 2 fader -6 dB, stem 3 mute, stem 5 phase, stem 6 pan L60, stem 7 pan R80,\n"
+                 L"          stem 8 trim +9 dB, stem 9 aux1 -3 dB, stem 10 aux2 -8 dB, stem 11 fader -12 dB, stem 12 trim -6 dB, aux 1 mute.\n");
 
     ui::MeterState meters;
-    float sp[kStemCount], bl[kBusCount], br[kBusCount];
-    for (std::uint32_t s = 0; s < kStemCount; ++s) sp[s] = std::pow(10.0f, (-48.0f + 3.5f * static_cast<float>(s)) / 20.0f);
-    for (std::uint32_t b = 0; b < kBusCount; ++b) { bl[b] = std::pow(10.0f, (-20.0f + 6.0f * b) / 20.0f); br[b] = bl[b] * 0.8f; }
-    meters.update(sp, bl, br, 0.016f);
-
-    const std::filesystem::path dataDir = out / "ui-data";
-    int failures = 0;
-    for (std::uint32_t t = 0; t < ui::kThemeCount; ++t) {
-        const auto theme = static_cast<ui::ThemeId>(t);
-        const ui::Palette& pal = ui::palette(theme);
-        std::string info;
-        const auto plateT0 = std::chrono::steady_clock::now();
-        const ui::CompressedTexture tex = ui::loadFaceplate(theme, ui::chooseTier(static_cast<std::uint32_t>(W), static_cast<std::uint32_t>(H)), layout, dataDir, &info);
-        const double plateMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - plateT0).count();
-        if (!renderer.setFaceplate(tex, &err)) { std::wprintf(L"faceplate failed: %hs\n", err.c_str()); return 2; }
-
-        ui::ViewState vs;
-        vs.theme       = theme;
-        vs.deviceLabel = "ASIO \xC2\xB7 Focusrite USB ASIO";
-        vs.sourceLabel = "TEST TONES";
-        vs.status      = "ASIO \xC2\xB7 48000 Hz \xC2\xB7 64 frames = 1.33 ms \xC2\xB7 latency in 2.50 / out 3.10 ms";
-        vs.detail      = "CPU 0.4% avg \xC2\xB7 1.1% peak \xC2\xB7 overruns 0  (snapshot demo values)";
-        vs.hover       = 14;
-
-        constexpr int kFrames = 60;
-        double cpuMs = 0, gpuMs = 0;
-        for (int f = 0; f < kFrames; ++f) {
-            const auto c0 = std::chrono::steady_clock::now();
-            renderer.begin(W, H, vp, {pal.plateBottom.r * 0.6f, pal.plateBottom.g * 0.6f, pal.plateBottom.b * 0.6f, 1});
-            view.draw(renderer, vs, meters);
-            renderer.end();
-            const auto c1 = std::chrono::steady_clock::now();
-            ::glFinish();
-            const auto c2 = std::chrono::steady_clock::now();
-            cpuMs += std::chrono::duration<double, std::milli>(c1 - c0).count();
-            gpuMs += std::chrono::duration<double, std::milli>(c2 - c1).count();
+    auto pump = [&](double forSeconds) {
+        const auto t0 = std::chrono::steady_clock::now();
+        auto last = t0;
+        while (std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() < forSeconds) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(16));
+            tree.dispatchChanges();
+            host.poll();
+            const auto now = std::chrono::steady_clock::now();
+            float sp[kStemCount], bl[kBusCount], br[kBusCount];
+            for (std::uint32_t s = 0; s < kStemCount; ++s) sp[s] = host.matrix().stemPeak(s);
+            for (std::uint32_t b = 0; b < kBusCount; ++b) { bl[b] = host.matrix().busPeak(b, 0); br[b] = host.matrix().busPeak(b, 1); }
+            meters.update(sp, bl, br, std::chrono::duration<float>(now - last).count());
+            last = now;
         }
+    };
+    pump(seconds);
 
-        ui::Image img;
-        img.width = static_cast<std::uint32_t>(W);
-        img.height = static_cast<std::uint32_t>(H);
-        img.rgba.resize(static_cast<std::size_t>(W) * H * 4);
-        ::glPixelStorei(GL_PACK_ALIGNMENT, 1);
-        ::glReadPixels(0, 0, W, H, GL_RGBA, GL_UNSIGNED_BYTE, img.rgba.data());
-        for (int y = 0; y < H / 2; ++y)   // GL rows are bottom-up
-            std::swap_ranges(img.rgba.begin() + static_cast<std::ptrdiff_t>(y) * W * 4,
-                             img.rgba.begin() + static_cast<std::ptrdiff_t>(y + 1) * W * 4,
-                             img.rgba.begin() + static_cast<std::ptrdiff_t>(H - 1 - y) * W * 4);
-        const auto file = out / (std::string("ui_") + pal.fileStem + ".png");
-        ui::writePng(file, img);
+    // ---- GPU ---------------------------------------------------------------------------------
+    ui::GlWindow window;
+    std::string err;
+    if (!window.create(L"hc_ui_snapshot", 320, 200, false, &err)) { std::wprintf(L"GPU init failed: %hs\n", err.c_str()); return 2; }
+    ui::Console console(tree);
+    std::filesystem::path assets = exeDir() / "assets";   // build tree; installed: <app>\bin\..\assets
+    if (!std::filesystem::is_directory(assets, ec)) assets = exeDir().parent_path() / "assets";
+    if (!console.init(assets, {}, 8, &err)) { std::wprintf(L"console init failed: %hs\n", err.c_str()); return 2; }
+    std::wprintf(L"OpenGL  : %hs\nRenderer: %hs\nMSAA    : %d samples (requested 8, GPU maximum %d)\nFaceplate: %hs\n",
+                 console.renderer().glVersion().c_str(), console.renderer().glRenderer().c_str(), console.renderer().samples(),
+                 console.renderer().maxSamples(), console.faceplateInfo().c_str());
+    std::string plateErr;
+    const auto art = ui::loadFaceplateArt(ui::resolveFaceplate(assets, {}), &plateErr);
+    if (!art) { std::wprintf(L"faceplate reload failed: %hs\n", plateErr.c_str()); return 2; }
 
-        const double whole = regionStdDev(img, 0, 0, W, H);
-        const double title = regionStdDev(img, static_cast<int>(30 * vp.scale), static_cast<int>(14 * vp.scale),
-                                          static_cast<int>(300 * vp.scale), static_cast<int>(48 * vp.scale));
-        const std::size_t neon = countNear(img, pal.neon, 40);
-        const bool ok = whole > 8.0 && title > 12.0 && neon > 2000 && ::glGetError() == GL_NO_ERROR;
+    int failures = 0;
+    for (const Size sz : sizes) {
+        if (!console.resize(sz.w, sz.h, &err)) { std::wprintf(L"resize failed: %hs\n", err.c_str()); return 2; }
+        const app::HostStatus& st = host.status();
+        ui::ViewState vs;
+        vs.deviceName   = st.deviceName;
+        vs.deviceFormat = st.driver + "  \xC2\xB7  " + std::to_string(st.blockFrames) + " SMP  \xC2\xB7  13 STEMS  \xC2\xB7  TEST TONES";
+        vs.running      = st.running;
+        vs.alert        = st.alert;
+        vs.tonesOn      = true;
+
+        constexpr int kFrames = 12;
+        double cpuMs = 0, totalMs = 0;
+        for (int f = 0; f < kFrames; ++f) {
+            pump(0.05);   // keep the meters live between frames
+            vs.status = st.line1 + "   \xC2\xB7   faceplate " + console.faceplateInfo();
+            vs.engine = {st.running, st.driver, st.sampleRate, st.blockFrames, st.outLatencyMs, st.loadAvg * 100.0f, st.loadPeak * 100.0f, st.dropouts};
+            const auto t0 = std::chrono::steady_clock::now();
+            console.renderToCapture(vs, meters);
+            const auto t1 = std::chrono::steady_clock::now();
+            ::glFinish();
+            const auto t2 = std::chrono::steady_clock::now();
+            if (f > 0) {   // frame 0 also builds the static layer
+                cpuMs   += std::chrono::duration<double, std::milli>(t1 - t0).count();
+                totalMs += std::chrono::duration<double, std::milli>(t2 - t0).count();
+            }
+        }
+        const ui::Image shot = console.capture();
+        const std::string base = "HybridCore-" + std::to_string(sz.w) + "x" + std::to_string(sz.h);
+        ui::writePng(out / (base + ".png"), shot);
+        ui::writePng(out / (base + "-vs-faceplate.png"), sideBySide(art->master, shot, std::min<std::uint32_t>(1080, static_cast<std::uint32_t>(sz.h))));
+
+        // Chassis fidelity: where nothing is drawn on top, the screen must BE the faceplate.
+        const ui::Canvas& cv = console.canvas();
+        const auto refW = static_cast<std::uint32_t>(std::lround(ui::plate::kWidth * cv.scale));
+        const auto refH = static_cast<std::uint32_t>(std::lround(ui::plate::kHeight * cv.scale));
+        const ui::Image ref = (refW == art->master.width) ? art->master : ui::resizeSrgb(art->master, refW, refH);
+        auto S = [&](float v) { return static_cast<int>(std::lround(v * cv.scale)); };
+        const double plateDiff = meanAbsDiff(shot, ref, S(1150), S(60), S(2400), S(175));          // top bar, between title and badge
+        const double frameDiff = meanAbsDiff(shot, ref, 0, S(250), S(56), S(880));               // left neon frame (above the band)
+        const double meterLit  = static_cast<double>(litPixels(shot, S(700), S(1500), S(3800), S(1935 + cv.extraH)));
+        const double display   = regionStdDev(shot, S(2660), S(265), S(3700), S(430));
+        const bool ok = plateDiff < 3.0 && frameDiff < 3.0 && meterLit > 200 && display > 12.0 && ::glGetError() == GL_NO_ERROR;
         failures += ok ? 0 : 1;
-        std::wprintf(L"%-12hs %dx%d  plate: %hs (%.0f ms)  VRAM %.2f MB  frame CPU %.2f ms GPU %.2f ms  "
-                     L"draw calls %u quads %u  checks: contrast %.1f title %.1f neon px %zu -> %ls\n",
-                     pal.name, W, H, info.c_str(), plateMs, static_cast<double>(renderer.vramBytes()) / (1024.0 * 1024.0),
-                     cpuMs / kFrames, gpuMs / kFrames, renderer.stats().drawCalls, renderer.stats().quads, whole, title, neon,
-                     ok ? L"PASS" : L"FAIL");
+        const auto& rs = console.renderer().stats();
+        std::wprintf(L"\n%dx%d  canvas scale %.4f  stretch +%.0f  chassis texture %u px\n"
+                     L"  frame: CPU %.2f ms (recording + submit)  CPU+GPU %.1f ms (software GPU in CI)  static layer %.1f ms (once)\n"
+                     L"  draw calls %u  quads %u  emissive quads %u  textures %.1f MB  render targets %.1f MB\n"
+                     L"  faceplate match: top bar diff %.2f/255  frame diff %.2f/255   meters lit px %.0f   display contrast %.1f  -> %ls\n"
+                     L"  saved %hs.png and %hs-vs-faceplate.png\n",
+                     sz.w, sz.h, cv.scale, cv.extraH, console.chassisTextureWidth(), cpuMs / (kFrames - 1), totalMs / (kFrames - 1),
+                     console.timings().staticMs, rs.drawCalls, rs.quads, rs.bloomQuads, console.renderer().textureBytes() / 1048576.0,
+                     console.renderer().targetBytes() / 1048576.0, plateDiff, frameDiff, meterLit, display, ok ? L"PASS" : L"FAIL",
+                     base.c_str(), base.c_str());
     }
-
-    gl::glBindFramebuffer(gl::kFramebuffer, 0);
-    gl::glDeleteRenderbuffers(1, &rb);
-    gl::glDeleteFramebuffers(1, &fbo);
+    const app::HostStatus& st = host.status();
+    std::wprintf(L"\nEngine after the shots: %hs\n  %hs\n", st.line1.c_str(), st.line2.c_str());
+    for (std::uint32_t s = 0; s < kStemCount; ++s)
+        std::wprintf(L"  stem %2u meter %6.1f dBFS%ls", s + 1, meters.stem[s] > 0 ? 20.0 * std::log10(meters.stem[s]) : -144.0, (s % 4 == 3) ? L"\n" : L"");
+    std::wprintf(L"\n  main bus L %.1f / R %.1f dBFS\n", meters.busL[0] > 0 ? 20.0 * std::log10(meters.busL[0]) : -144.0,
+                 meters.busR[0] > 0 ? 20.0 * std::log10(meters.busR[0]) : -144.0);
+    host.close();
     std::wprintf(failures ? L"\nUI SNAPSHOT FAIL\n" : L"\nUI SNAPSHOT PASS\n");
     return failures ? 3 : 0;
 }

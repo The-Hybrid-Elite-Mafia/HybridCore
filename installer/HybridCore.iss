@@ -47,6 +47,9 @@ Source: "{#BinDir}\app\Release\HybridCore.exe";                     DestDir: "{a
 Source: "{#BinDir}\tools\device_probe\Release\hc_device_probe.exe"; DestDir: "{app}\bin"; Flags: ignoreversion
 Source: "{#BinDir}\tools\engine_smoke\Release\hc_engine_smoke.exe"; DestDir: "{app}\bin"; Flags: ignoreversion
 Source: "{#BinDir}\tests\Release\hc_tests.exe";                     DestDir: "{app}\bin"; Flags: ignoreversion
+Source: "{#BinDir}\tools\ui_snapshot\Release\hc_ui_snapshot.exe";   DestDir: "{app}\bin"; Flags: ignoreversion
+Source: "..\assets\*";                                             DestDir: "{app}\assets"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\assets\fonts\OFL.txt";                                  DestDir: "{app}\licenses"; DestName: "Poppins-OFL.txt"; Flags: ignoreversion
 Source: "HOW-TO-TEST.txt";                                          DestDir: "{app}"; Flags: ignoreversion
 Source: "THIRD-PARTY-NOTICES.txt";                                  DestDir: "{app}"; Flags: ignoreversion
 Source: "..\external\stb\LICENSE";                                  DestDir: "{app}\licenses"; DestName: "stb-LICENSE.txt"; Flags: ignoreversion
@@ -66,6 +69,7 @@ Name: "{group}\Diagnostics\1 - Rig Check";             Filename: "{cmd}"; Parame
 Name: "{group}\Diagnostics\2 - Mixer Test (WASAPI)";   Filename: "{cmd}"; Parameters: "/k """"{app}\bin\hc_engine_smoke.exe"" --mixer --seconds 15"""; WorkingDir: "{app}\bin"
 Name: "{group}\Diagnostics\3 - Mixer Test (ASIO)";     Filename: "{cmd}"; Parameters: "/k """"{app}\bin\hc_engine_smoke.exe"" --asio --mixer --seconds 15"""; WorkingDir: "{app}\bin"
 Name: "{group}\Diagnostics\4 - Engine Self-Test";      Filename: "{cmd}"; Parameters: "/k """"{app}\bin\hc_tests.exe"""""; WorkingDir: "{app}\bin"
+Name: "{group}\Diagnostics\5 - Screen Snapshots";      Filename: "{cmd}"; Parameters: "/k """"{app}\bin\hc_ui_snapshot.exe"" --out ""{userdesktop}\HybridCore Snapshots"""""; WorkingDir: "{app}\bin"
 Name: "{group}\How to test";                   Filename: "{app}\HOW-TO-TEST.txt"
 Name: "{group}\Uninstall The Hybrid Core";     Filename: "{uninstallexe}"
 

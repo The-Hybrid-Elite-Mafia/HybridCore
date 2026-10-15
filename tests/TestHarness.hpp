@@ -3,6 +3,7 @@
 #include <atomic>
 #include <cstdint>
 #include <cstdio>
+#include <filesystem>
 
 namespace hc::test {
 
@@ -34,6 +35,11 @@ void testUiImage();
 void testUiLayout();
 void testUiFaceplate();
 void testUiFont();
+void testUiParts();
+
+// Folder with faceplates/ and fonts/: <exe dir>/assets (build tree) or <exe dir>/../assets (installed).
+void setExePath(const char* argv0);
+[[nodiscard]] std::filesystem::path assetDir();
 void benchmark();
 
 } // namespace hc::test

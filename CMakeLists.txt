@@ -36,6 +36,13 @@ if(NOT ASIOSDK_FOUND)
     endif()
 endif()
 
+# Runtime assets (faceplate PNG, Poppins fonts) are copied next to every executable that draws the UI.
+function(hc_copy_assets target)
+    add_custom_command(TARGET ${target} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${PROJECT_SOURCE_DIR}/assets" "$<TARGET_FILE_DIR:${target}>/assets"
+        VERBATIM)
+endfunction()
+
 add_subdirectory(core)
 add_subdirectory(io)
 add_subdirectory(dsp)

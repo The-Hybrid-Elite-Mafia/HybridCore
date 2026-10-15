@@ -72,13 +72,11 @@ jobs:
         run: |
           tools\ci\run-and-report.ps1 -Title "ui: fetch mesa" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\fetch-mesa.ps1','-TargetDirs','build\rig-full\tools\ui_snapshot\Release,build\rig-full\app\Release'
 
-      - name: GPU UI snapshot (render every theme, check pixels)
+      - name: GPU UI snapshot (live engine, 3840x2160 + 1389x868, faceplate comparison)
         env:
           GALLIUM_DRIVER: llvmpipe
         run: |
-          tools\ci\run-and-report.ps1 -Title "ui: snapshot 1x" -Exe .\build\rig-full\tools\ui_snapshot\Release\hc_ui_snapshot.exe -ArgList '--out','shots','--scale','1'
-          if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          tools\ci\run-and-report.ps1 -Title "ui: snapshot 2x" -Exe .\build\rig-full\tools\ui_snapshot\Release\hc_ui_snapshot.exe -ArgList '--out','shots2x','--scale','2'
+          tools\ci\run-and-report.ps1 -Title "ui: snapshot" -Exe .\build\rig-full\tools\ui_snapshot\Release\hc_ui_snapshot.exe -ArgList '--out','shots','--sizes','3840x2160,1389x868','--seconds','2'
 
       - name: Start the real app (HybridCore.exe) and capture its window
         env:

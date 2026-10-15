@@ -34,18 +34,20 @@ AudioHost::~AudioHost() { close(); }
 
 std::vector<DeviceChoice> AudioHost::listDevices() {
     std::vector<DeviceChoice> out;
-    out.push_back({DeviceChoice::Kind::Wasapi, L"", "WASAPI \xC2\xB7 Default output"});
+    out.push_back({DeviceChoice::Kind::Wasapi, L"", "WASAPI \xC2\xB7 Default output", "Default output"});
     if (auto eps = io::enumerateWasapi()) {
         for (const auto& ep : *eps) {
             if (ep.flow != io::Flow::Render) continue;
             if (!(ep.excl48kFloat32 || ep.excl48kInt24in32 || ep.excl48kInt16)) continue;
-            out.push_back({DeviceChoice::Kind::Wasapi, ep.id, "WASAPI \xC2\xB7 " + toUtf8(ep.name)});
+            out.push_back({DeviceChoice::Kind::Wasapi, ep.id, "WASAPI \xC2\xB7 " + toUtf8(ep.name), toUtf8(ep.name)});
         }
     }
 #if defined(HC_HAS_ASIO_SDK)
     for (const auto& d : io::enumerateAsioDrivers())
-        if (!d.dllPath.empty()) out.push_back({DeviceChoice::Kind::Asio, d.name, "ASIO \xC2\xB7 " + toUtf8(d.name)});
+        if (!d.dllPath.empty()) out.push_back({DeviceChoice::Kind::Asio, d.name, "ASIO \xC2\xB7 " + toUtf8(d.name), toUtf8(d.name)});
 #endif
+    // Last: a clock with no sound card behind it (engine + meters run, nothing is audible).
+    out.push_back({DeviceChoice::Kind::Offline, L"offline", "OFFLINE CLOCK \xC2\xB7 no sound", "Offline clock (no sound)"});
     return out;
 }
 
@@ -57,6 +59,7 @@ bool AudioHost::installMixerOnce() {
 
 void AudioHost::close() noexcept {
     if (wasapi_) { wasapi_->close(); wasapi_.reset(); }
+    if (offline_) { offline_->close(); offline_.reset(); }
 #if defined(HC_HAS_ASIO_SDK)
     if (asio_) { asio_->close(); asio_.reset(); }
 #endif
@@ -69,6 +72,7 @@ bool AudioHost::open(const DeviceChoice& choice) {
     current_ = choice;
     status_  = {};
     status_.device = choice.label;
+    status_.deviceName = choice.name.empty() ? choice.label : choice.name;
     problem_.clear();
     peakLoad_ = 0.0f;
     driverOverloads_ = 0;
@@ -101,6 +105,22 @@ bool AudioHost::open(const DeviceChoice& choice) {
                       toUtf8(wasapi_->formatName()).c_str(), cfg->sampleRate, cfg->blockFrames,
                       1000.0 * cfg->blockFrames / cfg->sampleRate, cfg->outputLatencyMs);
         status_.line1 = buf;
+        status_.driver = "WASAPI EXCLUSIVE";
+        status_.sampleRate = cfg->sampleRate;
+        status_.blockFrames = cfg->blockFrames;
+        status_.outLatencyMs = cfg->outputLatencyMs;
+    } else if (choice.kind == DeviceChoice::Kind::Offline) {
+        offline_ = std::make_unique<io::OfflineStream>();
+        const io::StreamConfig cfg = offline_->open({}, engine_);
+        if (!installMixerOnce()) { problem_ = "could not install mixer"; status_.alert = true; refreshLine2(); return false; }
+        offline_->start();
+        std::snprintf(buf, sizeof(buf), "Offline clock (no sound card) \xC2\xB7 %u Hz \xC2\xB7 %u frames = %.2f ms", cfg.sampleRate,
+                      cfg.blockFrames, 1000.0 * cfg.blockFrames / cfg.sampleRate);
+        status_.line1 = buf;
+        status_.driver = "OFFLINE CLOCK";
+        status_.sampleRate = cfg.sampleRate;
+        status_.blockFrames = cfg.blockFrames;
+        status_.outLatencyMs = -1.0;
     } else {
 #if defined(HC_HAS_ASIO_SDK)
         asio_ = std::make_unique<io::AsioDuplex>();
@@ -128,6 +148,10 @@ bool AudioHost::open(const DeviceChoice& choice) {
                       cfg->sampleRate, cfg->blockFrames, 1000.0 * cfg->blockFrames / cfg->sampleRate, cfg->numInputs,
                       cfg->numOutputs, cfg->inputLatencyMs, cfg->outputLatencyMs);
         status_.line1 = buf;
+        status_.driver = "ASIO";
+        status_.sampleRate = cfg->sampleRate;
+        status_.blockFrames = cfg->blockFrames;
+        status_.outLatencyMs = cfg->outputLatencyMs;
 #else
         problem_ = "this build has no ASIO support";
         status_.alert = true;
@@ -142,6 +166,9 @@ bool AudioHost::open(const DeviceChoice& choice) {
 
 void AudioHost::refreshLine2() {
     char buf[256];
+    status_.loadAvg  = lastTelemetry_.loadAvg;
+    status_.loadPeak = peakLoad_;
+    status_.dropouts = static_cast<std::uint64_t>(lastTelemetry_.overruns) + driverOverloads_;
     if (!problem_.empty()) {
         status_.line2 = problem_;
         return;

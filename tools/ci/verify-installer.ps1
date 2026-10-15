@@ -21,7 +21,9 @@ function Install() {
 }
 
 Check ((Install) -eq 0) 'silent install exit code 0'
-foreach ($f in 'HybridCore.exe','bin\hc_device_probe.exe','bin\hc_engine_smoke.exe','bin\hc_tests.exe','HOW-TO-TEST.txt','THIRD-PARTY-NOTICES.txt','licenses\stb-LICENSE.txt','unins000.exe') {
+foreach ($f in 'HybridCore.exe','bin\hc_device_probe.exe','bin\hc_engine_smoke.exe','bin\hc_tests.exe','bin\hc_ui_snapshot.exe',
+              'assets\faceplates\Main-Faceplate.png','assets\fonts\Poppins-Medium.ttf','assets\fonts\Poppins-SemiBold.ttf',
+              'assets\fonts\Poppins-Bold.ttf','HOW-TO-TEST.txt','THIRD-PARTY-NOTICES.txt','licenses\stb-LICENSE.txt','licenses\Poppins-OFL.txt','unins000.exe') {
     Check (Test-Path (Join-Path $app $f)) "installed $f"
 }
 Check (Test-Path (Join-Path $desktop 'The Hybrid Core.lnk')) 'desktop shortcut'

@@ -1,16 +1,18 @@
 #pragma once
 // =============================================================================
-//  MixerView — draws the whole 13-stem console with the Renderer: faceplate,
-//  header, knobs, buttons, faders, neon meters. Reads parameters (atomics) and
-//  meter values only; never touches DSP objects.
+//  MixerView — draws the console on the faceplate with the Renderer.
+//    drawStatic : chassis (the PNG), strip glass, sockets, slots, scales, labels.
+//                 Rendered once into the renderer's cached layer (on resize / layout change).
+//    drawDynamic: every frame — knobs, caps, faders, buttons, meters, live readouts.
+//  Reads parameters (atomics) and meter values only; never touches DSP objects.
 // =============================================================================
 #include "hybrid/core/Config.hpp"
 #include "hybrid/params/ParameterTree.hpp"
 #include "hybrid/ui/Layout.hpp"
 #include "hybrid/ui/Renderer.hpp"
-#include "hybrid/ui/Theme.hpp"
 
 #include <array>
+#include <cstdint>
 #include <string>
 
 namespace hc::ui {
@@ -30,31 +32,54 @@ private:
     std::array<float, hc::kBusCount>  busHoldAgeL_{}, busHoldAgeR_{};
 };
 
+// Live engine readout for the glass display (all measured by the engine / driver).
+struct EngineReadout {
+    bool          valid        = false;   // false: no stream running
+    std::string   driver;                 // "WASAPI", "ASIO", "OFFLINE CLOCK"
+    double        sampleRate   = 0.0;
+    std::uint32_t bufferFrames = 0;
+    double        latencyMs    = -1.0;    // output latency reported by the driver (-1 unknown)
+    float         loadPct      = 0.0f;    // average DSP load of the last interval
+    float         peakLoadPct  = 0.0f;
+    std::uint64_t dropouts     = 0;
+};
+
 struct ViewState {
-    ThemeId     theme = ThemeId::Pearl;
-    std::string deviceLabel;    // header DEVICE button
-    std::string sourceLabel;    // header SOURCE button
-    std::string status;         // header status line 1
-    std::string detail;         // header status line 2 (errors in neonAlt colour when `alert`)
-    bool        alert  = false;
-    int         hover  = -1;    // widget indices from Interaction
-    int         active = -1;
+    std::string   deviceName;      // name panel, line 1
+    std::string   deviceFormat;    // name panel, line 2
+    std::string   status;          // bottom bar
+    bool          alert   = false;
+    bool          running = false;
+    bool          tonesOn = true;
+    EngineReadout engine;
+    int           hover   = -1;    // widget indices from Interaction
+    int           active  = -1;
+    int           pressed = -1;
 };
 
 class MixerView {
 public:
     MixerView(const Layout& layout, const params::ParameterTree& tree) noexcept : layout_(layout), tree_(tree) {}
 
-    void draw(Renderer& r, const ViewState& view, const MeterState& meters) const;
+    void drawStatic(Renderer& r, const Canvas& canvas) const;
+    void drawDynamic(Renderer& r, const ViewState& view, const MeterState& meters) const;
 
     // Fader-taper position (0..1) for a linear level, so meters line up with fader scales.
     [[nodiscard]] static float levelToNorm(float linear) noexcept;
 
 private:
-    void drawKnob(Renderer& r, const Palette& p, const Widget& w, bool hot) const;
-    void drawButton(Renderer& r, const Palette& p, const Widget& w, bool hot) const;
-    void drawFader(Renderer& r, const Palette& p, const Widget& w, const StripLayout& st, bool hot) const;
-    void drawMeter(Renderer& r, const Palette& p, Rect rect, float level, float hold) const;
+    void drawChassis(Renderer& r, const Canvas& canvas) const;
+    void drawStrip(Renderer& r, const StripLayout& st) const;
+    void drawEmissiveStatic(Renderer& r) const;
+    void drawKnobStatic(Renderer& r, const Widget& w) const;
+    void drawKnob(Renderer& r, const Widget& w, Rgba accent, bool hot) const;
+    void drawButton(Renderer& r, const Widget& w, bool pressed) const;
+    void drawFader(Renderer& r, const StripLayout& st, Rgba lineColour) const;
+    void drawMeterColumn(Renderer& r, Rect col, float level, float hold, bool lit) const;
+    void drawMeterRow(Renderer& r, Rect row, float level, float hold, bool lit) const;
+    void drawTransport(Renderer& r, const Widget& w, const ViewState& v) const;
+    void drawDisplay(Renderer& r, const ViewState& v) const;
+    void drawGlassOverlay(Renderer& r, Rect glass) const;
 
     const Layout&                layout_;
     const params::ParameterTree& tree_;

@@ -9,3 +9,4 @@ target_include_directories(hc_tests PRIVATE
     "${PROJECT_SOURCE_DIR}/io/src")   # SampleConvert.hpp (internal)
 target_link_libraries(hc_tests PRIVATE hc::engine hc::dsp hc::params hc::ui)
 add_test(NAME hc_tests COMMAND hc_tests)
+hc_copy_assets(hc_tests)

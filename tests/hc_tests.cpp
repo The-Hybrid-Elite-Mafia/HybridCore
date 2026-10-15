@@ -195,8 +195,9 @@ void testEngine() {
 
 } // namespace hc::test
 
-int main() {
+int main(int argc, char** argv) {
     using namespace hc::test;
+    hc::test::setExePath(argc > 0 ? argv[0] : "");
     testRing();
     testConvert();
     testEngine();
@@ -210,6 +211,7 @@ int main() {
     testUiImage();
     testUiLayout();
     testUiFaceplate();
+    testUiParts();
     testUiFont();
     benchmark();
     std::printf("\n%d checks, %d failed -> %s\n", gChecks, gFails, gFails ? "FAIL" : "PASS");

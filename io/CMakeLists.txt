@@ -7,7 +7,8 @@ add_library(hc_io STATIC
     src/AsioRegistry.cpp
     src/CpuProbe.cpp
     src/SampleConvert.cpp
-    src/WasapiExclusiveOutput.cpp)
+    src/WasapiExclusiveOutput.cpp
+    src/OfflineStream.cpp)
 add_library(hc::io ALIAS hc_io)
 
 target_include_directories(hc_io PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")

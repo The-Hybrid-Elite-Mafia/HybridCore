@@ -1,98 +1,115 @@
 #pragma once
 // =============================================================================
 //  UI layout and interaction model (pure C++, no GPU, unit-tested).
-//  All coordinates are in DESIGN units: a 1673×940 canvas that the renderer scales
-//  (letterboxed) to the window. Widgets bind to parameters by index.
+//  Coordinates are DESIGN units = Main-Faceplate.png pixels (3840 wide). Everything
+//  sits on a measured faceplate region (Faceplate.hpp):
+//    top bar      : status lamp in the logo socket, engraved title
+//    name panel   : device + format (engraved)
+//    6 sockets    : ◀ device, device ▶, TONES, INPUTS, clear SOLO, clear MUTE
+//    glass display: live engine numbers (latency, DSP load, buffer, dropouts)
+//    4 tabs       : fader bank — MAIN MIX / AUX 1 / AUX 2 / AUX 3 sends on the stem faders
+//    left panel   : 4 bus strips (Main, Aux 1–3)
+//    main panel   : 13 stem strips
+//    bottom bar   : status line + main bus L/R meter
+//  The left/main panels grow with Canvas::extraH (windows taller than 16:9).
 // =============================================================================
 #include "hybrid/core/Config.hpp"
 #include "hybrid/params/ParameterTree.hpp"
+#include "hybrid/ui/Faceplate.hpp"
+#include "hybrid/ui/Geometry.hpp"
 
+#include <array>
 #include <cstdint>
-#include <optional>
+#include <functional>
 #include <string>
 #include <vector>
 
 namespace hc::ui {
 
-inline constexpr float kDesignWidth  = 1673.0f;
-inline constexpr float kDesignHeight = 940.0f;
+enum class WidgetKind : std::uint8_t { Knob, SendKnob, Fader, Button, StemMeter, BusMeter, MasterMeter, Transport, Tab };
+enum class UiAction : std::uint8_t { None, PrevDevice, NextDevice, SourceTones, SourceInputs, ClearSolo, ClearMute, FaderBank };
 
-struct Rect {
-    float x = 0, y = 0, w = 0, h = 0;
-    [[nodiscard]] bool  contains(float px, float py) const noexcept { return px >= x && py >= y && px < x + w && py < y + h; }
-    [[nodiscard]] float cx() const noexcept { return x + w * 0.5f; }
-    [[nodiscard]] float cy() const noexcept { return y + h * 0.5f; }
-};
-
-enum class WidgetKind : std::uint8_t { Knob, SmallKnob, Fader, Button, StemMeter, BusMeterL, BusMeterR, HeaderButton };
-enum class HeaderAction : std::uint8_t { None, CycleDevice, ToggleSource, CycleTheme };
+inline constexpr std::uint32_t kFaderBanks = hc::kBusCount;   // MAIN + AUX 1..3
 
 struct Widget {
-    WidgetKind    kind      = WidgetKind::Knob;
-    Rect          rect;                    // hit area (design units)
-    int           param     = -1;          // parameter index, -1 if none
-    std::uint32_t channel   = 0;           // stem or bus index for meters / labels
-    HeaderAction  action    = HeaderAction::None;
-    std::string   caption;                 // short label drawn by the renderer
+    WidgetKind    kind   = WidgetKind::Knob;
+    Rect          rect;                  // hit area / drawn bounds (design units)
+    int           param  = -1;           // parameter index, -1 if none
+    std::uint32_t index  = 0;            // stem, bus, socket or tab index
+    UiAction      action = UiAction::None;
+    std::string   caption;
 };
 
 struct StripLayout {
-    Rect          panel;                   // recessed panel behind the strip
+    Rect          bed;                   // glass bed of the strip
     bool          isBus = false;
     std::uint32_t index = 0;
     std::string   title;
-    Rect          faderTrack;              // engraved slot
-    int           faderParam = -1;
+    Rgba          accent;
+    Rect          faderTrack;            // recessed slot; the cap travels inside it
+    float         capW = 0, capH = 0;    // fader cap size
+    Rect          meter;                 // glass meter window
+    Rect          valueBox;              // glass readout under the fader
+    int           faderWidget = -1;
 };
+
+// Strip accent colours (sRGB): 13 stems, then Main / Aux 1–3.
+[[nodiscard]] Rgba stemAccent(std::uint32_t stem) noexcept;
+[[nodiscard]] Rgba busAccent(std::uint32_t bus) noexcept;
 
 class Layout {
 public:
-    // Builds every widget for the 13-stem mixer. Throws if a mixer parameter is missing.
-    explicit Layout(const params::ParameterTree& tree);
+    // Builds every widget. Throws if a mixer parameter is missing.
+    Layout(const params::ParameterTree& tree, float extraH);
 
     [[nodiscard]] const std::vector<Widget>&      widgets() const noexcept { return widgets_; }
     [[nodiscard]] const std::vector<StripLayout>& strips() const noexcept { return strips_; }
-    [[nodiscard]] Rect headerBar() const noexcept { return {0, 0, kDesignWidth, 72}; }
-    [[nodiscard]] int  hitTest(float x, float y) const noexcept;   // widget index or -1
+    [[nodiscard]] int   hitTest(float x, float y) const noexcept;   // widget index or -1
+    [[nodiscard]] float extraH() const noexcept { return extraH_; }
+
+    // Which send the 13 stem faders control (0 = MAIN mix, 1..3 = AUX sends).
+    [[nodiscard]] std::uint32_t faderBank() const noexcept { return bank_; }
+    void setFaderBank(std::uint32_t bank) noexcept;
+    [[nodiscard]] int faderParam(std::uint32_t stem, std::uint32_t bank) const noexcept { return stemFader_[stem][bank]; }
+
+    [[nodiscard]] Rect masterMeter() const noexcept { return master_; }
+    [[nodiscard]] Rect statusArea() const noexcept { return status_; }
 
 private:
     std::vector<Widget>      widgets_;
     std::vector<StripLayout> strips_;
-};
-
-// Maps window pixels to design units (letterboxed, aspect preserved).
-struct Viewport {
-    float scale   = 1.0f;
-    float offsetX = 0.0f;
-    float offsetY = 0.0f;
-    static Viewport fit(float windowW, float windowH) noexcept;
-    [[nodiscard]] float toDesignX(float px) const noexcept { return (px - offsetX) / scale; }
-    [[nodiscard]] float toDesignY(float py) const noexcept { return (py - offsetY) / scale; }
+    std::array<std::array<int, kFaderBanks>, hc::kStemCount> stemFader_{};
+    std::uint32_t bank_   = 0;
+    float         extraH_ = 0;
+    Rect          master_, status_;
 };
 
 // Mouse handling. Pointer positions are in design units.
 class Interaction {
 public:
-    Interaction(const Layout& layout, params::ParameterTree& tree) noexcept : layout_(layout), tree_(tree) {}
+    Interaction(Layout& layout, params::ParameterTree& tree) noexcept : layout_(layout), tree_(tree) {}
 
-    // Returns a header action when a header button was clicked.
-    HeaderAction mouseDown(float x, float y, bool doubleClick, bool fine);
-    void         mouseMove(float x, float y, bool fine);
-    void         mouseUp() noexcept { active_ = -1; }
-    void         wheel(float x, float y, float notches, bool fine);
+    // Returns the action of a clicked socket/tab (FaderBank: index in `actionIndex`).
+    UiAction mouseDown(float x, float y, bool doubleClick, bool fine, std::uint32_t* actionIndex = nullptr);
+    void     mouseMove(float x, float y, bool fine);
+    void     mouseUp() noexcept { active_ = -1; pressed_ = -1; }
+    void     wheel(float x, float y, float notches, bool fine);
+    void     rebind(Layout& layout) noexcept { layout_ = std::ref(layout); active_ = hover_ = pressed_ = -1; }
 
     [[nodiscard]] int activeWidget() const noexcept { return active_; }
     [[nodiscard]] int hoverWidget() const noexcept { return hover_; }
+    [[nodiscard]] int pressedWidget() const noexcept { return pressed_; }   // socket/tab held down
 
-    static constexpr float kKnobPixelsFullRange = 250.0f;   // vertical drag for 0..1
-    static constexpr float kFineDivider         = 10.0f;    // Shift / Ctrl
+    static constexpr float kKnobUnitsFullRange = 700.0f;   // vertical drag (design units) for 0..1
+    static constexpr float kFineDivider        = 10.0f;    // Shift / Ctrl
 
 private:
-    const Layout&          layout_;
+    std::reference_wrapper<Layout> layout_;
     params::ParameterTree& tree_;
-    int   active_ = -1;
-    int   hover_  = -1;
-    float lastY_  = 0.0f;
+    int   active_  = -1;
+    int   hover_   = -1;
+    int   pressed_ = -1;
+    float lastY_   = 0.0f;
 };
 
 } // namespace hc::ui

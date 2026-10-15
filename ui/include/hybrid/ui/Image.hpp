@@ -2,11 +2,14 @@
 // =============================================================================
 //  hc::ui image pipeline (CPU side, no GPU calls).
 //
-//  Rule: full-size masters (8K+) are decoded in RAM only long enough to be scaled
-//  to a screen tier; the GPU only ever receives tier-sized, mipmapped, DXT5
-//  (BC3) compressed data — 1 byte per pixel — and never anything wider or taller
-//  than kMaxTextureSide. Baked results are cached on disk so masters are decoded
-//  once per tier.
+//  Everything the GPU receives is RGBA8 in sRGB encoding with PREMULTIPLIED alpha
+//  (premultiplied in linear light, then sRGB-encoded) plus a full mip chain built
+//  in linear light. Uploaded as GL_SRGB8_ALPHA8, the GPU decodes to linear, filters
+//  trilinearly and blends in linear light.
+//
+//  Rule: masters (4K faceplate, 8K skins) stay in RAM only; the GPU receives a copy
+//  scaled to the window (see Faceplate.hpp), never wider or taller than kMaxTextureSide,
+//  and every upload is charged against the UI VRAM budget.
 // =============================================================================
 #include <cstddef>
 #include <cstdint>
@@ -17,55 +20,49 @@
 
 namespace hc::ui {
 
-inline constexpr std::uint32_t kMaxTextureSide = 4096;                 // hard cap for anything uploaded
+inline constexpr std::uint32_t kMaxTextureSide  = 4096;                 // hard cap for anything uploaded
 inline constexpr std::uint64_t kVramBudgetBytes = 64ull * 1024 * 1024;  // all UI textures together
-inline constexpr std::uint32_t kMaxDecodeSide  = 16384;                // refuse absurd source files
+inline constexpr std::uint32_t kMaxDecodeSide   = 16384;                // refuse absurd source files
 
 struct Image {
     std::uint32_t             width  = 0;
     std::uint32_t             height = 0;
-    std::vector<std::uint8_t> rgba;     // 8-bit sRGB, straight alpha, row-major
+    std::vector<std::uint8_t> rgba;     // 8-bit sRGB, row-major (straight or premultiplied: see function docs)
     [[nodiscard]] bool empty() const noexcept { return width == 0 || height == 0; }
+    [[nodiscard]] const std::uint8_t* at(std::uint32_t x, std::uint32_t y) const noexcept {
+        return &rgba[(static_cast<std::size_t>(y) * width + x) * 4];
+    }
 };
 
-struct Tier {
-    std::uint32_t width  = 0;
-    std::uint32_t height = 0;
-};
-// 1x = 1676×940 (design 1673×940 padded to a multiple of 4), 2x = 3348×1880.
-inline constexpr Tier kTier1x{1676, 940};
-inline constexpr Tier kTier2x{3348, 1880};
-[[nodiscard]] Tier chooseTier(std::uint32_t windowPixelWidth, std::uint32_t windowPixelHeight) noexcept;
-
-struct CompressedTexture {
-    std::uint32_t                          width  = 0;   // level 0, multiple of 4
+// sRGB8 premultiplied RGBA, level 0 first, each level half the previous (min 1).
+struct TextureLevels {
+    std::uint32_t                          width  = 0;
     std::uint32_t                          height = 0;
-    std::vector<std::vector<std::uint8_t>> levels;       // DXT5 blocks per mip level
+    std::vector<std::vector<std::uint8_t>> levels;
     [[nodiscard]] std::uint64_t bytes() const noexcept;
 };
+
+// sRGB <-> linear (exact IEC 61966-2-1 curves).
+[[nodiscard]] float srgbToLinear(float s) noexcept;
+[[nodiscard]] float linearToSrgb(float l) noexcept;
+[[nodiscard]] std::uint8_t linearToSrgb8(float l) noexcept;
+[[nodiscard]] float srgb8ToLinear(std::uint8_t v) noexcept;   // table lookup
 
 // Decoding / encoding ------------------------------------------------------------
 [[nodiscard]] std::optional<Image> loadImageFile(const std::filesystem::path& file, std::string* error = nullptr);
 bool writePng(const std::filesystem::path& file, const Image& image);
 
-// Scaling (sRGB-correct) ----------------------------------------------------------
+// Scaling of straight-alpha sRGB images, filtered in linear light.
 [[nodiscard]] Image resizeSrgb(const Image& src, std::uint32_t width, std::uint32_t height);
-// Scale to cover width×height keeping aspect ratio, then centre-crop to exactly that size.
-[[nodiscard]] Image coverResize(const Image& src, std::uint32_t width, std::uint32_t height);
-[[nodiscard]] std::vector<Image> buildMipChain(Image base);
 
-// Block compression ----------------------------------------------------------------
-[[nodiscard]] CompressedTexture compressDxt5(const std::vector<Image>& mips);
-[[nodiscard]] Image decompressDxt5(const std::uint8_t* blocks, std::uint32_t width, std::uint32_t height);
+// Straight sRGB -> premultiplied sRGB (alpha applied in linear light).
+[[nodiscard]] Image premultiply(const Image& straight);
 
-// Full bake: any-size image -> tier-sized, mipmapped, DXT5 texture (dimensions <= kMaxTextureSide).
-[[nodiscard]] CompressedTexture bakeForTier(const Image& source, Tier tier);
+// Premultiplied sRGB level 0 -> full mip chain (linear-light box filter).
+[[nodiscard]] TextureLevels buildMips(Image premultipliedLevel0);
 
-// Disk cache ("HCTX" files) ----------------------------------------------------------
-bool saveTextureCache(const std::filesystem::path& file, const CompressedTexture& tex);
-[[nodiscard]] std::optional<CompressedTexture> loadTextureCache(const std::filesystem::path& file);
-// Stable key from file path, size, modification time and tier.
-[[nodiscard]] std::string textureCacheKey(const std::filesystem::path& source, Tier tier);
+// Copies a sub-rectangle (clamped to the image).
+[[nodiscard]] Image crop(const Image& src, std::uint32_t x, std::uint32_t y, std::uint32_t w, std::uint32_t h);
 
 // VRAM accounting -------------------------------------------------------------------
 class TextureBudget {

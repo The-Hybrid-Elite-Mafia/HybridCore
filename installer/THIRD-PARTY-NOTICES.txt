@@ -15,7 +15,11 @@ VST
   (licenses\Steinberg-VST3-SDK-LICENSE.txt).
 
 stb
-  stb_image, stb_image_resize2, stb_image_write, stb_truetype and stb_dxt by Sean Barrett
+  stb_image, stb_image_resize2, stb_image_write and stb_truetype by Sean Barrett
   and contributors — public domain or MIT (licenses\stb-LICENSE.txt).
 
-Everything else in The Hybrid Core is proprietary to Hybrid Elite Mafia.
+Poppins
+  Poppins Medium / SemiBold / Bold, Copyright 2020 The Poppins Project Authors,
+  SIL Open Font License 1.1 (licenses\Poppins-OFL.txt). Bundled unmodified.
+
+Everything else in The Hybrid Core, including the faceplate art, is proprietary to Hybrid Elite Mafia.
