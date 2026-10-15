@@ -1,0 +1,41 @@
+#pragma once
+// Minimal test harness shared by all hc_tests translation units.
+#include <atomic>
+#include <cstdint>
+#include <cstdio>
+
+namespace hc::test {
+
+inline int gFails  = 0;
+inline int gChecks = 0;
+
+// Heap allocation counter (operator new replacement lives in AllocTracker.cpp).
+// Counting is enabled only inside an AllocScope.
+inline std::atomic<bool>          gTrackAllocs{false};
+inline std::atomic<std::uint64_t> gAllocCount{0};
+
+struct AllocScope {
+    AllocScope() noexcept { gAllocCount.store(0); gTrackAllocs.store(true); }
+    ~AllocScope() { gTrackAllocs.store(false); }
+    [[nodiscard]] std::uint64_t count() const noexcept { return gAllocCount.load(); }
+};
+
+void testRing();
+void testConvert();
+void testEngine();
+void testKernels();
+void testMatrix();
+void testMixer();
+void testZeroAllocation();
+void benchmark();
+
+} // namespace hc::test
+
+#define CHECK(cond)                                                                 \
+    do {                                                                            \
+        ++::hc::test::gChecks;                                                      \
+        if (!(cond)) {                                                              \
+            std::printf("  FAIL %s:%d  %s\n", __FILE__, __LINE__, #cond);           \
+            ++::hc::test::gFails;                                                   \
+        }                                                                           \
+    } while (0)

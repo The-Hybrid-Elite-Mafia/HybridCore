@@ -3,9 +3,10 @@
 # =============================================================================
 add_library(hc_engine STATIC
     src/Engine.cpp
-    src/ToneProcessor.cpp)
+    src/ToneProcessor.cpp
+    src/MixerProcessor.cpp)
 add_library(hc::engine ALIAS hc_engine)
 
 target_include_directories(hc_engine PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 
-target_link_libraries(hc_engine PUBLIC hc::build_flags hc::core hc::io)
+target_link_libraries(hc_engine PUBLIC hc::build_flags hc::core hc::io hc::dsp)

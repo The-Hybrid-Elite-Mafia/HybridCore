@@ -1,0 +1,32 @@
+THE HYBRID CORE — HOW TO TEST ON YOUR PC
+=========================================
+
+Turn your speakers/headphones DOWN before the mixer tests. Close any app that is
+playing audio (DAW, browser, Suno): the tests take exclusive control of the device.
+
+1) Desktop: "Hybrid Core - Rig Check"
+   Checks your CPU, lists your sound devices and ASIO drivers, then plays 2 seconds
+   of SILENCE through each one and measures the real buffer size and timing.
+   Last line should say: RIG READY.
+   >> Take a photo/screenshot of the whole window and send it to Claude.
+
+2) Start menu > The Hybrid Core > "2 - Mixer Test (WASAPI)"
+   15 seconds through your default Windows output. You should hear a soft chord
+   (13 test tones through the 13-stem matrix).
+   - After 5 s: only ONE low note (stem 1 solo).
+   - After 10 s: chord returns, the low note only in the LEFT ear.
+   Last line should say: STREAM OK.
+
+3) Start menu > "3 - Mixer Test (ASIO)"   (needs an ASIO driver, e.g. your audio interface)
+   Same test through ASIO. Last line should say: STREAM OK.
+
+4) Start menu > "4 - Engine Self-Test"
+   Runs the built-in tests (no sound). Last line should say: ... 0 failed -> PASS
+
+Send Claude screenshots of 1, 2 and 3 (and 4 if it fails).
+
+If a window says "open failed": another app is using the device, or the device
+does not allow exclusive mode. That message is useful — screenshot it too.
+
+Windows may show "Windows protected your PC" on install because the installer is
+not code-signed. Click "More info" then "Run anyway".

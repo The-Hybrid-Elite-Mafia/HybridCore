@@ -1,0 +1,12 @@
+THE HYBRID CORE — THIRD-PARTY NOTICES
+
+ASIO
+  ASIO is a trademark and software of Steinberg Media Technologies GmbH.
+  This build includes host code from the Steinberg ASIO SDK 2.3.4, which Steinberg
+  offers under either GPLv3 or Steinberg's proprietary licensing agreement.
+  The SDK licence text is installed in the "licenses" folder.
+  This is a private build for the owner's own machine. Before distributing it to
+  anyone else, a licence route must be chosen: sign Steinberg's ASIO licensing
+  agreement, or release the program under GPLv3.
+
+Everything else in The Hybrid Core is proprietary to Hybrid Elite Mafia.

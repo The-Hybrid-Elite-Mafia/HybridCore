@@ -34,6 +34,7 @@ endif()
 
 add_subdirectory(core)
 add_subdirectory(io)
+add_subdirectory(dsp)
 add_subdirectory(engine)
 add_subdirectory(tools/device_probe)
 add_subdirectory(tools/engine_smoke)

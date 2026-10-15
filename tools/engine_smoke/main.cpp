@@ -1,12 +1,18 @@
-// hc_engine_smoke — runs the lock-free engine on real hardware with a -18 dBFS 440 Hz tone.
+// hc_engine_smoke — runs the lock-free engine on real hardware.
 //
-//   hc_engine_smoke                                   WASAPI exclusive, default output, 10 s
+//   hc_engine_smoke                                   WASAPI exclusive, default output, 440 Hz tone, 10 s
 //   hc_engine_smoke --wasapi --device 1 --period-ms 3 --seconds 30
 //   hc_engine_smoke --asio "Focusrite USB ASIO" --frames 64 --seconds 30
+//   hc_engine_smoke --asio                            first registered 64-bit ASIO driver
+//   hc_engine_smoke --mixer                           13-stem matrix with 13 test tones:
+//                                                     1/3 in: stem 1 soloed (110 Hz only)
+//                                                     2/3 in: solo off, stem 1 panned hard left
+//   hc_engine_smoke --mixer --inputs                  13-stem matrix fed from hardware inputs (ASIO)
 //
 // Exit codes: 0 ok, 1 bad args, 2 open failed, 3 start failed, 4 stream fault during run.
 #include "hybrid/core/RealtimeThread.hpp"
 #include "hybrid/engine/Engine.hpp"
+#include "hybrid/engine/MixerProcessor.hpp"
 #include "hybrid/engine/ToneProcessor.hpp"
 #include "hybrid/io/DeviceProbe.hpp"
 #include "hybrid/io/WasapiExclusiveOutput.hpp"
@@ -17,6 +23,7 @@
 #include <windows.h>
 
 #include <atomic>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cwchar>
@@ -42,6 +49,8 @@ struct Args {
     double        periodMs  = 0.0;
     std::uint32_t frames    = 0;
     double        seconds   = 10.0;
+    bool          mixer     = false;
+    bool          inputs    = false;
 };
 
 bool parse(int argc, wchar_t** argv, Args& a) {
@@ -51,8 +60,12 @@ bool parse(int argc, wchar_t** argv, Args& a) {
         if (k == L"--wasapi") {
             a.asio = false;
         } else if (k == L"--asio") {
-            const wchar_t* v = next(); if (!v) return false;
-            a.asio = true; a.asioName = v;
+            a.asio = true;
+            if (i + 1 < argc && std::wcsncmp(argv[i + 1], L"--", 2) != 0) a.asioName = argv[++i];
+        } else if (k == L"--mixer") {
+            a.mixer = true;
+        } else if (k == L"--inputs") {
+            a.inputs = true;
         } else if (k == L"--device") {
             const wchar_t* v = next(); if (!v) return false;
             a.device = std::wcstol(v, nullptr, 10);
@@ -93,9 +106,21 @@ void printConfig(const hc::io::StreamConfig& c) {
                  c.numInputs, c.numOutputs, c.inputLatencyMs, c.outputLatencyMs);
 }
 
+float toDb(float v) { return v > 1e-9f ? 20.0f * std::log10(v) : -180.0f; }
+
+// Builds the processor for this run; `mix` is set when the 13-stem mixer is used.
+std::unique_ptr<hc::engine::AudioProcessor> makeProcessor(const Args& a, hc::engine::MixerProcessor*& mix) {
+    mix = nullptr;
+    if (!a.mixer) return std::make_unique<hc::engine::ToneProcessor>();
+    auto m = std::make_unique<hc::engine::MixerProcessor>(
+        a.inputs ? hc::engine::MixerProcessor::Source::Hardware : hc::engine::MixerProcessor::Source::TestTones);
+    mix = m.get();
+    return m;
+}
+
 // Pumps window messages (ASIO drivers in an STA need it) and reports telemetry once a second.
 template <typename Stream>
-int runLoop(Stream& stream, hc::engine::Engine& engine, double seconds) {
+int runLoop(Stream& stream, hc::engine::Engine& engine, double seconds, hc::engine::MixerProcessor* mix) {
     const ULONGLONG start = ::GetTickCount64();
     ULONGLONG       lastPrint = start;
     hc::engine::Telemetry latest{};
@@ -129,8 +154,16 @@ int runLoop(Stream& stream, hc::engine::Engine& engine, double seconds) {
         const ULONGLONG now     = ::GetTickCount64();
         const double    elapsed = static_cast<double>(now - start) / 1000.0;
 
-        if (!dipped && elapsed >= seconds / 3.0)        { dipped   = engine.setMasterGain(0.5f); }
-        if (!restored && elapsed >= 2.0 * seconds / 3.0) { restored = engine.setMasterGain(1.0f); }
+        if (!dipped && elapsed >= seconds / 3.0) {
+            if (mix) { mix->matrix().setStemSolo(0, true); dipped = true;
+                       std::wprintf(L"  >> stem 1 SOLO (only 110 Hz should be audible)\n"); }
+            else     { dipped = engine.setMasterGain(0.5f); }
+        }
+        if (!restored && elapsed >= 2.0 * seconds / 3.0) {
+            if (mix) { mix->matrix().setStemSolo(0, false); mix->matrix().setStemBalance(0, -1.0f); restored = true;
+                       std::wprintf(L"  >> solo off, stem 1 panned hard LEFT\n"); }
+            else     { restored = engine.setMasterGain(1.0f); }
+        }
 
         if (now - lastPrint >= 1000) {
             lastPrint = now;
@@ -141,6 +174,10 @@ int runLoop(Stream& stream, hc::engine::Engine& engine, double seconds) {
                              latest.masterGain);
             else
                 std::wprintf(L"  (no telemetry yet — stream not delivering callbacks)\n");
+            if (mix && haveTelemetry)
+                std::wprintf(L"           Main bus peak L %6.1f dBFS  R %6.1f dBFS | stem 1 %6.1f dBFS\n",
+                             toDb(mix->matrix().busPeak(0, 0)), toDb(mix->matrix().busPeak(0, 1)),
+                             toDb(mix->matrix().stemPeak(0)));
             peakSincePrint = 0.0f;
         }
         if (elapsed >= seconds) break;
@@ -177,7 +214,7 @@ int wmain(int argc, wchar_t** argv) {
     Args args;
     if (!parse(argc, argv, args)) {
         std::wprintf(L"usage: hc_engine_smoke [--wasapi [--device N] [--period-ms X]] | "
-                     L"[--asio \"Driver Name\" [--frames N]] [--seconds S]\n");
+                     L"[--asio [\"Driver Name\"] [--frames N]] [--mixer [--inputs]] [--seconds S]\n");
         return 1;
     }
 
@@ -210,8 +247,12 @@ int wmain(int argc, wchar_t** argv) {
         std::wprintf(L"== WASAPI exclusive (%ls) ==\n", stream.formatName());
         printConfig(*cfg);
 
-        std::unique_ptr<hc::engine::AudioProcessor> tone = std::make_unique<hc::engine::ToneProcessor>();
-        if (!engine.install(tone)) { std::wprintf(L"install failed\n"); return 2; }
+        hc::engine::MixerProcessor* mix = nullptr;
+        std::unique_ptr<hc::engine::AudioProcessor> proc = makeProcessor(args, mix);
+        if (!engine.install(proc)) { std::wprintf(L"install failed\n"); return 2; }
+        std::wprintf(L"  processor: %ls\n", mix ? (args.inputs ? L"13-stem mixer (hardware inputs)"
+                                                                : L"13-stem mixer (13 test tones)")
+                                               : L"440 Hz tone");
 
         if (auto s = stream.start(); !s) {
             std::wprintf(L"WASAPI start failed at %hs: 0x%08lX\n", s.error().stage,
@@ -221,10 +262,15 @@ int wmain(int argc, wchar_t** argv) {
         ::Sleep(50);
         std::wprintf(L"  RT thread: MMCSS %ls | P-core pinned %ls\n",
                      stream.rtThreadUsesMmcss() ? L"YES" : L"no", stream.rtThreadPinned() ? L"YES" : L"no");
-        rc = runLoop(stream, engine, args.seconds);
+        rc = runLoop(stream, engine, args.seconds, mix);
         stream.close();
     } else {
 #if defined(HC_HAS_ASIO_SDK)
+        if (args.asioName.empty()) {
+            for (const auto& d : hc::io::enumerateAsioDrivers())
+                if (!d.dllPath.empty()) { args.asioName = d.name; break; }
+            if (args.asioName.empty()) { std::wprintf(L"No 64-bit ASIO driver is registered on this PC.\n"); return 2; }
+        }
         hc::io::AsioDuplex::Options opt;
         opt.driverName   = args.asioName;
         opt.bufferFrames = args.frames;
@@ -240,14 +286,18 @@ int wmain(int argc, wchar_t** argv) {
         std::wprintf(L"== ASIO: %ls ==\n", args.asioName.c_str());
         printConfig(*cfg);
 
-        std::unique_ptr<hc::engine::AudioProcessor> tone = std::make_unique<hc::engine::ToneProcessor>();
-        if (!engine.install(tone)) { std::wprintf(L"install failed\n"); return 2; }
+        hc::engine::MixerProcessor* mix = nullptr;
+        std::unique_ptr<hc::engine::AudioProcessor> proc = makeProcessor(args, mix);
+        if (!engine.install(proc)) { std::wprintf(L"install failed\n"); return 2; }
+        std::wprintf(L"  processor: %ls\n", mix ? (args.inputs ? L"13-stem mixer (hardware inputs)"
+                                                                : L"13-stem mixer (13 test tones)")
+                                               : L"440 Hz tone");
 
         if (auto s = stream.start(); !s) {
             std::wprintf(L"ASIO start failed at %hs: %ld\n", s.error().stage, s.error().code);
             return 3;
         }
-        rc = runLoop(stream, engine, args.seconds);
+        rc = runLoop(stream, engine, args.seconds, mix);
         stream.close();
 #else
         std::wprintf(L"ASIO not available: build with the Steinberg SDK in external/asiosdk.\n");

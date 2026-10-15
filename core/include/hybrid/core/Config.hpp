@@ -12,6 +12,7 @@ namespace hc {
 // ---- Audio format -----------------------------------------------------------
 inline constexpr std::uint32_t kSampleRate = 48000;   // locked rig rate
 inline constexpr std::uint32_t kStemCount  = 13;      // HEM stem matrix width
+inline constexpr std::uint32_t kBusCount   = 4;       // stereo buses: 0 = Main, 1..3 = aux
 
 // ---- Engine limits ----------------------------------------------------------
 inline constexpr std::uint32_t kMaxChannels    = 64;
@@ -23,5 +24,6 @@ inline constexpr std::size_t kSimdAlign = 32;   // AVX2 register width (no AVX-5
 
 static_assert(kSampleRate == 48000, "HybridCore is locked to 48 kHz.");
 static_assert(kStemCount > 0 && kStemCount <= kMaxChannels);
+static_assert(kBusCount > 0 && kBusCount * 2 <= kMaxChannels);
 
 } // namespace hc

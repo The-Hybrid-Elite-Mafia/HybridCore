@@ -1,6 +1,8 @@
 // hc_tests — hardware-free unit tests for the RT core. Runs in CI and on the rig.
-// Covers: wait-free SPSC ring (2 threads), AVX2 sample conversion, engine command /
-// retire / telemetry path including concurrent processor hot-swaps.
+// This file: wait-free SPSC ring (2 threads), AVX2 sample conversion, engine command /
+// retire / telemetry path including concurrent processor hot-swaps, and main().
+#include "TestHarness.hpp"
+
 #include "hybrid/core/Config.hpp"
 #include "hybrid/core/SpscRing.hpp"
 #include "hybrid/engine/Engine.hpp"
@@ -17,19 +19,7 @@
 
 using namespace hc::io::convert;
 
-namespace {
-
-int gFails  = 0;
-int gChecks = 0;
-
-#define CHECK(cond)                                                                 \
-    do {                                                                            \
-        ++gChecks;                                                                  \
-        if (!(cond)) {                                                              \
-            std::printf("  FAIL %s:%d  %s\n", __FILE__, __LINE__, #cond);           \
-            ++gFails;                                                               \
-        }                                                                           \
-    } while (0)
+namespace hc::test {
 
 void testRing() {
     std::printf("[ring]\n");
@@ -126,10 +116,10 @@ void testConvert() {
     }
 }
 
-struct Counter final : hc::engine::AudioProcessor {
+struct EngineCounter final : hc::engine::AudioProcessor {
     static inline std::atomic<int> alive{0};
-    Counter() { ++alive; }
-    ~Counter() override { --alive; }
+    EngineCounter() { ++alive; }
+    ~EngineCounter() override { --alive; }
     void prepare(const hc::io::StreamConfig&) override {}
     void process(const hc::engine::ProcessContext& c) noexcept override {
         for (std::uint32_t i = 0; i < c.frames; ++i) c.outputs[0][i] = 1.f;
@@ -163,7 +153,7 @@ void testEngine() {
         hc::engine::Engine e;
         e.prepare(hc::io::StreamConfig{hc::kSampleRate, F, 0, 1, 0.0, 0.0});
         float* o1[1] = {a.data()};
-        std::unique_ptr<hc::engine::AudioProcessor> c = std::make_unique<Counter>();
+        std::unique_ptr<hc::engine::AudioProcessor> c = std::make_unique<EngineCounter>();
         CHECK(e.install(c));
         CHECK(e.setMasterGain(0.5f));
         e.process(nullptr, 0, o1, 1, F);
@@ -185,7 +175,7 @@ void testEngine() {
         });
         int installed = 0;
         while (installed < 5000) {
-            std::unique_ptr<hc::engine::AudioProcessor> q = std::make_unique<Counter>();
+            std::unique_ptr<hc::engine::AudioProcessor> q = std::make_unique<EngineCounter>();
             if (e.install(q)) ++installed;
             e.collectGarbage();
         }
@@ -196,19 +186,25 @@ void testEngine() {
         float* ot[1] = {tail.data()};
         for (int k = 0; k < 8; ++k) e.process(nullptr, 0, ot, 1, F);
         e.collectGarbage();
-        CHECK(Counter::alive.load() == 1);
+        CHECK(EngineCounter::alive.load() == 1);
         std::printf("  5,000 hot-swaps under a live RT thread, live processors left: %d (expect 1)\n",
-                    Counter::alive.load());
+                    EngineCounter::alive.load());
     }
-    CHECK(Counter::alive.load() == 0);
+    CHECK(EngineCounter::alive.load() == 0);
 }
 
-} // namespace
+} // namespace hc::test
 
 int main() {
+    using namespace hc::test;
     testRing();
     testConvert();
     testEngine();
+    testKernels();
+    testMatrix();
+    testMixer();
+    testZeroAllocation();
+    benchmark();
     std::printf("\n%d checks, %d failed -> %s\n", gChecks, gFails, gFails ? "FAIL" : "PASS");
     return gFails ? 1 : 0;
 }
