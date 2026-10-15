@@ -34,7 +34,7 @@ Turn your speakers/headphones DOWN first. Close any app that is playing audio
    Last line should say: ... 0 failed -> PASS
 
 5) Diagnostics > "5 - Screen Snapshots" — renders the console on YOUR graphics card at
-   3840x2160 and 1389x868 into a "HybridCore Snapshots" folder on your desktop, next to your
+   3840x2160 and 1389x868 into a "HybridCore Snapshots" folder on your Desktop, next to your
    faceplate, and prints frame times.   >> Send the folder's PNGs and a screenshot of the text.
 
 6) VST3 (optional): in your DAW, rescan plug-ins and look for "The Hybrid Core"

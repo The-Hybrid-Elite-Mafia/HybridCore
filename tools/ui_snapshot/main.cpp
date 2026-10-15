@@ -2,7 +2,8 @@
 // off-screen with LIVE engine data and saves PNGs plus side-by-side comparisons with the
 // faceplate art. Used by CI (software OpenGL) and works on the rig.
 //
-//   hc_ui_snapshot --out <folder> [--sizes 3840x2160,1389x868] [--seconds 2] [--device offline|default]
+//   hc_ui_snapshot [--out <folder>] [--sizes 3840x2160,1389x868] [--seconds 2] [--device offline|default]
+//   (default folder: "HybridCore Snapshots" on the current user's Desktop)
 //
 // Live data: the real Engine + 13-stem MixerProcessor (13 test tones) run on the offline clock
 // (no sound card needed) or on the default WASAPI output; meters, DSP load and buffer numbers
@@ -21,6 +22,7 @@
 #include "hybrid/ui/GlWindow.hpp"
 
 #include <windows.h>
+#include <shlobj.h>
 
 #include <algorithm>
 #include <chrono>
@@ -38,6 +40,14 @@ using namespace hc;
 namespace {
 
 struct Size { int w, h; };
+
+std::filesystem::path desktopFolder() {
+    PWSTR p = nullptr;
+    std::filesystem::path out = ".";
+    if (SUCCEEDED(::SHGetKnownFolderPath(FOLDERID_Desktop, 0, nullptr, &p)) && p) out = std::filesystem::path(p) / "HybridCore Snapshots";
+    if (p) ::CoTaskMemFree(p);
+    return out;
+}
 
 std::filesystem::path exeDir() {
     wchar_t buf[MAX_PATH * 4];
@@ -120,7 +130,7 @@ void setUserControls(params::ParameterTree& t) {
 
 int wmain(int argc, wchar_t** argv) {
     io::configureWideConsole();
-    std::filesystem::path out = ".";
+    std::filesystem::path out = desktopFolder();
     std::vector<Size> sizes = {{3840, 2160}, {1389, 868}};
     double seconds = 2.0;
     bool   offline = true;
@@ -144,13 +154,14 @@ int wmain(int argc, wchar_t** argv) {
                 pos = comma + 1;
             }
         } else {
-            std::wprintf(L"usage: hc_ui_snapshot --out <folder> [--sizes 3840x2160,1389x868] [--seconds 2] [--device offline|default]\n");
+            std::wprintf(L"usage: hc_ui_snapshot [--out <folder>] [--sizes 3840x2160,1389x868] [--seconds 2] [--device offline|default]\n");
             return 1;
         }
     }
     if (sizes.empty()) return 1;
     std::error_code ec;
     std::filesystem::create_directories(out, ec);
+    std::wprintf(L"Output  : %ls\n", std::filesystem::absolute(out, ec).c_str());
 
     // ---- live engine -----------------------------------------------------------------------
     params::ParameterTree tree;

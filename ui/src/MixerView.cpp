@@ -248,7 +248,7 @@ void MixerView::drawKnob(Renderer& r, const Widget& w, Rgba accent, bool hot) co
 
     // Value arc: unlit LED ring, then the lit part (emissive -> bloom) and a hot tip.
     const float ar = knob::kArcRadius * R, aw = knob::kArcWidth * R;
-    r.arc(cx, cy, ar, aw, kKnobMin, kKnobMax, accent.withAlpha(0.16f), false);
+    r.arc(cx, cy, ar, aw, kKnobMin, kKnobMax, accent.withAlpha(0.09f), false);
     if (!off && std::fabs(ang - a0) > 0.004f) {
         r.arc(cx, cy, ar, aw, std::min(a0, ang), std::max(a0, ang), accent, true);
         const float tx = cx + std::sin(ang) * ar, ty = cy - std::cos(ang) * ar;

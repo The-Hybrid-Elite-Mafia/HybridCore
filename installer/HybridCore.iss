@@ -69,7 +69,7 @@ Name: "{group}\Diagnostics\1 - Rig Check";             Filename: "{cmd}"; Parame
 Name: "{group}\Diagnostics\2 - Mixer Test (WASAPI)";   Filename: "{cmd}"; Parameters: "/k """"{app}\bin\hc_engine_smoke.exe"" --mixer --seconds 15"""; WorkingDir: "{app}\bin"
 Name: "{group}\Diagnostics\3 - Mixer Test (ASIO)";     Filename: "{cmd}"; Parameters: "/k """"{app}\bin\hc_engine_smoke.exe"" --asio --mixer --seconds 15"""; WorkingDir: "{app}\bin"
 Name: "{group}\Diagnostics\4 - Engine Self-Test";      Filename: "{cmd}"; Parameters: "/k """"{app}\bin\hc_tests.exe"""""; WorkingDir: "{app}\bin"
-Name: "{group}\Diagnostics\5 - Screen Snapshots";      Filename: "{cmd}"; Parameters: "/k """"{app}\bin\hc_ui_snapshot.exe"" --out ""{userdesktop}\HybridCore Snapshots"""""; WorkingDir: "{app}\bin"
+Name: "{group}\Diagnostics\5 - Screen Snapshots";      Filename: "{cmd}"; Parameters: "/k """"{app}\bin\hc_ui_snapshot.exe"""""; WorkingDir: "{app}\bin"
 Name: "{group}\How to test";                   Filename: "{app}\HOW-TO-TEST.txt"
 Name: "{group}\Uninstall The Hybrid Core";     Filename: "{uninstallexe}"
 
