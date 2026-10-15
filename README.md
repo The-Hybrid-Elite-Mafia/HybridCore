@@ -3,23 +3,32 @@
 Proprietary real-time audio framework for Hybrid Elite Mafia (HEM).
 Built for one machine only: Windows x64, MSVC, Intel Core i7-14700HX, 48 kHz.
 
+Rig-wide constants (sample rate, 13 stems, limits) live in ONE file:
+`core/include/hybrid/core/Config.hpp`.
+
 ## Status
-- Phase 1 — Windows/MSVC build foundation, ASIO + WASAPI device probe: **done (untested on rig)**
-- Phase 2 — Lock-free audio callback, WASAPI exclusive + ASIO streams: **done (untested on rig)**
-- Phase 3 — AVX2 13-stem DSP matrix: next
-- Phase 4 — GPU UI canvas
-- Phase 5 — Parameter tree, standalone .exe + .vst3 switch
+| Phase | What | State |
+|---|---|---|
+| 1 | Windows/MSVC build, ASIO + WASAPI device probe | Builds + runs in CI. Not yet run on the rig. |
+| 2 | Lock-free audio callback, WASAPI exclusive + ASIO streams | Builds in CI, unit tests pass. Not yet run on real audio hardware. |
+| 3 | AVX2 13-stem DSP matrix | Not started |
+| 4 | GPU UI canvas (see `docs/UI_TEXTURE_PLAN.md`) | Planned |
+| 5 | Parameter tree, standalone .exe + .vst3 switch | Not started |
 
-## Build (on the rig)
+CI: every push builds on GitHub's Windows Server 2022 + Visual Studio 2022 runner,
+runs `hc_tests` and `hc_device_probe --no-audio-ok` (the runner has no sound card).
+
+## Build on the rig
 1. Install Visual Studio 2022 (Desktop development with C++) and CMake 3.28+.
-2. Optional for ASIO: download the ASIO SDK from https://www.steinberg.net/developers/ and extract it into `external/asiosdk/`.
-3. From this folder:
+2. ASIO (optional): `powershell -ExecutionPolicy Bypass -File tools\fetch-asio-sdk.ps1`
+3. Build:
    ```
-   cmake --preset rig
-   cmake --build --preset rig-release
+   cmake --preset rig            (or rig-asio after step 2)
+   cmake --build --preset rig-release   (or rig-asio-release)
    ```
 
-## Test tools
-- `build\rig\tools\device_probe\Release\hc_device_probe.exe` — checks CPU, WASAPI 48 kHz support, ASIO drivers
-- `build\rig\tools\engine_smoke\Release\hc_engine_smoke.exe` — plays a -18 dBFS 440 Hz tone through the engine
-  - ASIO: `hc_engine_smoke.exe --asio "Driver Name" --frames 64 --seconds 30`
+## Tools
+- `hc_device_probe.exe` — CPU check, then opens every 48 kHz-capable output (and ASIO driver),
+  plays 1 s of silence, and reports the real buffer size, latency and measured callback timing.
+- `hc_engine_smoke.exe` — plays a -18 dBFS 440 Hz tone through the engine.
+- `hc_tests.exe` — hardware-free unit tests.

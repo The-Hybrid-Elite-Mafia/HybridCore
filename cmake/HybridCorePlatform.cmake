@@ -45,6 +45,7 @@ target_compile_options(hc_build_flags INTERFACE
     /Zc:inline
     /utf-8
     /W4
+    /wd4324                 # "structure padded due to alignment": intentional cache-line padding
     /external:anglebrackets
     /external:W0
     /MP
