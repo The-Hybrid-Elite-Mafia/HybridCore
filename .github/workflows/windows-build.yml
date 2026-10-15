@@ -10,42 +10,42 @@ jobs:
     name: MSVC Release (WASAPI only)
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Toolchain versions
-        run: |
-          cmake --version
-          & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property catalog_productDisplayVersion
+        run: >
+          tools\ci\run-and-report.ps1 -Title "wasapi: toolchain" -Exe pwsh
+          -ArgList '-NoProfile','-Command','cmake --version; & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property catalog_productDisplayVersion; (Get-CimInstance Win32_Processor).Name'
 
       - name: Configure
-        run: cmake --preset rig
+        run: tools\ci\run-and-report.ps1 -Title "wasapi: configure" -Exe cmake -ArgList '--preset','rig'
 
       - name: Build Release
-        run: cmake --build --preset rig-release
+        run: tools\ci\run-and-report.ps1 -Title "wasapi: build" -Exe cmake -ArgList '--build','--preset','rig-release' -WarningSummary
 
       - name: Unit tests
-        run: ctest --test-dir build/rig -C Release --output-on-failure
+        run: tools\ci\run-and-report.ps1 -Title "wasapi: unit tests" -Exe ctest -ArgList '--test-dir','build/rig','-C','Release','-V'
 
       - name: Device probe
-        run: .\build\rig\tools\device_probe\Release\hc_device_probe.exe --no-audio-ok
+        run: tools\ci\run-and-report.ps1 -Title "wasapi: device probe" -Exe .\build\rig\tools\device_probe\Release\hc_device_probe.exe -ArgList '--no-audio-ok'
 
   asio-compile:
     name: MSVC Release (ASIO SDK fetched at build time, never committed)
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Fetch ASIO SDK
-        run: powershell -ExecutionPolicy Bypass -File tools\fetch-asio-sdk.ps1
+        run: tools\ci\run-and-report.ps1 -Title "asio: fetch sdk" -Exe powershell -ArgList '-ExecutionPolicy','Bypass','-File','tools\fetch-asio-sdk.ps1'
 
       - name: Configure (ASIO required)
-        run: cmake --preset rig-asio
+        run: tools\ci\run-and-report.ps1 -Title "asio: configure" -Exe cmake -ArgList '--preset','rig-asio'
 
       - name: Build Release
-        run: cmake --build --preset rig-asio-release
+        run: tools\ci\run-and-report.ps1 -Title "asio: build" -Exe cmake -ArgList '--build','--preset','rig-asio-release' -WarningSummary
 
       - name: Unit tests
-        run: ctest --test-dir build/rig-asio -C Release --output-on-failure
+        run: tools\ci\run-and-report.ps1 -Title "asio: unit tests" -Exe ctest -ArgList '--test-dir','build/rig-asio','-C','Release','-V'
 
       - name: Device probe
-        run: .\build\rig-asio\tools\device_probe\Release\hc_device_probe.exe --no-audio-ok
+        run: tools\ci\run-and-report.ps1 -Title "asio: device probe" -Exe .\build\rig-asio\tools\device_probe\Release\hc_device_probe.exe -ArgList '--no-audio-ok'
