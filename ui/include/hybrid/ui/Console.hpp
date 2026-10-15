@@ -27,7 +27,8 @@ namespace hc::ui {
 
 struct ConsoleTimings {
     double staticMs   = 0.0;   // CPU time to record the static layer (last rebuild)
-    double frameCpuMs = 0.0;   // CPU time to record + submit the last frame
+    double recordMs   = 0.0;   // CPU time of the UI code for the last frame (layout + vertex recording)
+    double frameCpuMs = 0.0;   // CPU time to record + submit the last frame (includes the GL driver)
 };
 
 class Console {

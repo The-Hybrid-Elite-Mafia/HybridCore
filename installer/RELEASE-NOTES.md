@@ -1,16 +1,21 @@
-## The Hybrid Core — Phases 1–5 test build
+## The Hybrid Core — 0.5.1 visual overhaul (test build)
 
 Private test build for Steven's rig (Windows 10/11 x64, Intel i7-14700HX).
 
-**What's inside**
-- **The Hybrid Core** (`HybridCore.exe`, desktop shortcut): GPU-drawn 13-stem console — 13 stem strips (trim, pan, 3 aux sends, mute/solo/phase, fader, meter) and 4 buses (Main + Aux 1–3), Pearl White / Obsidian / Titanium themes, WASAPI exclusive or ASIO, settings saved automatically.
-- **VST3 plug-in** (optional, installed to Common Files\VST3): the same 125-parameter 13-stem matrix for use inside a DAW (generic host controls, no custom screen yet).
-- Diagnostics: Rig Check (measured buffer/latency per device), Mixer Test (WASAPI / ASIO), Engine Self-Test.
+**What changed**
+- The console is now drawn on **Main-Faceplate.png**: your chrome, glass and neon art is the screen.
+- Knobs are layered (shadow, socket cut from your faceplate, rotating spun-metal body and pointer, fixed light), with glowing value arcs.
+- Chrome fader caps with a coloured centre line, recessed slots, glass LED meters with peak hold, chrome M / S / Ø caps that light from inside.
+- Poppins type: engraved on chrome, soft-shadowed on glass, neon in the display.
+- Glass display shows live engine numbers: latency, DSP load, driver, buffer, dropouts.
+- Round buttons: previous / next device, test tones, hardware inputs, clear solo, clear mute. Tabs pick what the 13 stem faders control (main mix or aux 1–3 sends).
+- New diagnostics shortcut "5 - Screen Snapshots" renders the console on your graphics card into a desktop folder.
+- The Pearl / Obsidian / Titanium themes are gone (they were the drawn look). A different faceplate in the same layout can go in `%APPDATA%\HybridCore\skins\Main-Faceplate.png`.
 
 **How to test:** see `HOW-TO-TEST.txt` (Start menu → The Hybrid Core → How to test).
 
-**Verified in CI** (GitHub Windows Server 2022 runner — no sound card, no GPU): builds with 0 compiler warnings; all unit tests pass; Steinberg's VST3 validator passes; the UI renders every theme correctly with a software OpenGL driver; the real app starts, draws and saves settings; the installer installs / upgrades / uninstalls silently and keeps settings.
+**Verified in CI** (GitHub Windows Server 2022 runner — no sound card, no GPU): builds, unit tests, VST3 validator, UI snapshots with the live engine compared against the faceplate, the real app starts and draws, installer install / upgrade / uninstall.
 
-**Not tested yet:** sound through real speakers, real latency, your graphics card, your ASIO driver, the plug-in inside a real DAW. That is what this build is for.
+**Not tested yet:** your graphics card (look, frame rate, 8× anti-aliasing), sound through real speakers, your ASIO driver, the plug-in inside a real DAW.
 
 Not code-signed: Windows SmartScreen will warn. Click "More info" → "Run anyway".

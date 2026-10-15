@@ -72,7 +72,9 @@ void Console::drawStaticIfDirty() {
 void Console::drawFrame(const ViewState& view, const MeterState& meters) {
     drawStaticIfDirty();
     renderer_.beginFrame(canvas_);
+    const auto t0 = std::chrono::steady_clock::now();
     view_->drawDynamic(renderer_, view, meters);
+    timings_.recordMs = msSince(t0);
 }
 
 void Console::render(const ViewState& view, const MeterState& meters, unsigned int targetFbo) {

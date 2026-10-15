@@ -5,19 +5,21 @@ Turn your speakers/headphones DOWN first. Close any app that is playing audio
 (DAW, browser, Suno): The Hybrid Core takes exclusive control of the device.
 
 1) Desktop: "The Hybrid Core"  (the main app)
-   - The console opens: 13 stem strips + Main / Aux 1-3 buses.
-   - Top bar shows the audio device, buffer size in ms and live CPU %.
-   - SOURCE = TEST TONES by default: you hear a soft chord and the meters move.
-   - Click DEVICE to step through your outputs (WASAPI) and ASIO drivers.
-   - Click THEME to switch Pearl White / Obsidian / Titanium.
+   - The console opens on your Main-Faceplate art: 13 stems in the big panel,
+     Main / Aux 1-3 buses in the left panel.
+   - Glass display (top right): output latency in ms, DSP load %, driver, buffer, dropouts.
+   - Round buttons, left to right: previous device, next device, TONES (soft test chord),
+     INPUTS (hardware inputs), CLR SOLO, CLR MUTE.
+   - Tabs: MAIN MIX / AUX 1 / AUX 2 / AUX 3 SENDS = what the 13 stem faders control.
    - Knobs: drag up/down. Hold Shift for fine moves. Double-click = reset. Mouse wheel works too.
    - Faders: drag the cap. M = mute, S = solo, Ø = phase invert.
+   - The last device in the list is "OFFLINE CLOCK - no sound" (meters run, nothing plays).
    - Your settings are saved automatically and come back next time.
    >> Screenshot the window and send it to Claude.
 
-   Your own faceplate art: put pearl.png / obsidian.png / titanium.png (any size, 8K is
-   fine) into %APPDATA%\HybridCore\skins\ and restart. It is scaled to your screen and
-   compressed before it reaches the graphics card.
+   A different faceplate: save it as Main-Faceplate.png (same layout, 16:9, 4K or 8K) in
+   %APPDATA%\HybridCore\skins\ and restart. It is scaled to your window before it reaches
+   the graphics card.
 
 2) Start menu > The Hybrid Core > Diagnostics > "1 - Rig Check"
    Checks your CPU, lists your sound devices and ASIO drivers, plays 2 seconds of
@@ -31,7 +33,11 @@ Turn your speakers/headphones DOWN first. Close any app that is playing audio
 4) Diagnostics > "4 - Engine Self-Test" — runs the built-in tests (no sound).
    Last line should say: ... 0 failed -> PASS
 
-5) VST3 (optional): in your DAW, rescan plug-ins and look for "The Hybrid Core"
+5) Diagnostics > "5 - Screen Snapshots" — renders the console on YOUR graphics card at
+   3840x2160 and 1389x868 into a "HybridCore Snapshots" folder on your desktop, next to your
+   faceplate, and prints frame times.   >> Send the folder's PNGs and a screenshot of the text.
+
+6) VST3 (optional): in your DAW, rescan plug-ins and look for "The Hybrid Core"
    (vendor Hybrid Elite Mafia). It has 13 stereo inputs (Stem 1 + 12 side-chain inputs)
    and 4 stereo outputs. It uses the DAW's own generic controls (no custom screen yet).
 

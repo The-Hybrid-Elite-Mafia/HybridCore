@@ -26,6 +26,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <iterator>
 #include <string>
@@ -135,8 +136,10 @@ int wmain(int argc, wchar_t** argv) {
             while (pos < s.size()) {
                 const std::size_t comma = s.find(L',', pos);
                 const std::wstring item = s.substr(pos, comma == std::wstring::npos ? std::wstring::npos : comma - pos);
-                int w = 0, h = 0;
-                if (std::swscanf(item.c_str(), L"%dx%d", &w, &h) == 2 && w >= 320 && h >= 200 && w <= 4096 && h <= 4096) sizes.push_back({w, h});
+                wchar_t* end = nullptr;
+                const long w = std::wcstol(item.c_str(), &end, 10);
+                const long h = (end && *end == L'x') ? std::wcstol(end + 1, nullptr, 10) : 0;
+                if (w >= 320 && h >= 200 && w <= 4096 && h <= 4096) sizes.push_back({static_cast<int>(w), static_cast<int>(h)});
                 if (comma == std::wstring::npos) break;
                 pos = comma + 1;
             }
@@ -208,7 +211,7 @@ int wmain(int argc, wchar_t** argv) {
         vs.tonesOn      = true;
 
         constexpr int kFrames = 12;
-        double cpuMs = 0, totalMs = 0;
+        double cpuMs = 0, totalMs = 0, recordMs = 0;
         for (int f = 0; f < kFrames; ++f) {
             pump(0.05);   // keep the meters live between frames
             vs.status = st.line1 + "   \xC2\xB7   faceplate " + console.faceplateInfo();
@@ -219,6 +222,7 @@ int wmain(int argc, wchar_t** argv) {
             ::glFinish();
             const auto t2 = std::chrono::steady_clock::now();
             if (f > 0) {   // frame 0 also builds the static layer
+                recordMs += console.timings().recordMs;
                 cpuMs   += std::chrono::duration<double, std::milli>(t1 - t0).count();
                 totalMs += std::chrono::duration<double, std::milli>(t2 - t0).count();
             }
@@ -238,17 +242,19 @@ int wmain(int argc, wchar_t** argv) {
         const double frameDiff = meanAbsDiff(shot, ref, 0, S(250), S(56), S(880));               // left neon frame (above the band)
         const double meterLit  = static_cast<double>(litPixels(shot, S(700), S(1500), S(3800), S(1935 + cv.extraH)));
         const double display   = regionStdDev(shot, S(2660), S(265), S(3700), S(430));
-        const bool ok = plateDiff < 3.0 && frameDiff < 3.0 && meterLit > 200 && display > 12.0 && ::glGetError() == GL_NO_ERROR;
+        // 1:1 (4K) must be exact; scaled windows differ only by filtering (GPU trilinear vs CPU resample).
+        const double tol = cv.scale == 1.0f ? 0.5 : 8.0;
+        const bool ok = plateDiff < tol && frameDiff < tol && meterLit > 200 && display > 12.0 && ::glGetError() == GL_NO_ERROR;
         failures += ok ? 0 : 1;
         const auto& rs = console.renderer().stats();
         std::wprintf(L"\n%dx%d  canvas scale %.4f  stretch +%.0f  chassis texture %u px\n"
-                     L"  frame: CPU %.2f ms (recording + submit)  CPU+GPU %.1f ms (software GPU in CI)  static layer %.1f ms (once)\n"
+                     L"  frame: UI code %.2f ms CPU (layout + vertex recording)  with GL driver %.1f ms  until GPU done %.1f ms  static layer %.1f ms (once)\n"
                      L"  draw calls %u  quads %u  emissive quads %u  textures %.1f MB  render targets %.1f MB\n"
-                     L"  faceplate match: top bar diff %.2f/255  frame diff %.2f/255   meters lit px %.0f   display contrast %.1f  -> %ls\n"
+                     L"  faceplate match: top bar diff %.2f/255  frame diff %.2f/255 (limit %.1f)   meters lit px %.0f   display contrast %.1f  -> %ls\n"
                      L"  saved %hs.png and %hs-vs-faceplate.png\n",
-                     sz.w, sz.h, cv.scale, cv.extraH, console.chassisTextureWidth(), cpuMs / (kFrames - 1), totalMs / (kFrames - 1),
+                     sz.w, sz.h, cv.scale, cv.extraH, console.chassisTextureWidth(), recordMs / (kFrames - 1), cpuMs / (kFrames - 1), totalMs / (kFrames - 1),
                      console.timings().staticMs, rs.drawCalls, rs.quads, rs.bloomQuads, console.renderer().textureBytes() / 1048576.0,
-                     console.renderer().targetBytes() / 1048576.0, plateDiff, frameDiff, meterLit, display, ok ? L"PASS" : L"FAIL",
+                     console.renderer().targetBytes() / 1048576.0, plateDiff, frameDiff, tol, meterLit, display, ok ? L"PASS" : L"FAIL",
                      base.c_str(), base.c_str());
     }
     const app::HostStatus& st = host.status();
