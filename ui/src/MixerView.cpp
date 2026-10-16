@@ -55,7 +55,8 @@ Rgba zoneColour(float segNorm) {
 
 bool isBipolar(const params::Parameter& p) {
     const auto& sp = p.spec();
-    return sp.kind == params::Kind::Pan || (sp.kind == params::Kind::Decibel && !sp.minIsOff && sp.min < 0.0f && sp.max > 0.0f);
+    return sp.kind == params::Kind::Pan || ((sp.kind == params::Kind::Decibel || sp.kind == params::Kind::Linear) && !sp.minIsOff &&
+                                            sp.min < 0.0f && sp.max > 0.0f);
 }
 
 std::string fmt(const char* f, double v) {
@@ -484,22 +485,27 @@ void MixerView::drawDynamic(Renderer& r, const ViewState& v, const MeterState& m
         case WidgetKind::Knob:
         case WidgetKind::SendKnob: {
             Rgba acc = stemAccent(w.index);
-            if (w.kind == WidgetKind::SendKnob) acc = busAccent(static_cast<std::uint32_t>(w.caption[1] - '0'));
+            if (w.kind == WidgetKind::SendKnob && layout_.page() == Page::Mix) acc = busAccent(static_cast<std::uint32_t>(w.caption[1] - '0'));
             drawKnob(r, w, acc, hot);
             break;
         }
         case WidgetKind::Button: drawButton(r, w, static_cast<int>(i) == v.pressed); break;
         case WidgetKind::Transport: drawTransport(r, w, v); break;
         case WidgetKind::Tab: {
-            const bool sel = w.index == bank;
+            // Tabs 1-3 pick the knob page; tab 4 cycles the fader bank (lit when the faders are on a send).
+            const bool faders = w.action == UiAction::FaderBank;
+            const bool sel = faders ? bank > 0 : static_cast<std::uint32_t>(layout_.page()) == w.index;
+            static const char* const kBankCap[4] = {"FADERS: MAIN", "FADERS: AUX 1", "FADERS: AUX 2", "FADERS: AUX 3"};
+            const std::string cap = faders ? kBankCap[std::min<std::uint32_t>(bank, 3)] : w.caption;
             const float baseline = w.rect.cy() + r.capHeight(TextStyle::Tab) * 0.5f;
+            const Rgba tint = faders ? busAccent(bank) : kTabBlue;
             if (sel) {
                 const Rect f = w.rect.inset(8, 9);
-                r.fillRound(f, plate::kTabFaceRadius - 6, kTabBlue.withAlpha(0.62f), Blend::Over);
-                r.glow(f, plate::kTabFaceRadius - 6, 9, kTabBlue.withAlpha(0.45f), true);
-                r.text(TextStyle::Tab, w.caption, w.rect.cx(), baseline, rgb8(0xFFFFFF), Align::Center, TextFx::Shadowed);
+                r.fillRound(f, plate::kTabFaceRadius - 6, tint.withAlpha(0.62f), Blend::Over);
+                r.glow(f, plate::kTabFaceRadius - 6, 9, tint.withAlpha(0.45f), true);
+                r.text(TextStyle::Tab, cap, w.rect.cx(), baseline, rgb8(0xFFFFFF), Align::Center, TextFx::Shadowed);
             } else {
-                r.text(TextStyle::Tab, w.caption, w.rect.cx(), baseline, kEngrave, Align::Center, TextFx::Engraved);
+                r.text(TextStyle::Tab, cap, w.rect.cx(), baseline, kEngrave, Align::Center, TextFx::Engraved);
             }
             break;
         }
@@ -535,7 +541,14 @@ void MixerView::drawDynamic(Renderer& r, const ViewState& v, const MeterState& m
             drawMeterColumn(r, {in.x, in.y, cw, in.h}, m.busL[st.index], m.busHoldL[st.index], true);
             drawMeterColumn(r, {in.x + cw + 4, in.y, cw, in.h}, m.busR[st.index], m.busHoldR[st.index], true);
         } else {
-            drawMeterColumn(r, st.meter.inset(9, 12), m.stem[st.index], m.stemHold[st.index], true);
+            const Rect col = st.meter.inset(9, 12);
+            drawMeterColumn(r, col, m.stem[st.index], m.stemHold[st.index], true);
+            // Compressor gain reduction: an amber bar hanging from the top (full height = 24 dB).
+            const float gr = std::min(v.gainReduction[st.index], 24.0f);
+            if (gr > 0.05f) {
+                const float h = std::max(3.0f, col.h * gr / 24.0f);
+                r.fillRound({col.x + col.w * 0.3f, col.y, col.w * 0.4f, h}, 3, rgb8(0xFF6A10, 0.9f), Blend::Over, true);   // narrower than the LEDs, orange
+            }
         }
         drawGlassOverlay(r, st.meter.inset(5));
         drawGlassOverlay(r, st.valueBox.inset(5));
@@ -550,6 +563,15 @@ void MixerView::drawDynamic(Renderer& r, const ViewState& v, const MeterState& m
     drawGlassOverlay(r, mm.inset(6));
     drawOverview(r, v);
     drawGlassOverlay(r, layout_.overview().inset(6));
+    {   // Limiter gain reduction next to the LIM button.
+        const Rect lb = layout_.limiterButton();
+        const params::Parameter* lim = tree_.find("main.limit");
+        const bool on = lim && lim->isOn();
+        const std::string gr = !on ? "OFF" : v.limiterGr >= 0.05f ? fmt("-%.1f dB", static_cast<double>(v.limiterGr)) : "0.0 dB";
+        r.text(TextStyle::Caption, "GR", lb.right() + 22, lb.y + 14, kEngraveLo, Align::Left, TextFx::Engraved);
+        r.text(TextStyle::Caption, gr, lb.right() + 22, lb.bottom() - 2, on && v.limiterGr >= 0.05f ? rgb8(0x8A1C14) : kEngrave, Align::Left,
+               TextFx::Engraved);
+    }
     const Rect sa = layout_.statusArea();
     r.text(TextStyle::Status, fit(r, TextStyle::Status, v.status, sa.w - 40), sa.x, sa.cy() + r.capHeight(TextStyle::Status) * 0.5f,
            v.alert ? rgb8(0x8A1C14) : kEngraveLo, Align::Left, TextFx::Engraved);

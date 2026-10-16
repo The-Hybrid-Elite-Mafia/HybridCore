@@ -208,6 +208,10 @@ int main(int argc, char** argv) {
     testParams();
     testSettings();
     testMixerBinding();
+    testChannelStrip();
+    testLimiter();
+    testStripInMatrix();
+    testStripParams();
     testMediaFiles();
     testResampler();
     testStemLoader();

@@ -90,7 +90,7 @@ public:
         for (std::uint32_t s = 1; s < kStems; ++s) addAudioInput(inNames[s], Vst::SpeakerArr::kStereo, Vst::BusTypes::kAux, 0);
         addAudioOutput(outNames[0], Vst::SpeakerArr::kStereo);
         for (std::uint32_t b = 1; b < kBuses; ++b) addAudioOutput(outNames[b], Vst::SpeakerArr::kStereo, Vst::BusTypes::kAux, 0);
-        bindings_->applyAll(tree_, matrix_);
+        bindings_->applyAll(tree_, matrix_, &limiter_);
         return kResultOk;
     }
 
@@ -109,8 +109,9 @@ public:
 
     tresult PLUGIN_API setupProcessing(Vst::ProcessSetup& setup) SMTG_OVERRIDE {
         const auto maxFrames = static_cast<std::uint32_t>(std::clamp<int32>(setup.maxSamplesPerBlock, 32, 8192));
-        matrix_.prepare(maxFrames);
-        bindings_->applyAll(tree_, matrix_);
+        matrix_.prepare(maxFrames, setup.sampleRate);
+        limiter_.prepare(setup.sampleRate, maxFrames);
+        bindings_->applyAll(tree_, matrix_, &limiter_);
         return AudioEffect::setupProcessing(setup);
     }
 
@@ -128,7 +129,7 @@ public:
                 if (points > 0 && id < tree_.size() && q->getPoint(points - 1, offset, value) == kResultTrue) {
                     params::Parameter& p = tree_.at(id);
                     p.setNormalized(static_cast<float>(value));
-                    bindings_->apply(p, matrix_);
+                    bindings_->apply(p, matrix_, &limiter_);
                 }
             }
         }
@@ -147,12 +148,16 @@ public:
                 }
             }
             matrix_.process(L.data(), R.data(), frames);
+            std::array<const float*, dsp::BusLimiter::kChannels> buses{};
+            for (std::uint32_t b = 0; b < kBuses; ++b)
+                for (std::uint32_t c = 0; c < 2; ++c) buses[2 * b + c] = matrix_.busChannel(b, c);
+            limiter_.process(buses.data(), frames);
             for (std::uint32_t b = 0; b < kBuses && b < static_cast<std::uint32_t>(data.numOutputs); ++b) {
                 Vst::AudioBusBuffers& out = data.outputs[b];
                 if (!out.channelBuffers32) continue;
                 for (int32 c = 0; c < out.numChannels && c < 2; ++c)
                     if (out.channelBuffers32[c])
-                        std::memcpy(out.channelBuffers32[c] + done, matrix_.busChannel(b, static_cast<std::uint32_t>(c)),
+                        std::memcpy(out.channelBuffers32[c] + done, limiter_.channel(b, static_cast<std::uint32_t>(c)),
                                     frames * sizeof(float));
                 out.silenceFlags = 0;
             }
@@ -163,16 +168,20 @@ public:
 
     tresult PLUGIN_API setState(IBStream* state) SMTG_OVERRIDE {
         if (!readState(state, tree_)) return kResultFalse;
-        bindings_->applyAll(tree_, matrix_);
+        bindings_->applyAll(tree_, matrix_, &limiter_);
         return kResultOk;
     }
 
     tresult PLUGIN_API getState(IBStream* state) SMTG_OVERRIDE { return writeState(state, tree_) ? kResultOk : kResultFalse; }
 
+    // Every bus runs through the limiter's look-ahead delay (1 ms), on or off, so the latency is constant.
+    uint32 PLUGIN_API getLatencySamples() SMTG_OVERRIDE { return limiter_.latency(); }
+
 private:
     params::ParameterTree                  tree_;
     std::unique_ptr<params::MixerBindings> bindings_;
     dsp::StemMatrix                        matrix_;
+    dsp::BusLimiter                        limiter_;
 };
 
 // ---- controller ------------------------------------------------------------------
@@ -204,12 +213,13 @@ public:
             else if (s[0] == 'L' || s[0] == 'l') plain = -std::strtof(s.c_str() + 1, nullptr) / 100.0f;
             else if (s[0] == 'R' || s[0] == 'r') plain = std::strtof(s.c_str() + 1, nullptr) / 100.0f;
             else plain = std::strtof(s.c_str(), nullptr);
-        } else if (s.find("inf") != std::string::npos) {
+        } else if (s.find("inf") != std::string::npos || s.find("OFF") != std::string::npos || s.find("off") != std::string::npos) {
             plain = sp.min;
         } else {
             char* end = nullptr;
             plain = std::strtof(s.c_str(), &end);
             if (end == s.c_str()) return false;
+            if (sp.unit == "Hz" && s.find_first_of("kK", static_cast<std::size_t>(end - s.c_str())) != std::string::npos) plain *= 1000.0f;
         }
         norm = param_.toNormalized(plain);
         return true;
@@ -220,7 +230,11 @@ public:
 
 private:
     static const Vst::TChar* unitFor(const params::Parameter& p) {
-        return p.spec().kind == params::Kind::Decibel ? STR16("dB") : STR16("");
+        const std::string& u = p.spec().unit;
+        if (p.spec().kind == params::Kind::Decibel || u == "dB") return STR16("dB");
+        if (u == "Hz") return STR16("Hz");
+        if (u == "ms") return STR16("ms");
+        return STR16("");
     }
     const params::Parameter& param_;
 };

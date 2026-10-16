@@ -50,6 +50,7 @@ public:
     AudioHost& operator=(const AudioHost&) = delete;
 
     [[nodiscard]] dsp::StemMatrix& matrix() noexcept { return mixer_->matrix(); }
+    [[nodiscard]] dsp::BusLimiter& limiter() noexcept { return mixer_->limiter(); }
     [[nodiscard]] engine::MixerProcessor::Source source() const noexcept { return mixer_->source(); }
     void setSource(engine::MixerProcessor::Source s) noexcept { mixer_->setSource(s); }
 

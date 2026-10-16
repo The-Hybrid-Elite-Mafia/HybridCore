@@ -8,11 +8,12 @@
 //    name panel   : device + format (click: next device, right-click: previous)
 //    6 sockets    : LOAD stems, |◀ to start, PLAY / PAUSE, STOP, LOOP, SOURCE (tones / inputs / stems)
 //    glass display: song position + length, DSP load, driver / buffer / latency / dropouts
-//    4 tabs       : fader bank — MAIN MIX / AUX 1 / AUX 2 / AUX 3 sends on the stem faders
+//    4 tabs       : knob page MIX (trim, pan, aux sends) / EQ / DYNAMICS, and FADERS (cycles what
+//                   the 13 stem faders control: MAIN / AUX 1 / AUX 2 / AUX 3 sends)
 //    left panel   : 4 bus strips (Main, Aux 1–3)
 //    main panel   : 13 stem strips
 //    top bar      : title, status line (engraved)
-//    bottom bar   : song overview (click / drag to seek) + main bus L/R meter
+//    bottom bar   : song overview (click / drag to seek), LIM (main limiter) + main output L/R meter
 //  The left/main panels grow with Canvas::extraH (windows taller than 16:9).
 // =============================================================================
 #include "hybrid/core/Config.hpp"
@@ -30,7 +31,19 @@ namespace hc::ui {
 
 enum class WidgetKind : std::uint8_t { Knob, SendKnob, Fader, Button, StemMeter, BusMeter, MasterMeter, Transport, Tab, NamePanel, Overview };
 enum class UiAction : std::uint8_t { None, PrevDevice, NextDevice, LoadStems, CycleSource, ClearSolo, ClearMute, FaderBank,
-                                     ToStart, PlayPause, Stop, ToggleLoop, Seek };
+                                     ToStart, PlayPause, Stop, ToggleLoop, Seek, SelectPage };
+
+// What the 5 knobs of every stem strip control.
+enum class Page : std::uint8_t { Mix, Eq, Dynamics };
+inline constexpr std::uint32_t kPages      = 3;
+inline constexpr std::uint32_t kStripKnobs = 5;   // 2 large + 3 small per stem strip
+// Parameter field ("stemNN.<field>") and caption of each knob on each page.
+inline constexpr const char* kPageFields[kPages][kStripKnobs]   = {{"trim", "pan", "aux1", "aux2", "aux3"},
+                                                                   {"lo", "hi", "hpf", "mid", "midf"},
+                                                                   {"thr", "ratio", "att", "rel", "mkup"}};
+inline constexpr const char* kPageCaptions[kPages][kStripKnobs] = {{"TRIM", "PAN", "A1", "A2", "A3"},
+                                                                   {"LOW", "HIGH", "CUT", "MID", "FREQ"},
+                                                                   {"THRESH", "RATIO", "ATK", "REL", "GAIN"}};
 
 inline constexpr std::uint32_t kFaderBanks = hc::kBusCount;   // MAIN + AUX 1..3
 
@@ -77,17 +90,25 @@ public:
     // Which send the 13 stem faders control (0 = MAIN mix, 1..3 = AUX sends).
     [[nodiscard]] std::uint32_t faderBank() const noexcept { return bank_; }
     void setFaderBank(std::uint32_t bank) noexcept;
+    // Rebinds the 5 knobs of every stem strip (parameters and captions).
+    void setPage(Page page) noexcept;
+    [[nodiscard]] Page page() const noexcept { return page_; }
     [[nodiscard]] int faderParam(std::uint32_t stem, std::uint32_t bank) const noexcept { return stemFader_[stem][bank]; }
 
     [[nodiscard]] Rect masterMeter() const noexcept { return master_; }
     [[nodiscard]] Rect statusArea() const noexcept { return status_; }
     [[nodiscard]] Rect overview() const noexcept { return overview_; }
+    [[nodiscard]] Rect limiterButton() const noexcept { return limit_; }
 
 private:
     std::vector<Widget>      widgets_;
     std::vector<StripLayout> strips_;
     std::array<std::array<int, kFaderBanks>, hc::kStemCount> stemFader_{};
     std::uint32_t bank_   = 0;
+    Page          page_   = Page::Mix;
+    std::array<std::array<int, kStripKnobs>, hc::kStemCount> knobWidget_{};
+    std::array<std::array<std::array<int, kStripKnobs>, kPages>, hc::kStemCount> pageParam_{};
+    Rect          limit_;
     float         extraH_ = 0;
     Rect          master_, status_, overview_;
 };

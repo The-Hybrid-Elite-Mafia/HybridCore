@@ -133,7 +133,8 @@ double MixerProcessor::testToneHz(std::uint32_t stem) noexcept {
 
 void MixerProcessor::prepare(const io::StreamConfig& config) {
     maxFrames_ = config.blockFrames;
-    matrix_.prepare(maxFrames_);
+    matrix_.prepare(maxFrames_, static_cast<double>(config.sampleRate));
+    limiter_.prepare(static_cast<double>(config.sampleRate), maxFrames_);
     toneData_.allocate(static_cast<std::size_t>(dsp::StemMatrix::kStems) * maxFrames_);
     stemData_.allocate(static_cast<std::size_t>(dsp::StemMatrix::kStems) * 2 * maxFrames_);
     for (std::uint32_t s = 0; s < dsp::StemMatrix::kStems; ++s) {
@@ -188,10 +189,15 @@ void MixerProcessor::process(const ProcessContext& ctx) noexcept {
     songPub_.store(songFrames_, std::memory_order_relaxed);
     playingPub_.store(playing_, std::memory_order_relaxed);
 
+    std::array<const float*, dsp::BusLimiter::kChannels> buses{};
+    for (std::uint32_t b = 0; b < dsp::StemMatrix::kBuses; ++b)
+        for (std::uint32_t c = 0; c < 2; ++c) buses[2 * b + c] = matrix_.busChannel(b, c);
+    limiter_.process(buses.data(), ctx.frames);
+
     for (std::uint32_t b = 0; b < dsp::StemMatrix::kBuses; ++b)
         for (std::uint32_t c = 0; c < 2; ++c) {
             const std::uint32_t out = 2 * b + c;
-            if (out < ctx.numOutputs) dsp::copy(ctx.outputs[out], matrix_.busChannel(b, c), ctx.frames);
+            if (out < ctx.numOutputs) dsp::copy(ctx.outputs[out], limiter_.channel(b, c), ctx.frames);
         }
 }
 

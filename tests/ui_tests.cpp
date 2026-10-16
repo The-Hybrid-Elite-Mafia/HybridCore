@@ -251,6 +251,7 @@ void testUiLayout() {
         int knobs = 0, knobsOut = 0;
         for (const auto& w : L.widgets()) {
             if (w.kind != ui::WidgetKind::Knob && w.kind != ui::WidgetKind::SendKnob && w.kind != ui::WidgetKind::Button) continue;
+            if (w.caption == "LIM") continue;   // bottom bar
             ++knobs;
             if (!inside(w.rect, L.strips()[w.kind == ui::WidgetKind::Button && w.caption == "M" && w.rect.x < mainP.x ? kStemCount + w.index : w.index].bed)) ++knobsOut;
         }
@@ -288,8 +289,38 @@ void testUiLayout() {
         CHECK(!in.takeSeek(f));
         CHECK(o.x >= ui::plate::kBottomBar.x && o.right() <= L.masterMeter().x);
     }
-    CHECK(in.mouseDown(ui::plate::kTabFaces[2].cx(), ui::plate::kTabFaces[2].cy(), false, false, &idx) == ui::UiAction::FaderBank && idx == 2);
+    CHECK(in.mouseDown(ui::plate::kTabFaces[2].cx(), ui::plate::kTabFaces[2].cy(), false, false, &idx) == ui::UiAction::SelectPage && idx == 2);
     in.mouseUp();
+    CHECK(in.mouseDown(ui::plate::kTabFaces[3].cx(), ui::plate::kTabFaces[3].cy(), false, false, &idx) == ui::UiAction::FaderBank && idx == 3);
+    in.mouseUp();
+    {   // LIM button in the bottom bar toggles the main limiter.
+        const ui::Rect lb = L.limiterButton();
+        params::Parameter* lim = tree.find("main.limit");
+        const bool was = lim->isOn();
+        in.mouseDown(lb.cx(), lb.cy(), false, false);
+        in.mouseUp();
+        CHECK(lim->isOn() != was && lb.x > L.overview().right() && lb.right() < L.masterMeter().x);
+        lim->setPlain(was ? 1.0f : 0.0f);
+    }
+
+    // Knob pages: every stem knob rebinds to that page's parameter and caption, and back.
+    {
+        int ok = 0, total = 0;
+        for (std::uint32_t pg = 0; pg < ui::kPages; ++pg) {
+            L.setPage(static_cast<ui::Page>(pg));
+            for (const auto& w : L.widgets()) {
+                if (w.kind != ui::WidgetKind::Knob && w.kind != ui::WidgetKind::SendKnob) continue;
+                const float kx = w.rect.cx() - L.strips()[w.index].bed.cx();
+                const std::uint32_t k = w.kind == ui::WidgetKind::Knob ? (w.rect.cy() < L.strips()[w.index].bed.y + 300 ? 0u : 1u)
+                                                                        : (kx < -1 ? 2u : kx > 1 ? 4u : 3u);
+                ++total;
+                if (tree.at(static_cast<std::size_t>(w.param)).spec().id == params::stemParamId(w.index, ui::kPageFields[pg][k]) &&
+                    w.caption == ui::kPageCaptions[pg][k]) ++ok;
+            }
+        }
+        L.setPage(ui::Page::Mix);
+        CHECK(total == static_cast<int>(3 * kStemCount * 5) && ok == total);
+    }
 
     // Fader bank: the 13 stem faders follow the selected send.
     L.setFaderBank(2);

@@ -73,6 +73,8 @@ struct ViewState {
     std::array<StemSlotView, hc::kStemCount> slots{};
     TransportView transport;
     const std::vector<float>* overview = nullptr;   // song overview, peak 0..1 per bin (null = nothing loaded)
+    std::array<float, hc::kStemCount> gainReduction{};   // compressor gain reduction per stem, dB >= 0
+    float         limiterGr = 0.0f;                       // main limiter gain reduction, dB >= 0
     EngineReadout engine;
     int           hover   = -1;    // widget indices from Interaction
     int           active  = -1;

@@ -43,6 +43,7 @@ bool Console::resize(int w, int h, std::string* error) {
     if (!layout_ || layout_->extraH() != c.extraH) {
         layout_ = std::make_unique<Layout>(tree_, c.extraH);
         layout_->setFaderBank(bank_);
+        layout_->setPage(page_);
         view_ = std::make_unique<MixerView>(*layout_, tree_);
         if (interaction_) interaction_->rebind(*layout_);
         else interaction_ = std::make_unique<Interaction>(*layout_, tree_);
@@ -56,6 +57,13 @@ bool Console::resize(int w, int h, std::string* error) {
 void Console::setFaderBank(std::uint32_t bank) {
     bank_ = std::min(bank, kFaderBanks - 1);
     if (layout_) layout_->setFaderBank(bank_);
+    staticDirty_ = true;
+}
+
+void Console::setPage(Page page) {
+    page_ = page;
+    if (layout_) layout_->setPage(page_);
+    if (interaction_) interaction_->rebind(*layout_);   // drop any drag on a knob that changed meaning
     staticDirty_ = true;
 }
 

@@ -122,13 +122,16 @@ struct App {
     std::vector<app::DeviceChoice> devices;
     int                   deviceIndex = 0;
 
-    void saveSettings(std::uint32_t bank) {
+    // uiState = fader bank + 4 × knob page.
+    void saveSettings(std::uint32_t uiState) {
+        const std::uint32_t bank = uiState % 4, page = uiState / 4;
         settings.setSectionText("params", tree.serialize());
         const auto& d = audio.current();
         settings.set("app", "device.kind", kindName(d.kind));
         settings.set("app", "device.id", app::toUtf8(d.id));
         settings.set("app", "source", sourceName(audio.source()));
         settings.set("app", "faderBank", std::to_string(bank));
+        settings.set("app", "page", std::to_string(page));
         settings.set("app", "loop", audio.loop() ? "1" : "0");
         for (std::uint32_t s = 0; s < kStemCount; ++s) settings.set("stems", slotKey(s), app::toUtf8(stems.slot(s).file.wstring()));
         settings.save(params::Settings::defaultFile());
@@ -199,7 +202,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     params::addMixerParameters(a.tree);
     a.tree.deserialize(a.settings.sectionText("params"));
     const params::MixerBindings bindings(a.tree);
-    params::bindMixerParameters(a.tree, bindings, a.audio.matrix());
+    params::bindMixerParameters(a.tree, bindings, a.audio.matrix(), &a.audio.limiter());
     a.tree.dispatchChanges();   // push every value into the matrix before audio starts
 
     a.restoreStems();   // background loads; the saved source below wins over the "switch to stems" a load does
@@ -224,6 +227,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         return 3;
     }
     console.setFaderBank(static_cast<std::uint32_t>(std::clamp(std::atoi(a.settings.get("app", "faderBank", "0").c_str()), 0, 3)));
+    console.setPage(static_cast<ui::Page>(std::clamp(std::atoi(a.settings.get("app", "page", "0").c_str()), 0, 2)));
+    auto uiState = [&console] { return console.faderBank() + 4u * static_cast<std::uint32_t>(console.page()); };
 
     ui::MeterState meters;
     const auto started = std::chrono::steady_clock::now();
@@ -231,7 +236,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     auto lastFrame = started;
     auto lastSave  = lastFrame;
     std::uint64_t savedVersion = a.tree.version();
-    std::uint32_t savedBank    = console.faderBank();
+    std::uint32_t savedBank    = uiState();
     bool          savedLoop    = a.audio.loop();
 
     while (window.pump()) {
@@ -260,7 +265,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                 }
                 case ui::UiAction::ClearSolo:    a.clearAll("solo"); break;
                 case ui::UiAction::ClearMute:    a.clearAll("mute"); break;
-                case ui::UiAction::FaderBank:    console.setFaderBank(idx); break;
+                case ui::UiAction::FaderBank:    console.setFaderBank((console.faderBank() + 1) % ui::kFaderBanks); break;
+                case ui::UiAction::SelectPage:   console.setPage(static_cast<ui::Page>(idx)); break;
                 case ui::UiAction::ToStart:      a.audio.seek(0); break;
                 case ui::UiAction::PlayPause:    a.playPause(); break;
                 case ui::UiAction::Stop:         a.audio.stop(); break;
@@ -322,16 +328,18 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         float sp[kStemCount], bl[kBusCount], br[kBusCount];
         for (std::uint32_t s = 0; s < kStemCount; ++s) sp[s] = a.audio.matrix().stemPeak(s);
         for (std::uint32_t b = 0; b < kBusCount; ++b) { bl[b] = a.audio.matrix().busPeak(b, 0); br[b] = a.audio.matrix().busPeak(b, 1); }
+        bl[0] = a.audio.limiter().mainPeak(0);   // Main is metered after the limiter (what reaches the speakers)
+        br[0] = a.audio.limiter().mainPeak(1);
         if (!a.audio.status().running) { for (float& v : sp) v = 0; for (float& v : bl) v = 0; for (float& v : br) v = 0; }
         meters.update(sp, bl, br, std::min(dt, 0.1f));
 
         // Persist settings at most every 5 s, only when something changed (crash-safe file replace).
         if (now - lastSave > std::chrono::seconds(5)) {
             lastSave = now;
-            if (a.tree.version() != savedVersion || console.faderBank() != savedBank || a.audio.loop() != savedLoop || a.stems.loading()) {
-                a.saveSettings(console.faderBank());
+            if (a.tree.version() != savedVersion || uiState() != savedBank || a.audio.loop() != savedLoop || a.stems.loading()) {
+                a.saveSettings(uiState());
                 savedVersion = a.tree.version();
-                savedBank    = console.faderBank();
+                savedBank    = uiState();
                 savedLoop    = a.audio.loop();
             }
         }
@@ -369,6 +377,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         vs.transport.position  = static_cast<double>(a.audio.stemPlayhead()) / kSampleRate;
         vs.transport.length    = static_cast<double>(a.stems.songFrames()) / kSampleRate;
         vs.overview            = a.stems.songOverview().empty() ? nullptr : &a.stems.songOverview();
+        for (std::uint32_t s = 0; s < kStemCount; ++s) vs.gainReduction[s] = st.running ? a.audio.matrix().strip(s).gainReductionDb() : 0.0f;
+        vs.limiterGr           = st.running ? a.audio.limiter().gainReductionDb() : 0.0f;
         vs.hover   = console.interaction().hoverWidget();
         vs.active  = console.interaction().activeWidget();
         vs.pressed = console.interaction().pressedWidget();
@@ -385,6 +395,6 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     }
 
     a.audio.close();
-    a.saveSettings(console.faderBank());
+    a.saveSettings(uiState());
     return 0;
 }

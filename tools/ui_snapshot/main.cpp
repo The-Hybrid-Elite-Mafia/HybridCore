@@ -127,6 +127,16 @@ void setUserControls(params::ParameterTree& t) {
     t.find("stem11.main")->setPlain(-12.0f);
     t.find("stem12.trim")->setPlain(-6.0f);
     t.find("aux1.mute")->setPlain(1.0f);
+    t.find("stem01.hpf")->setPlain(80.0f);
+    t.find("stem01.lo")->setPlain(4.0f);
+    t.find("stem01.mid")->setPlain(-3.0f);
+    t.find("stem01.midf")->setPlain(2500.0f);
+    t.find("stem01.hi")->setPlain(3.0f);
+    t.find("stem01.thr")->setPlain(-40.0f);
+    t.find("stem01.ratio")->setPlain(4.0f);
+    t.find("stem01.mkup")->setPlain(6.0f);
+    t.find("stem04.thr")->setPlain(-44.0f);
+    t.find("stem04.ratio")->setPlain(8.0f);
 }
 
 } // namespace
@@ -138,6 +148,7 @@ int wmain(int argc, wchar_t** argv) {
     double seconds = 2.0;
     bool   offline = true;
     std::filesystem::path stemsDir;
+    ui::Page page = ui::Page::Mix;
     std::string           prefix = "HybridCore";
     for (int i = 1; i < argc; ++i) {
         const std::wstring k = argv[i];
@@ -145,6 +156,7 @@ int wmain(int argc, wchar_t** argv) {
         else if (k == L"--seconds" && i + 1 < argc) seconds = std::wcstod(argv[++i], nullptr);
         else if (k == L"--device" && i + 1 < argc) offline = std::wstring(argv[++i]) != L"default";
         else if (k == L"--stems" && i + 1 < argc) stemsDir = argv[++i];
+        else if (k == L"--page" && i + 1 < argc) { const std::wstring p = argv[++i]; page = p == L"eq" ? ui::Page::Eq : p == L"dyn" ? ui::Page::Dynamics : ui::Page::Mix; }
         else if (k == L"--name" && i + 1 < argc) { prefix.clear(); for (const wchar_t* c = argv[++i]; *c; ++c) prefix.push_back(*c < 128 ? static_cast<char>(*c) : '_'); }
         else if (k == L"--sizes" && i + 1 < argc) {
             sizes.clear();
@@ -161,7 +173,7 @@ int wmain(int argc, wchar_t** argv) {
                 pos = comma + 1;
             }
         } else {
-            std::wprintf(L"usage: hc_ui_snapshot [--out <folder>] [--sizes 3840x2160,1389x868] [--seconds 2] [--device offline|default] [--stems <folder>] [--name <prefix>]\n");
+            std::wprintf(L"usage: hc_ui_snapshot [--out <folder>] [--sizes 3840x2160,1389x868] [--seconds 2] [--device offline|default] [--stems <folder>] [--name <prefix>] [--page mix|eq|dyn]\n");
             return 1;
         }
     }
@@ -175,7 +187,7 @@ int wmain(int argc, wchar_t** argv) {
     params::addMixerParameters(tree);
     app::AudioHost host;
     const params::MixerBindings bindings(tree);
-    params::bindMixerParameters(tree, bindings, host.matrix());
+    params::bindMixerParameters(tree, bindings, host.matrix(), &host.limiter());
     setUserControls(tree);
     tree.dispatchChanges();
     const auto devices = app::AudioHost::listDevices();
@@ -200,7 +212,8 @@ int wmain(int argc, wchar_t** argv) {
     }
     std::wprintf(L"Engine  : %hs\n          %hs\n", host.status().line1.c_str(), host.status().line2.c_str());
     std::wprintf(L"Controls set before the shots: stem 2 fader -6 dB, stem 3 mute, stem 5 phase, stem 6 pan L60, stem 7 pan R80,\n"
-                 L"          stem 8 trim +9 dB, stem 9 aux1 -3 dB, stem 10 aux2 -8 dB, stem 11 fader -12 dB, stem 12 trim -6 dB, aux 1 mute.\n");
+                 L"          stem 8 trim +9 dB, stem 9 aux1 -3 dB, stem 10 aux2 -8 dB, stem 11 fader -12 dB, stem 12 trim -6 dB, aux 1 mute,\n"
+                 L"          stem 1 EQ (cut 80 Hz, low +4, mid -3 @ 2.5 kHz, high +3) + compressor -40 dB 4:1 +6 dB, stem 4 compressor -44 dB 8:1.\n");
 
     ui::MeterState meters;
     auto pump = [&](double forSeconds) {
@@ -215,6 +228,8 @@ int wmain(int argc, wchar_t** argv) {
             float sp[kStemCount], bl[kBusCount], br[kBusCount];
             for (std::uint32_t s = 0; s < kStemCount; ++s) sp[s] = host.matrix().stemPeak(s);
             for (std::uint32_t b = 0; b < kBusCount; ++b) { bl[b] = host.matrix().busPeak(b, 0); br[b] = host.matrix().busPeak(b, 1); }
+            bl[0] = host.limiter().mainPeak(0);
+            br[0] = host.limiter().mainPeak(1);
             meters.update(sp, bl, br, std::chrono::duration<float>(now - last).count());
             last = now;
         }
@@ -229,6 +244,7 @@ int wmain(int argc, wchar_t** argv) {
     std::filesystem::path assets = exeDir() / "assets";   // build tree; installed: <app>\bin\..\assets
     if (!std::filesystem::is_directory(assets, ec)) assets = exeDir().parent_path() / "assets";
     if (!console.init(assets, {}, 8, &err)) { std::wprintf(L"console init failed: %hs\n", err.c_str()); return 2; }
+    console.setPage(page);
     std::wprintf(L"OpenGL  : %hs\nRenderer: %hs\nMSAA    : %d samples (requested 8, GPU maximum %d)\nFaceplate: %hs\n",
                  console.renderer().glVersion().c_str(), console.renderer().glRenderer().c_str(), console.renderer().samples(),
                  console.renderer().maxSamples(), console.faceplateInfo().c_str());
@@ -265,6 +281,8 @@ int wmain(int argc, wchar_t** argv) {
             vs.transport.position = static_cast<double>(host.stemPlayhead()) / hc::kSampleRate;
             vs.transport.length   = static_cast<double>(deck.songFrames()) / hc::kSampleRate;
             vs.overview           = deck.songOverview().empty() ? nullptr : &deck.songOverview();
+            for (std::uint32_t s2 = 0; s2 < kStemCount; ++s2) vs.gainReduction[s2] = host.matrix().strip(s2).gainReductionDb();
+            vs.limiterGr          = host.limiter().gainReductionDb();
             const auto t0 = std::chrono::steady_clock::now();
             console.renderToCapture(vs, meters);
             const auto t1 = std::chrono::steady_clock::now();

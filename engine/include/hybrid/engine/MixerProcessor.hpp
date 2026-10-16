@@ -10,7 +10,8 @@
 //                returns to the start). Song length = longest loaded stem; shorter stems play
 //                silence after their end. Starts and seeks fade in over 64 samples, pause / stop
 //                fade out over one block, so the transport never clicks.
-//  Bus b is written to output channels 2b / 2b+1 when the device has them (bus 0 = Main = outs 1/2).
+//  Bus b is written to output channels 2b / 2b+1 when the device has them (bus 0 = Main = outs 1/2),
+//  after dsp::BusLimiter: every bus is delayed by the limiter look-ahead (latencyFrames()), Main is limited.
 //
 //  Stem hand-off is lock-free and allocation-free on the audio thread:
 //    message thread  submitStem()  --commands ring-->  audio thread swaps the slot pointer
@@ -23,6 +24,7 @@
 #include "hybrid/core/AlignedBuffer.hpp"
 #include "hybrid/core/SpscRing.hpp"
 #include "hybrid/dsp/StemMatrix.hpp"
+#include "hybrid/dsp/BusLimiter.hpp"
 
 #include <array>
 #include <atomic>
@@ -43,6 +45,9 @@ public:
     [[nodiscard]] Source source() const noexcept { return source_.load(std::memory_order_relaxed); }
     [[nodiscard]] dsp::StemMatrix&       matrix() noexcept { return matrix_; }
     [[nodiscard]] const dsp::StemMatrix& matrix() const noexcept { return matrix_; }
+    [[nodiscard]] dsp::BusLimiter&       limiter() noexcept { return limiter_; }
+    [[nodiscard]] const dsp::BusLimiter& limiter() const noexcept { return limiter_; }
+    [[nodiscard]] std::uint32_t latencyFrames() const noexcept { return limiter_.latency(); }
 
     // ---- stems (message thread) ----------------------------------------------------
     // Queues `audio` for `slot` (nullptr clears the slot). On success ownership moves to
@@ -84,6 +89,7 @@ private:
 
     std::atomic<Source>                               source_;
     dsp::StemMatrix                                   matrix_;
+    dsp::BusLimiter                                   limiter_;
     core::AlignedBuffer<float>                        toneData_;
     core::AlignedBuffer<float>                        stemData_;   // 13 × 2 × maxFrames
     std::array<Osc, dsp::StemMatrix::kStems>          osc_{};

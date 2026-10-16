@@ -41,9 +41,9 @@ Layout::Layout(const params::ParameterTree& tree, float extraH) : extraH_(std::m
         const float R = plate::kSocketOuterRadius;
         widgets_.push_back({WidgetKind::Transport, {c.cx - R, c.cy - R, 2 * R, 2 * R}, -1, i, kSocketActions[i], kSocketCaps[i]});
     }
-    static const char* const kTabCaps[4] = {"MAIN MIX", "AUX 1 SENDS", "AUX 2 SENDS", "AUX 3 SENDS"};
+    static const char* const kTabCaps[4] = {"MIX", "EQ", "DYNAMICS", "FADERS"};
     for (std::uint32_t i = 0; i < plate::kTabFaces.size(); ++i)
-        widgets_.push_back({WidgetKind::Tab, plate::kTabFaces[i], -1, i, UiAction::FaderBank, kTabCaps[i]});
+        widgets_.push_back({WidgetKind::Tab, plate::kTabFaces[i], -1, i, i < kPages ? UiAction::SelectPage : UiAction::FaderBank, kTabCaps[i]});
 
     // ---- stem strips (main panel) ----
     const float bottomPad = kPanelMargin;
@@ -64,16 +64,19 @@ Layout::Layout(const params::ParameterTree& tree, float extraH) : extraH_(std::m
         for (std::uint32_t b = 0; b < kFaderBanks; ++b)
             stemFader_[s][b] = paramIndex(tree, params::stemParamId(s, b == 0 ? "main" : (b == 1 ? "aux1" : b == 2 ? "aux2" : "aux3")));
 
-        widgets_.push_back({WidgetKind::Knob, {cx - kKnobD / 2, y0 + 222 - kKnobD / 2, kKnobD, kKnobD},
-                            paramIndex(tree, params::stemParamId(s, "trim")), s, UiAction::None, "TRIM"});
-        widgets_.push_back({WidgetKind::Knob, {cx - kKnobD / 2, y0 + 382 - kKnobD / 2, kKnobD, kKnobD},
-                            paramIndex(tree, params::stemParamId(s, "pan")), s, UiAction::None, "PAN"});
-        static const char* const kAux[3] = {"aux1", "aux2", "aux3"};
-        static const char* const kAuxCap[3] = {"A1", "A2", "A3"};
-        for (int a = 0; a < 3; ++a) {
-            const float kx = cx + static_cast<float>(a - 1) * kSendPitch;
-            widgets_.push_back({WidgetKind::SendKnob, {kx - kSendD / 2, y0 + 520 - kSendD / 2, kSendD, kSendD},
-                                paramIndex(tree, params::stemParamId(s, kAux[a])), s, UiAction::None, kAuxCap[a]});
+        for (std::uint32_t pg = 0; pg < kPages; ++pg)
+            for (std::uint32_t k = 0; k < kStripKnobs; ++k) pageParam_[s][pg][k] = paramIndex(tree, params::stemParamId(s, kPageFields[pg][k]));
+        for (std::uint32_t k = 0; k < 2; ++k) {
+            knobWidget_[s][k] = static_cast<int>(widgets_.size());
+            const float ky = y0 + (k == 0 ? 222.0f : 382.0f);
+            widgets_.push_back({WidgetKind::Knob, {cx - kKnobD / 2, ky - kKnobD / 2, kKnobD, kKnobD}, pageParam_[s][0][k], s, UiAction::None,
+                                kPageCaptions[0][k]});
+        }
+        for (std::uint32_t a = 0; a < 3; ++a) {
+            const float kx = cx + (static_cast<float>(a) - 1.0f) * kSendPitch;
+            knobWidget_[s][2 + a] = static_cast<int>(widgets_.size());
+            widgets_.push_back({WidgetKind::SendKnob, {kx - kSendD / 2, y0 + 520 - kSendD / 2, kSendD, kSendD}, pageParam_[s][0][2 + a], s,
+                                UiAction::None, kPageCaptions[0][2 + a]});
         }
         static const char* const kBtn[3] = {"mute", "solo", "invert"};
         static const char* const kBtnCap[3] = {"M", "S", "\xC3\x98"};   // UTF-8 "Ø"
@@ -126,7 +129,9 @@ Layout::Layout(const params::ParameterTree& tree, float extraH) : extraH_(std::m
     // ---- bottom bar ----
     const float by = plate::kBottomBar.y + extraH_;
     master_   = {2900, by + 34, 820, 74};
-    overview_ = {130, by + 26, 2430, 90};
+    overview_ = {130, by + 26, 2270, 90};
+    limit_    = {2448, by + 47, 112, 48};
+    widgets_.push_back({WidgetKind::Button, limit_, paramIndex(tree, params::busParamId(0, "limit")), 0, UiAction::None, "LIM"});
     status_   = {1120, plate::kTopBar.y, 1960, plate::kTopBar.h};   // engraved in the top bar
     widgets_.push_back({WidgetKind::MasterMeter, master_, -1, 0, UiAction::None, ""});
     widgets_.push_back({WidgetKind::Overview, overview_, -1, 0, UiAction::Seek, ""});
@@ -136,6 +141,17 @@ void Layout::setFaderBank(std::uint32_t bank) noexcept {
     bank_ = std::min(bank, kFaderBanks - 1);
     for (const StripLayout& st : strips_)
         if (!st.isBus) widgets_[static_cast<std::size_t>(st.faderWidget)].param = stemFader_[st.index][bank_];
+}
+
+void Layout::setPage(Page page) noexcept {
+    page_ = page;
+    const auto pg = static_cast<std::uint32_t>(page);
+    for (std::uint32_t s = 0; s < hc::kStemCount; ++s)
+        for (std::uint32_t k = 0; k < kStripKnobs; ++k) {
+            Widget& w = widgets_[static_cast<std::size_t>(knobWidget_[s][k])];
+            w.param   = pageParam_[s][pg][k];
+            w.caption = kPageCaptions[pg][k];
+        }
 }
 
 int Layout::hitTest(float x, float y) const noexcept {

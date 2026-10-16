@@ -2,10 +2,11 @@
 // =============================================================================
 //  StemMatrix — the 13-stem × 4-bus stereo routing matrix.
 //
-//  Per stem   : trim (dB), polarity invert, balance (-1 L .. +1 R), mute, solo,
-//               send level to every bus (dB, -inf = off)
+//  Per stem   : trim (dB) -> ChannelStrip (EQ + compressor) -> polarity invert,
+//               balance (-1 L .. +1 R), mute, solo, send level to every bus (dB, -inf = off)
 //  Per bus    : gain (dB), mute
-//  Metering   : peak + RMS per stem (post-trim, pre-fader) and per bus channel
+//  Metering   : peak + RMS per stem (post-trim/EQ/compressor, pre-fader) and per bus channel;
+//               compressor gain reduction per stem
 //
 //  Threading
 //    Setters / meter getters : any non-RT thread (message/UI). Wait-free atomics.
@@ -16,6 +17,7 @@
 // =============================================================================
 #include "hybrid/core/AlignedBuffer.hpp"
 #include "hybrid/core/Config.hpp"
+#include "hybrid/dsp/ChannelStrip.hpp"
 
 #include <array>
 #include <atomic>
@@ -34,7 +36,7 @@ public:
     StemMatrix& operator=(const StemMatrix&) = delete;
 
     // ---- message thread ----------------------------------------------------
-    void prepare(std::uint32_t maxFrames);
+    void prepare(std::uint32_t maxFrames, double sampleRate = hc::kSampleRate);
 
     void setStemTrimDb(std::uint32_t stem, float db) noexcept;
     void setStemBalance(std::uint32_t stem, float balance) noexcept;   // -1 .. +1
@@ -44,6 +46,10 @@ public:
     void setSendDb(std::uint32_t stem, std::uint32_t bus, float db) noexcept;
     void setBusGainDb(std::uint32_t bus, float db) noexcept;
     void setBusMute(std::uint32_t bus, bool mute) noexcept;
+
+    // Per-stem EQ + compressor (setters are thread-safe atomics).
+    [[nodiscard]] ChannelStrip&       strip(std::uint32_t stem) noexcept { return strips_[stem]; }
+    [[nodiscard]] const ChannelStrip& strip(std::uint32_t stem) const noexcept { return strips_[stem]; }
 
     [[nodiscard]] float stemPeak(std::uint32_t stem) const noexcept;
     [[nodiscard]] float stemRms(std::uint32_t stem) const noexcept;
@@ -88,8 +94,13 @@ private:
     std::array<Meter, kStems>          stemMeters_{};
     std::array<Meter, kBuses * 2>      busMeters_{};
 
+    std::array<ChannelStrip, kStems>   strips_{};
+
     // RT-owned ramp state
     float prevSend_[kStems][kBuses][2]{};
+    float prevTrim_[kStems]{};
+    bool  viaStrip_[kStems]{};          // last block went through the strip (trim applied in the buffer)
+    core::AlignedBuffer<float> stripData_;   // 2 × maxFrames scratch for the stem being processed
     float prevBus_[kBuses]{};
 
     core::AlignedBuffer<float> busData_;

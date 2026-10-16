@@ -1,3 +1,23 @@
+## The Hybrid Core — 0.8.0: Phase 8 EQ + compressor on every stem, main limiter
+
+Private test build for Steven's rig (Windows 10/11 x64, Intel i7-14700HX).
+
+**New**
+- **EQ on every stem:** low cut, low shelf, mid (sweepable 150 Hz – 8 kHz), high shelf. Tab **EQ**.
+- **Compressor on every stem:** threshold, ratio, attack, release, makeup. Tab **DYNAMICS**. An orange bar on each stem meter shows the gain reduction.
+- **Main limiter (LIM):** look-ahead brick-wall limiter on the main output, ceiling −0.3 dB, on by default. Gain reduction shown next to the button. Adds 1 ms of delay to every output (same on all buses, so they stay lined up).
+- **FADERS tab** cycles the stem faders between MAIN / AUX 1 / AUX 2 / AUX 3 sends.
+- The VST3 plug-in has the same EQ, compressor and limiter, and reports its 1 ms latency to the DAW.
+- The main meters now show the signal after the limiter.
+
+**Measured in the tests** (CI machine, not your rig): EQ curves within 0.1 dB of design at the checked points; compressor −20 dB 4:1 on a full-scale tone turns it down 14.5 dB (15 dB on paper — the detector follows the waveform); limiter never let a sample past the ceiling with bursts 15 dB over it; all 13 stems with every band and the compressor plus the limiter cost about 4 % of one CPU core at 480 frames; 0 memory allocations on the audio thread.
+
+**Not tested yet:** how it sounds on your speakers, your graphics card, your ASIO driver, the plug-in in a DAW.
+
+Not code-signed: Windows SmartScreen will warn. Click "More info" → "Run anyway".
+
+---
+
 ## The Hybrid Core — 0.7.0: Phase 7 transport (play / pause / stop / seek / loop) + song overview
 
 Private test build for Steven's rig (Windows 10/11 x64, Intel i7-14700HX).

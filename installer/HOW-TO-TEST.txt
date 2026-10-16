@@ -25,7 +25,15 @@ Turn your speakers/headphones DOWN first. Close any app that is playing audio
      Anything not 48 kHz is converted to 48 kHz while it loads. Loading never starts playback:
      press PLAY. All stems play together; the song is as long as the longest stem.
      Right-click a strip's name to empty it. Your stems come back next time you open the app.
-   - Tabs: MAIN MIX / AUX 1 / AUX 2 / AUX 3 SENDS = what the 13 stem faders control.
+   - Tabs: MIX / EQ / DYNAMICS change what the 5 knobs on every stem do:
+       MIX      = TRIM, PAN, A1 / A2 / A3 sends
+       EQ       = LOW (shelf 100 Hz), HIGH (shelf 10 kHz), CUT (low cut, all the way left = off),
+                  MID (boost / cut), FREQ (where the MID works, 150 Hz - 8 kHz)
+       DYNAMICS = compressor: THRESH, RATIO (all the way left = off), ATK, REL, GAIN (makeup)
+     An orange bar hanging from the top of a stem meter = how much the compressor is turning it down.
+     FADERS tab: click to switch the stem faders between MAIN, AUX 1, AUX 2, AUX 3 sends.
+   - LIM (bottom bar, blue = on) is a safety limiter on the main output: nothing goes over
+     -0.3 dB. GR next to it shows how much it is turning down. It adds 1 ms of delay.
    - Knobs: drag up/down. Hold Shift for fine moves. Double-click = reset. Mouse wheel works too.
    - Faders: drag the cap. M = mute, S = solo, Ø = phase invert.
    - The last device in the list is "OFFLINE CLOCK - no sound" (meters run, nothing plays).

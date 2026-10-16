@@ -27,6 +27,7 @@ enum class Kind : std::uint8_t {
     Pan,       // -1 (L) .. +1 (R), linear
     Toggle,    // 0 / 1
     Linear,    // min..max, linear
+    Log,       // min..max on a logarithmic taper (frequency, time, ratio); min > 0
 };
 
 struct ParamSpec {
@@ -40,6 +41,8 @@ struct ParamSpec {
     // Decibel taper: this plain value sits at anchorNorm on the control (e.g. 0 dB at 0.75).
     float       anchorPlain = 0.0f;
     float       anchorNorm  = 0.0f;    // 0 = linear taper
+    std::string unit;                  // "dB", "Hz", "ms", ":1" — display / host unit ("" = none)
+    bool        offLabel = false;      // Log / Linear: the bottom of travel shows "OFF"
 };
 
 class Parameter {

@@ -6,9 +6,15 @@
 //    trim  (-24..+24 dB)   pan (-1..+1)   main / aux1 / aux2 / aux3 sends (-60..+6 dB, bottom = off)
 //    mute  solo  invert    (toggles)
 //  Per bus ("main", "aux1".."aux3"):  gain (-60..+6 dB, bottom = off)   mute
+//  Added in 0.8.0 (appended, so earlier ids / VST3 parameter numbers are unchanged):
+//    per stem  EQ: hpf (20..1000 Hz, 20 = off)  lo / mid / hi (±15 dB)  midf (150..8000 Hz)
+//              compressor: thr (-48..0 dB)  ratio (1..20, 1 = off)  att (0.1..100 ms)
+//                          rel (10..2000 ms)  mkup (0..24 dB)
+//    main      limit (toggle, default on)  ceil (-12..0 dB, default -0.3)
 // =============================================================================
 #include "hybrid/params/ParameterTree.hpp"
 #include "hybrid/dsp/StemMatrix.hpp"
+#include "hybrid/dsp/BusLimiter.hpp"
 
 #include <cstdint>
 #include <string>
@@ -28,10 +34,14 @@ void addMixerParameters(ParameterTree& tree);
 class MixerBindings {
 public:
     explicit MixerBindings(const ParameterTree& tree);
-    void apply(const Parameter& p, dsp::StemMatrix& matrix) const noexcept;
-    void applyAll(const ParameterTree& tree, dsp::StemMatrix& matrix) const noexcept;
+    // `limiter` may be null (limiter parameters are then ignored).
+    void apply(const Parameter& p, dsp::StemMatrix& matrix, dsp::BusLimiter* limiter = nullptr) const noexcept;
+    void applyAll(const ParameterTree& tree, dsp::StemMatrix& matrix, dsp::BusLimiter* limiter = nullptr) const noexcept;
 
-    enum class Target : std::uint8_t { None, Trim, Pan, Send, Mute, Solo, Invert, BusGain, BusMute };
+    enum class Target : std::uint8_t { None, Trim, Pan, Send, Mute, Solo, Invert, BusGain, BusMute,
+                                       EqHpf, EqLow, EqMid, EqMidHz, EqHigh,
+                                       CompThreshold, CompRatio, CompAttack, CompRelease, CompMakeup,
+                                       LimitOn, LimitCeiling };
     struct Entry { Target target = Target::None; std::uint8_t index = 0; std::uint8_t bus = 0; };
     [[nodiscard]] const Entry& entry(std::size_t paramIndex) const noexcept { return table_[paramIndex]; }
 
@@ -41,6 +51,7 @@ private:
 
 // Binds every mixer parameter to the matrix. Listeners run on dispatchChanges().
 // `bindings` must outlive the tree's listeners.
-void bindMixerParameters(ParameterTree& tree, const MixerBindings& bindings, dsp::StemMatrix& matrix);
+void bindMixerParameters(ParameterTree& tree, const MixerBindings& bindings, dsp::StemMatrix& matrix,
+                         dsp::BusLimiter* limiter = nullptr);
 
 } // namespace hc::params

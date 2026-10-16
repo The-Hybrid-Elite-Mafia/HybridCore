@@ -21,6 +21,7 @@ std::string_view trim(std::string_view s) {
 Parameter::Parameter(ParamSpec spec, std::uint32_t index) : spec_(std::move(spec)), index_(index) {
     if (!(spec_.max > spec_.min)) throw std::invalid_argument("parameter range must be max > min: " + spec_.id);
     if (spec_.kind == Kind::Toggle) { spec_.min = 0.0f; spec_.max = 1.0f; }
+    if (spec_.kind == Kind::Log && !(spec_.min > 0.0f)) throw std::invalid_argument("log parameter needs min > 0: " + spec_.id);
     if (spec_.anchorNorm > 0.0f && spec_.anchorNorm < 1.0f && spec_.anchorPlain > spec_.min && spec_.anchorPlain < spec_.max) {
         const float t = (spec_.anchorPlain - spec_.min) / (spec_.max - spec_.min);
         taperExp_ = std::log(t) / std::log(spec_.anchorNorm);
@@ -51,6 +52,7 @@ void Parameter::setPlain(float v) noexcept {
 }
 
 float Parameter::toNormalized(float p) const noexcept {
+    if (spec_.kind == Kind::Log) return std::log(clampPlain(p) / spec_.min) / std::log(spec_.max / spec_.min);
     const float t = (clampPlain(p) - spec_.min) / (spec_.max - spec_.min);
     return taperExp_ == 1.0f ? t : std::pow(t, 1.0f / taperExp_);
 }
@@ -58,6 +60,7 @@ float Parameter::toNormalized(float p) const noexcept {
 float Parameter::toPlain(float n) const noexcept {
     if (!std::isfinite(n)) n = 0.0f;
     n = std::clamp(n, 0.0f, 1.0f);
+    if (spec_.kind == Kind::Log) return clampPlain(spec_.min * std::pow(spec_.max / spec_.min, n));
     const float t = taperExp_ == 1.0f ? n : std::pow(n, taperExp_);
     return clampPlain(spec_.min + t * (spec_.max - spec_.min));
 }
@@ -77,10 +80,26 @@ std::string Parameter::formatValue(float v) const {
         if (spec_.minIsOff && v <= spec_.min) return "-inf";
         std::snprintf(buf, sizeof(buf), "%+.1f dB", static_cast<double>(v));
         return buf;
+    case Kind::Log:
     case Kind::Linear:
-    default:
-        std::snprintf(buf, sizeof(buf), "%.2f", static_cast<double>(v));
+    default: {
+        if (spec_.offLabel && v <= spec_.min) return "OFF";
+        const double d = v;
+        const std::string& u = spec_.unit;
+        if (u == "Hz") {
+            if (d >= 1000.0) std::snprintf(buf, sizeof(buf), "%.2f kHz", d / 1000.0);
+            else std::snprintf(buf, sizeof(buf), "%.0f Hz", d);
+        } else if (u == "ms") {
+            std::snprintf(buf, sizeof(buf), d < 10.0 ? "%.1f ms" : "%.0f ms", d);
+        } else if (u == ":1") {
+            std::snprintf(buf, sizeof(buf), "%.1f:1", d);
+        } else if (u == "dB") {
+            std::snprintf(buf, sizeof(buf), spec_.min < 0.0f && spec_.max > 0.0f ? "%+.1f dB" : "%.1f dB", d);
+        } else {
+            std::snprintf(buf, sizeof(buf), "%.2f", d);
+        }
         return buf;
+    }
     }
 }
 

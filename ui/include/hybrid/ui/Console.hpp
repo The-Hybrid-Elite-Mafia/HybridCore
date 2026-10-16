@@ -43,6 +43,8 @@ public:
 
     void setFaderBank(std::uint32_t bank);
     [[nodiscard]] std::uint32_t faderBank() const noexcept { return bank_; }
+    void setPage(Page page);
+    [[nodiscard]] Page page() const noexcept { return page_; }
 
     // Draws one frame into `targetFbo` (0 = window) or into the capture buffer.
     void render(const ViewState& view, const MeterState& meters, unsigned int targetFbo);
@@ -75,6 +77,7 @@ private:
     std::uint32_t                 chassisWidth_ = 0;
     float                         fontScale_    = 0.0f;
     std::uint32_t                 bank_         = 0;
+    Page                          page_         = Page::Mix;
     std::string                   faceplateInfo_;
     ConsoleTimings                timings_;
 };

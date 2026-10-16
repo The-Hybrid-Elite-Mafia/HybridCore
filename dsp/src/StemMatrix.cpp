@@ -34,10 +34,16 @@ StemMatrix::StemMatrix() noexcept {
     }
 }
 
-void StemMatrix::prepare(std::uint32_t maxFrames) {
+void StemMatrix::prepare(std::uint32_t maxFrames, double sampleRate) {
     maxFrames_ = maxFrames;
     busData_.allocate(static_cast<std::size_t>(kBuses) * 2 * maxFrames);
+    stripData_.allocate(static_cast<std::size_t>(2) * maxFrames);
     for (auto& s : prevSend_) for (auto& b : s) b[0] = b[1] = 0.0f;
+    for (std::uint32_t s = 0; s < kStems; ++s) {
+        strips_[s].prepare(sampleRate);
+        prevTrim_[s] = stems_[s].trim.load(kRelaxed);
+        viaStrip_[s] = false;
+    }
     for (std::uint32_t b = 0; b < kBuses; ++b)
         prevBus_[b] = buses_[b].mute.load(kRelaxed) ? 0.0f : buses_[b].gain.load(kRelaxed);
 }
@@ -92,15 +98,44 @@ void StemMatrix::process(const float* const* stemL, const float* const* stemR, s
         if (L && !R) R = L;
         if (!L && R) L = R;
 
-        const float trim = p.trim.load(kRelaxed);
+        float trim = p.trim.load(kRelaxed);
         if (!L) {
             stemMeters_[s].peak.store(0.0f, kRelaxed);
             stemMeters_[s].rms.store(0.0f, kRelaxed);
             for (std::uint32_t b = 0; b < kBuses; ++b) prevSend_[s][b][0] = prevSend_[s][b][1] = 0.0f;
+            prevTrim_[s] = trim;
+            viaStrip_[s] = false;
             continue;
         }
 
-        // Stem meter: post-trim, pre-fader.
+        // EQ / compressor in use: trim (ramped) is applied into a scratch copy, the strip runs
+        // on it, and the sends below carry no trim. Switching paths re-expresses the send ramps
+        // with or without trim, so the total gain stays continuous at the block boundary.
+        ChannelStrip& cs = strips_[s];
+        const bool strip = cs.engaged();
+        if (strip != viaStrip_[s]) {
+            const float k = strip ? 1.0f / prevTrim_[s] : prevTrim_[s];
+            for (std::uint32_t b = 0; b < kBuses; ++b) { prevSend_[s][b][0] *= k; prevSend_[s][b][1] *= k; }
+            viaStrip_[s] = strip;
+        }
+        if (strip) {
+            float* sl = stripData_.data();
+            float* sr = sl + maxFrames_;
+            copy(sl, L, frames);
+            copy(sr, R, frames);
+            scaleRamp(sl, prevTrim_[s], trim, frames);
+            scaleRamp(sr, prevTrim_[s], trim, frames);
+            cs.process(sl, sr, frames);
+            prevTrim_[s] = trim;
+            L = sl;
+            R = sr;
+            trim = 1.0f;   // already in the buffer
+        } else {
+            prevTrim_[s] = trim;
+            if (cs.gainReductionDb() != 0.0f) cs.reset();
+        }
+
+        // Stem meter: post-trim (and strip), pre-fader.
         const float  pk = std::max(peakAbs(L, frames), R == L ? 0.0f : peakAbs(R, frames)) * trim;
         const double ss = sumSquares(L, frames) + (R == L ? sumSquares(L, frames) : sumSquares(R, frames));
         stemMeters_[s].peak.store(pk, kRelaxed);

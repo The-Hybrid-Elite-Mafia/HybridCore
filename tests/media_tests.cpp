@@ -371,6 +371,9 @@ void testStemPlayback() {
         cfg.sampleRate = 48000; cfg.blockFrames = F; cfg.numOutputs = 8;
         mp.prepare(cfg);
         for (std::uint32_t s = 1; s < kStemCount; ++s) mp.matrix().setStemMute(s, true);   // only stem 1 is heard
+        // Sample-exact checks read the matrix's Main bus: the device outputs are the same signal
+        // delayed by the limiter look-ahead (tested in strip_tests).
+        const float* mainBus = mp.matrix().busChannel(0, 0);
         std::vector<float> out(8 * F);
         float* outs[8];
         for (int i = 0; i < 8; ++i) outs[i] = out.data() + i * F;
@@ -389,7 +392,7 @@ void testStemPlayback() {
         std::vector<float> heard;
         for (int blk = 0; blk < 12; ++blk) {   // 3072 frames: two loops of 1500 plus change
             mp.process(ctx);
-            heard.insert(heard.end(), outs[0], outs[0] + F);
+            heard.insert(heard.end(), mainBus, mainBus + F);
         }
         CHECK(mp.stemSongFrames() == 1500);
         // Stem 1 (1000 frames) then 500 frames of silence, repeating every 1500 frames, at unity gain.
@@ -454,9 +457,10 @@ void testTransport() {
     cfg.sampleRate = 48000; cfg.blockFrames = F; cfg.numOutputs = 2;
     mp.prepare(cfg);
     std::vector<float> out(2 * F);
-    float* outs[2] = {out.data(), out.data() + F};
+    float* devOuts[2] = {out.data(), out.data() + F};
+    const float* outs[1] = {mp.matrix().busChannel(0, 0)};   // Main before the limiter delay (see strip_tests)
     engine::ProcessContext ctx;
-    ctx.outputs = outs; ctx.numOutputs = 2; ctx.frames = F;
+    ctx.outputs = devOuts; ctx.numOutputs = 2; ctx.frames = F;
     auto st = make(10 * F);
     CHECK(mp.submitStem(0, st));
 

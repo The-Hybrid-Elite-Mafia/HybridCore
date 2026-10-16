@@ -76,6 +76,37 @@ void addMixerParameters(ParameterTree& tree) {
         tree.add(fader(busParamId(b, "gain"), std::string(kBusNames[b]) + " Level", 0.0f));
         tree.add(toggle(busParamId(b, "mute"), std::string(kBusNames[b]) + " Mute"));
     }
+
+    // ---- 0.8.0: channel strips + main limiter (appended: earlier indices stay put) ----
+    auto lin = [](std::string id, std::string name, float lo, float hi, float def, const char* unit) {
+        ParamSpec s;
+        s.id = std::move(id); s.name = std::move(name);
+        s.kind = Kind::Linear; s.min = lo; s.max = hi; s.def = def; s.unit = unit;
+        return s;
+    };
+    auto lg = [](std::string id, std::string name, float lo, float hi, float def, const char* unit, bool off = false) {
+        ParamSpec s;
+        s.id = std::move(id); s.name = std::move(name);
+        s.kind = Kind::Log; s.min = lo; s.max = hi; s.def = def; s.unit = unit; s.offLabel = off;
+        return s;
+    };
+    for (std::uint32_t s = 0; s < kStems; ++s) {
+        const std::string n = "Stem " + std::to_string(s + 1) + " ";
+        tree.add(lg(stemParamId(s, "hpf"), n + "EQ Low Cut", dsp::ChannelStrip::kHpfOffHz, 1000.0f, dsp::ChannelStrip::kHpfOffHz, "Hz", true));
+        tree.add(lin(stemParamId(s, "lo"), n + "EQ Low", -15.0f, 15.0f, 0.0f, "dB"));
+        tree.add(lin(stemParamId(s, "mid"), n + "EQ Mid", -15.0f, 15.0f, 0.0f, "dB"));
+        tree.add(lg(stemParamId(s, "midf"), n + "EQ Mid Freq", 150.0f, 8000.0f, 1000.0f, "Hz"));
+        tree.add(lin(stemParamId(s, "hi"), n + "EQ High", -15.0f, 15.0f, 0.0f, "dB"));
+        tree.add(lin(stemParamId(s, "thr"), n + "Comp Threshold", -48.0f, 0.0f, -18.0f, "dB"));
+        tree.add(lg(stemParamId(s, "ratio"), n + "Comp Ratio", 1.0f, 20.0f, 1.0f, ":1", true));
+        tree.add(lg(stemParamId(s, "att"), n + "Comp Attack", 0.1f, 100.0f, 10.0f, "ms"));
+        tree.add(lg(stemParamId(s, "rel"), n + "Comp Release", 10.0f, 2000.0f, 150.0f, "ms"));
+        tree.add(lin(stemParamId(s, "mkup"), n + "Comp Makeup", 0.0f, 24.0f, 0.0f, "dB"));
+    }
+    ParamSpec limit = toggle(busParamId(0, "limit"), "Main Limiter");
+    limit.def = 1.0f;
+    tree.add(limit);
+    tree.add(lin(busParamId(0, "ceil"), "Main Limiter Ceiling", -12.0f, 0.0f, -0.3f, "dB"));
 }
 
 MixerBindings::MixerBindings(const ParameterTree& tree) : table_(tree.size()) {
@@ -92,6 +123,16 @@ MixerBindings::MixerBindings(const ParameterTree& tree) : table_(tree.size()) {
             else if (field == "mute")   e.target = Target::Mute;
             else if (field == "solo")   e.target = Target::Solo;
             else if (field == "invert") e.target = Target::Invert;
+            else if (field == "hpf")    e.target = Target::EqHpf;
+            else if (field == "lo")     e.target = Target::EqLow;
+            else if (field == "mid")    e.target = Target::EqMid;
+            else if (field == "midf")   e.target = Target::EqMidHz;
+            else if (field == "hi")     e.target = Target::EqHigh;
+            else if (field == "thr")    e.target = Target::CompThreshold;
+            else if (field == "ratio")  e.target = Target::CompRatio;
+            else if (field == "att")    e.target = Target::CompAttack;
+            else if (field == "rel")    e.target = Target::CompRelease;
+            else if (field == "mkup")   e.target = Target::CompMakeup;
             else
                 for (std::uint32_t b = 1; b < kBuses; ++b)
                     if (field == kBusIds[b]) { e.target = Target::Send; e.bus = static_cast<std::uint8_t>(b); }
@@ -99,12 +140,14 @@ MixerBindings::MixerBindings(const ParameterTree& tree) : table_(tree.size()) {
             e.index = static_cast<std::uint8_t>(idx);
             if (field == "gain")      e.target = Target::BusGain;
             else if (field == "mute") e.target = Target::BusMute;
+            else if (field == "limit" && idx == 0) e.target = Target::LimitOn;
+            else if (field == "ceil" && idx == 0)  e.target = Target::LimitCeiling;
         }
         table_[i] = e;
     }
 }
 
-void MixerBindings::apply(const Parameter& p, dsp::StemMatrix& m) const noexcept {
+void MixerBindings::apply(const Parameter& p, dsp::StemMatrix& m, dsp::BusLimiter* lim) const noexcept {
     if (p.index() >= table_.size()) return;
     const Entry& e = table_[p.index()];
     switch (e.target) {
@@ -116,17 +159,29 @@ void MixerBindings::apply(const Parameter& p, dsp::StemMatrix& m) const noexcept
     case Target::Invert:  m.setStemInvert(e.index, p.isOn()); break;
     case Target::BusGain: m.setBusGainDb(e.index, p.effectiveDb()); break;
     case Target::BusMute: m.setBusMute(e.index, p.isOn()); break;
+    case Target::EqHpf:         m.strip(e.index).setHpfHz(p.plain()); break;
+    case Target::EqLow:         m.strip(e.index).setLowDb(p.plain()); break;
+    case Target::EqMid:         m.strip(e.index).setMidDb(p.plain()); break;
+    case Target::EqMidHz:       m.strip(e.index).setMidHz(p.plain()); break;
+    case Target::EqHigh:        m.strip(e.index).setHighDb(p.plain()); break;
+    case Target::CompThreshold: m.strip(e.index).setThresholdDb(p.plain()); break;
+    case Target::CompRatio:     m.strip(e.index).setRatio(p.plain()); break;
+    case Target::CompAttack:    m.strip(e.index).setAttackMs(p.plain()); break;
+    case Target::CompRelease:   m.strip(e.index).setReleaseMs(p.plain()); break;
+    case Target::CompMakeup:    m.strip(e.index).setMakeupDb(p.plain()); break;
+    case Target::LimitOn:       if (lim) lim->setEnabled(p.isOn()); break;
+    case Target::LimitCeiling:  if (lim) lim->setCeilingDb(p.plain()); break;
     case Target::None:    break;
     }
 }
 
-void MixerBindings::applyAll(const ParameterTree& tree, dsp::StemMatrix& m) const noexcept {
-    for (std::size_t i = 0; i < tree.size(); ++i) apply(tree.at(i), m);
+void MixerBindings::applyAll(const ParameterTree& tree, dsp::StemMatrix& m, dsp::BusLimiter* lim) const noexcept {
+    for (std::size_t i = 0; i < tree.size(); ++i) apply(tree.at(i), m, lim);
 }
 
-void bindMixerParameters(ParameterTree& tree, const MixerBindings& bindings, dsp::StemMatrix& matrix) {
+void bindMixerParameters(ParameterTree& tree, const MixerBindings& bindings, dsp::StemMatrix& matrix, dsp::BusLimiter* limiter) {
     for (std::size_t i = 0; i < tree.size(); ++i)
-        tree.bind(tree.at(i), [&bindings, &matrix](const Parameter& p) { bindings.apply(p, matrix); });
+        tree.bind(tree.at(i), [&bindings, &matrix, limiter](const Parameter& p) { bindings.apply(p, matrix, limiter); });
 }
 
 } // namespace hc::params
