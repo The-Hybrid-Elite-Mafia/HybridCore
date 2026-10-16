@@ -12,7 +12,7 @@
 //                   the 13 stem faders control: MAIN / AUX 1 / AUX 2 / AUX 3 sends)
 //    left panel   : 4 bus strips (Main, Aux 1–3)
 //    main panel   : 13 stem strips
-//    top bar      : title, status line (engraved)
+//    top bar      : title, OPEN / SAVE / EXPORT, status line (engraved)
 //    bottom bar   : song overview (click / drag to seek), LIM (main limiter) + main output L/R meter
 //  The left/main panels grow with Canvas::extraH (windows taller than 16:9).
 // =============================================================================
@@ -29,9 +29,11 @@
 
 namespace hc::ui {
 
-enum class WidgetKind : std::uint8_t { Knob, SendKnob, Fader, Button, StemMeter, BusMeter, MasterMeter, Transport, Tab, NamePanel, Overview };
+enum class WidgetKind : std::uint8_t { Knob, SendKnob, Fader, Button, StemMeter, BusMeter, MasterMeter, Transport, Tab, NamePanel, Overview,
+                                       Command };
 enum class UiAction : std::uint8_t { None, PrevDevice, NextDevice, LoadStems, CycleSource, ClearSolo, ClearMute, FaderBank,
-                                     ToStart, PlayPause, Stop, ToggleLoop, Seek, SelectPage };
+                                     ToStart, PlayPause, Stop, ToggleLoop, Seek, SelectPage,
+                                     OpenSession, SaveSession, ExportMix };
 
 // What the 5 knobs of every stem strip control.
 enum class Page : std::uint8_t { Mix, Eq, Dynamics };

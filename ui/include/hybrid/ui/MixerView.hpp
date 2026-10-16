@@ -75,6 +75,7 @@ struct ViewState {
     const std::vector<float>* overview = nullptr;   // song overview, peak 0..1 per bin (null = nothing loaded)
     std::array<float, hc::kStemCount> gainReduction{};   // compressor gain reduction per stem, dB >= 0
     float         limiterGr = 0.0f;                       // main limiter gain reduction, dB >= 0
+    float         exportProgress = -1.0f;                 // 0..1 while a WAV export runs, -1 otherwise
     EngineReadout engine;
     int           hover   = -1;    // widget indices from Interaction
     int           active  = -1;
@@ -98,6 +99,7 @@ private:
     void drawKnobStatic(Renderer& r, const Widget& w) const;
     void drawKnob(Renderer& r, const Widget& w, Rgba accent, bool hot) const;
     void drawButton(Renderer& r, const Widget& w, bool pressed) const;
+    void drawCap(Renderer& r, Rect b, const std::string& caption, bool on, bool pressed, Rgba lit) const;
     void drawFader(Renderer& r, const StripLayout& st, Rgba lineColour) const;
     void drawMeterColumn(Renderer& r, Rect col, float level, float hold, bool lit) const;
     void drawMeterRow(Renderer& r, Rect row, float level, float hold, bool lit) const;

@@ -158,52 +158,49 @@ void StemLoader::worker() noexcept {
     }
 }
 
+std::expected<std::unique_ptr<engine::StemAudio>, std::string> buildStem(const std::filesystem::path& file, std::uint32_t outRate,
+                                                                        const Progress& progress) noexcept {
+    try {
+        auto decoded = decodeFile(file, [&](float f) { return !progress || progress(0.6f * f); });
+        if (!decoded) return std::unexpected(decoded.error());
+        DecodedAudio& d = *decoded;
+        const std::uint32_t srcRate = d.sampleRate;
+        if (!resampleTo(d, outRate, [&](float f) { return !progress || progress(0.6f + 0.4f * f); })) return std::unexpected(std::string("cancelled"));
+        auto a = std::make_unique<engine::StemAudio>();
+        a->frames = d.frames();
+        a->left.allocate(static_cast<std::size_t>(a->frames));
+        a->right.allocate(static_cast<std::size_t>(a->frames));
+        std::memcpy(a->left.data(), d.left.data(), sizeof(float) * d.left.size());
+        std::memcpy(a->right.data(), d.right.data(), sizeof(float) * d.right.size());
+        a->name           = utf8(file.stem());
+        a->path           = utf8(file);
+        a->format         = d.format + (d.note.empty() ? "" : " (" + d.note + ")");
+        a->sourceRate     = srcRate;
+        a->sourceChannels = d.channels;
+        a->overview.assign(engine::StemAudio::kOverviewBins, 0.0f);
+        for (std::uint64_t i = 0; i < a->frames; ++i) {
+            const std::size_t bin = static_cast<std::size_t>(i * engine::StemAudio::kOverviewBins / std::max<std::uint64_t>(a->frames, 1));
+            const float v = std::max(std::fabs(d.left[static_cast<std::size_t>(i)]), std::fabs(d.right[static_cast<std::size_t>(i)]));
+            if (v > a->overview[bin]) a->overview[bin] = std::min(v, 1.0f);
+        }
+        return a;
+    } catch (const std::exception& e) {   // e.g. out of memory on a huge file
+        return std::unexpected(std::string("load failed: ") + e.what());
+    }
+}
+
 void StemLoader::run(const Job& job) noexcept {
     const auto t0 = std::chrono::steady_clock::now();
     auto alive = [&] { return live_[job.slot].load(std::memory_order_relaxed) == job.generation; };
     Result res;
     res.slot = job.slot;
     res.file = job.file;
-    try {
-        auto decoded = decodeFile(job.file, [&](float f) {
-            progress_[job.slot].store(0.6f * f, std::memory_order_relaxed);
-            return alive();
-        });
-        if (!decoded) {
-            res.error = decoded.error();
-        } else {
-            DecodedAudio& d = *decoded;
-            const std::uint32_t srcRate = d.sampleRate;
-            if (!resampleTo(d, outRate_, [&](float f) {
-                    progress_[job.slot].store(0.6f + 0.38f * f, std::memory_order_relaxed);
-                    return alive();
-                })) {
-                res.error = "cancelled";
-            } else {
-                auto a = std::make_unique<engine::StemAudio>();
-                a->frames = d.frames();
-                a->left.allocate(static_cast<std::size_t>(a->frames));
-                a->right.allocate(static_cast<std::size_t>(a->frames));
-                std::memcpy(a->left.data(), d.left.data(), sizeof(float) * d.left.size());
-                std::memcpy(a->right.data(), d.right.data(), sizeof(float) * d.right.size());
-                a->name           = utf8(job.file.stem());
-                a->path           = utf8(job.file);
-                a->format         = d.format + (d.note.empty() ? "" : " (" + d.note + ")");
-                a->sourceRate     = srcRate;
-                a->sourceChannels = d.channels;
-                a->overview.assign(engine::StemAudio::kOverviewBins, 0.0f);
-                for (std::uint64_t i = 0; i < a->frames; ++i) {
-                    const std::size_t bin = static_cast<std::size_t>(i * engine::StemAudio::kOverviewBins / std::max<std::uint64_t>(a->frames, 1));
-                    const float v = std::max(std::fabs(d.left[static_cast<std::size_t>(i)]), std::fabs(d.right[static_cast<std::size_t>(i)]));
-                    if (v > a->overview[bin]) a->overview[bin] = std::min(v, 1.0f);
-                }
-                res.audio = std::move(a);
-            }
-        }
-    } catch (const std::exception& e) {   // e.g. out of memory on a huge file
-        res.audio.reset();
-        res.error = std::string("load failed: ") + e.what();
-    }
+    auto built = buildStem(job.file, outRate_, [&](float f) {
+        progress_[job.slot].store(0.98f * f, std::memory_order_relaxed);
+        return alive();
+    });
+    if (built) res.audio = std::move(*built);
+    else res.error = built.error();
     res.seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
     std::lock_guard lock(mutex_);
     if (live_[job.slot].load() != job.generation) return;   // replaced or cancelled: drop it

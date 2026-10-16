@@ -1,3 +1,21 @@
+## The Hybrid Core — 0.9.0: Phase 9 sessions (save / open) + WAV export
+
+Private test build for Steven's rig (Windows 10/11 x64, Intel i7-14700HX).
+
+**New**
+- **OPEN / SAVE / EXPORT** buttons in the top bar (Ctrl+O / Ctrl+S / Ctrl+Shift+S / Ctrl+E).
+- **Sessions (.hcs):** stems, every control, loop and song position in one small text file. Stems are found relative to the session first, so a song folder that is moved or copied to another drive still opens. Missing stems are named in the status line.
+- **Export:** the mix to a 48 kHz WAV (24-bit), the exact length of the song, from its first sample, with every setting (EQ, compressors, faders, mutes, limiter). Runs in the background while you keep listening; press EXPORT again to cancel. It reads the stems from disk again, so it needs free RAM about the size of the loaded stems.
+- Window title shows the version and the session name.
+
+**Measured in the tests** (CI machine): an export of two stems with default settings matches the plain sum of the stems to within 6e-8 (32-bit float check); two exports of the same session are byte-identical; with the limiter on, a mix pushed 12 dB hot stays at the −0.3 dB ceiling; a moved song folder reopens with all stems.
+
+**Not tested yet:** the Windows open / save dialogs and exporting on your PC (CI has no one to click them), your speakers, graphics card and ASIO driver.
+
+Not code-signed: Windows SmartScreen will warn. Click "More info" → "Run anyway".
+
+---
+
 ## The Hybrid Core — 0.8.0: Phase 8 EQ + compressor on every stem, main limiter
 
 Private test build for Steven's rig (Windows 10/11 x64, Intel i7-14700HX).

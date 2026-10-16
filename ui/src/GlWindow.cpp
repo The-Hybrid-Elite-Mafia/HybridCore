@@ -255,5 +255,6 @@ float GlWindow::dpiScale() const noexcept {
 }
 bool  GlWindow::minimized() const noexcept { return impl_->hwnd && ::IsIconic(impl_->hwnd); }
 void* GlWindow::nativeHandle() const noexcept { return impl_->hwnd; }
+void GlWindow::setTitle(const std::wstring& title) noexcept { if (impl_->hwnd) ::SetWindowTextW(impl_->hwnd, title.c_str()); }
 
 } // namespace hc::ui

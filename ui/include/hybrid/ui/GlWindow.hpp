@@ -50,6 +50,7 @@ public:
     [[nodiscard]] float dpiScale() const noexcept;    // 1.0 = 96 DPI
     [[nodiscard]] bool  minimized() const noexcept;
     [[nodiscard]] void* nativeHandle() const noexcept;   // HWND
+    void setTitle(const std::wstring& title) noexcept;
 
     struct Impl;
 

@@ -13,4 +13,5 @@ add_executable(HybridCore WIN32
 target_include_directories(HybridCore PRIVATE src)
 target_link_libraries(HybridCore PRIVATE hc_apphost hc::params hc::ui opengl32 shell32 ole32)
 set_target_properties(HybridCore PROPERTIES OUTPUT_NAME "HybridCore")
+target_compile_definitions(HybridCore PRIVATE HC_VERSION_STR="${PROJECT_VERSION}")
 hc_copy_assets(HybridCore)

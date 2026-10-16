@@ -9,6 +9,8 @@
 
 #include "hybrid/core/RealtimeThread.hpp"
 #include "hybrid/io/DeviceProbe.hpp"
+#include "hybrid/media/MixExporter.hpp"
+#include "hybrid/media/Session.hpp"
 #include "hybrid/params/MixerParams.hpp"
 #include "hybrid/params/ParameterTree.hpp"
 #include "hybrid/params/Settings.hpp"
@@ -21,6 +23,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -60,6 +63,7 @@ struct Options {
     double                exitAfter = 0.0;
     std::filesystem::path screenshot;
     bool                  offline   = false;
+    std::filesystem::path session;   // a .hcs given on the command line (double-click in Explorer)
 };
 
 Options parseOptions() {
@@ -71,6 +75,7 @@ Options parseOptions() {
         if (k == L"--exit-after" && i + 1 < argc) o.exitAfter = std::wcstod(argv[++i], nullptr);
         else if (k == L"--screenshot" && i + 1 < argc) o.screenshot = argv[++i];
         else if (k == L"--device" && i + 1 < argc) o.offline = std::wstring(argv[++i]) == L"offline";
+        else if (!k.empty() && k[0] != L'-') o.session = k;
     }
     if (argv) ::LocalFree(argv);
     return o;
@@ -114,6 +119,76 @@ std::vector<std::filesystem::path> askForStems(HWND owner) {
     return out;
 }
 
+// Windows save dialog. Empty when cancelled.
+std::filesystem::path askSaveFile(HWND owner, const wchar_t* title, const wchar_t* filterName, const wchar_t* pattern, const wchar_t* ext,
+                                  const std::filesystem::path& suggested) {
+    std::filesystem::path out;
+    IFileSaveDialog* dlg = nullptr;
+    if (FAILED(::CoCreateInstance(CLSID_FileSaveDialog, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&dlg)))) return out;
+    const COMDLG_FILTERSPEC filters[] = {{filterName, pattern}};
+    dlg->SetFileTypes(1, filters);
+    dlg->SetDefaultExtension(ext);
+    dlg->SetTitle(title);
+    FILEOPENDIALOGOPTIONS o = 0;
+    dlg->GetOptions(&o);
+    dlg->SetOptions(o | FOS_OVERWRITEPROMPT | FOS_FORCEFILESYSTEM);
+    if (!suggested.filename().empty()) dlg->SetFileName(suggested.filename().c_str());
+    std::error_code ec;
+    if (!suggested.parent_path().empty() && std::filesystem::is_directory(suggested.parent_path(), ec)) {
+        IShellItem* folder = nullptr;
+        if (SUCCEEDED(::SHCreateItemFromParsingName(suggested.parent_path().c_str(), nullptr, IID_PPV_ARGS(&folder)))) {
+            dlg->SetFolder(folder);
+            folder->Release();
+        }
+    }
+    if (SUCCEEDED(dlg->Show(owner))) {
+        IShellItem* it = nullptr;
+        PWSTR path = nullptr;
+        if (SUCCEEDED(dlg->GetResult(&it)) && SUCCEEDED(it->GetDisplayName(SIGDN_FILESYSPATH, &path))) {
+            out = path;
+            ::CoTaskMemFree(path);
+        }
+        if (it) it->Release();
+    }
+    dlg->Release();
+    return out;
+}
+
+std::filesystem::path askOpenSession(HWND owner, const std::filesystem::path& folder) {
+    std::filesystem::path out;
+    IFileOpenDialog* dlg = nullptr;
+    if (FAILED(::CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&dlg)))) return out;
+    const COMDLG_FILTERSPEC filters[] = {{L"Hybrid Core session", L"*.hcs"}};
+    dlg->SetFileTypes(1, filters);
+    dlg->SetTitle(L"Open session");
+    FILEOPENDIALOGOPTIONS o = 0;
+    dlg->GetOptions(&o);
+    dlg->SetOptions(o | FOS_FILEMUSTEXIST | FOS_FORCEFILESYSTEM);
+    std::error_code ec;
+    if (!folder.empty() && std::filesystem::is_directory(folder, ec)) {
+        IShellItem* f = nullptr;
+        if (SUCCEEDED(::SHCreateItemFromParsingName(folder.c_str(), nullptr, IID_PPV_ARGS(&f)))) { dlg->SetFolder(f); f->Release(); }
+    }
+    if (SUCCEEDED(dlg->Show(owner))) {
+        IShellItem* it = nullptr;
+        PWSTR path = nullptr;
+        if (SUCCEEDED(dlg->GetResult(&it)) && SUCCEEDED(it->GetDisplayName(SIGDN_FILESYSPATH, &path))) {
+            out = path;
+            ::CoTaskMemFree(path);
+        }
+        if (it) it->Release();
+    }
+    dlg->Release();
+    return out;
+}
+
+std::string fmtTime(double seconds) {
+    const int s = static_cast<int>(seconds + 0.5);
+    char b[32];
+    std::snprintf(b, sizeof b, "%d:%02d", s / 60, s % 60);
+    return b;
+}
+
 struct App {
     params::Settings      settings;
     params::ParameterTree tree;
@@ -121,6 +196,101 @@ struct App {
     app::StemDeck         stems{audio};
     std::vector<app::DeviceChoice> devices;
     int                   deviceIndex = 0;
+    std::filesystem::path session;          // current .hcs ("" = not saved yet)
+    std::uint64_t         pendingSeek = UINT64_MAX;   // applied once the stems of an opened session are loaded
+    media::MixExporter    exporter;
+    std::string           notice;
+    std::chrono::steady_clock::time_point noticeUntil{};
+
+    void say(std::string text) {
+        notice      = std::move(text);
+        noticeUntil = std::chrono::steady_clock::now() + std::chrono::seconds(8);
+    }
+    [[nodiscard]] std::string currentNotice() const {
+        return std::chrono::steady_clock::now() < noticeUntil ? notice : std::string();
+    }
+    [[nodiscard]] std::filesystem::path songFolder() const {
+        if (!session.empty()) return session.parent_path();
+        for (std::uint32_t s = 0; s < kStemCount; ++s)
+            if (!stems.slot(s).file.empty()) return stems.slot(s).file.parent_path();
+        return {};
+    }
+    [[nodiscard]] std::wstring songName() const {
+        if (!session.empty()) return session.stem().wstring();
+        const std::filesystem::path f = songFolder();
+        return f.empty() ? std::wstring(L"Hybrid Core Mix") : f.filename().wstring();
+    }
+
+    bool saveSessionTo(const std::filesystem::path& file, const ui::Console& console) {
+        media::SessionData d;
+        for (std::uint32_t s = 0; s < kStemCount; ++s) d.stems[s] = stems.slot(s).file;
+        d.params    = tree.serialize();
+        d.loop      = audio.loop();
+        d.page      = static_cast<std::uint32_t>(console.page());
+        d.faderBank = console.faderBank();
+        d.source    = sourceName(audio.source());
+        d.playhead  = audio.stemPlayhead();
+        std::string err;
+        if (!media::saveSession(file, d, HC_VERSION_STR, &err)) { say("Save failed: " + err); return false; }
+        session = file;
+        settings.set("app", "session", app::toUtf8(file.wstring()));
+        say("Saved " + app::toUtf8(file.filename().wstring()));
+        return true;
+    }
+    void openSession(const std::filesystem::path& file, ui::Console& console) {
+        auto l = media::loadSession(file);
+        if (!l) { say("Open failed: " + l.error()); return; }
+        audio.stop();
+        for (std::size_t i = 0; i < tree.size(); ++i) tree.at(i).resetToDefault();
+        tree.deserialize(l->data.params);
+        for (std::uint32_t s = 0; s < kStemCount; ++s) {
+            if (l->data.stems[s].empty()) stems.clear(s);
+            else stems.load(s, {l->data.stems[s]});
+        }
+        audio.setLoop(l->data.loop);
+        console.setPage(static_cast<ui::Page>(l->data.page));
+        console.setFaderBank(l->data.faderBank);
+        audio.setSource(sourceFromName(l->data.source));
+        pendingSeek = l->data.playhead;
+        session = file;
+        settings.set("app", "session", app::toUtf8(file.wstring()));
+        std::string msg = "Opened " + app::toUtf8(file.filename().wstring());
+        if (!l->missing.empty()) {
+            msg += "  \xC2\xB7  " + std::to_string(l->missing.size()) + " stem(s) not found: ";
+            for (std::size_t i = 0; i < l->missing.size(); ++i) msg += (i ? ", " : "") + l->missing[i];
+        }
+        say(msg);
+    }
+    void startExport(HWND owner) {
+        if (exporter.busy()) { exporter.cancel(); return; }   // EXPORT while exporting = cancel
+        if (stems.loadedCount() == 0) { say("Load stems before exporting"); return; }
+        const auto target = askSaveFile(owner, L"Export the mix (WAV, 48 kHz, 24-bit)", L"WAV audio", L"*.wav", L"wav",
+                                        songFolder() / (songName() + L" - Mix.wav"));
+        if (target.empty()) return;
+        media::ExportRequest req;
+        for (std::uint32_t s = 0; s < kStemCount; ++s)
+            if (!stems.slot(s).name.empty()) req.stems[s] = stems.slot(s).file;
+        req.params   = tree.serialize();
+        req.out      = target;
+        req.encoding = media::WavEncoding::Pcm24;
+        if (exporter.start(std::move(req))) say("Exporting " + app::toUtf8(target.filename().wstring()) + "...");
+    }
+    void pollExport() {
+        auto r = exporter.poll();
+        if (!r) return;
+        if (!r->has_value()) {
+            say(r->error() == "cancelled" ? std::string("Export cancelled") : "Export failed: " + r->error());
+            return;
+        }
+        const media::ExportResult& x = **r;
+        char b[160];
+        std::snprintf(b, sizeof b, " (%s, peak %.1f dBFS, %.1f s)", fmtTime(static_cast<double>(x.frames) / kSampleRate).c_str(),
+                      x.peak > 0 ? 20.0 * std::log10(x.peak) : -144.0, x.seconds);
+        std::string msg = "Exported " + app::toUtf8(x.file.filename().wstring()) + b;
+        if (x.clipped) msg += "  \xC2\xB7  " + std::to_string(x.clipped) + " samples clipped (turn LIM on)";
+        if (!x.warning.empty()) msg += "  \xC2\xB7  " + x.warning;
+        say(msg);
+    }
 
     // uiState = fader bank + 4 × knob page.
     void saveSettings(std::uint32_t uiState) {
@@ -205,7 +375,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     params::bindMixerParameters(a.tree, bindings, a.audio.matrix(), &a.audio.limiter());
     a.tree.dispatchChanges();   // push every value into the matrix before audio starts
 
-    a.restoreStems();   // background loads; the saved source below wins over the "switch to stems" a load does
+    if (opts.session.empty()) a.restoreStems();   // background loads; the saved source below wins over the "switch to stems" a load does
+    a.session = app::fromUtf8(a.settings.get("app", "session"));
     a.audio.setSource(sourceFromName(a.settings.get("app", "source", "tones")));
     a.audio.setLoop(a.settings.get("app", "loop", "1") != "0");
     a.devices = app::AudioHost::listDevices();
@@ -229,6 +400,9 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     console.setFaderBank(static_cast<std::uint32_t>(std::clamp(std::atoi(a.settings.get("app", "faderBank", "0").c_str()), 0, 3)));
     console.setPage(static_cast<ui::Page>(std::clamp(std::atoi(a.settings.get("app", "page", "0").c_str()), 0, 2)));
     auto uiState = [&console] { return console.faderBank() + 4u * static_cast<std::uint32_t>(console.page()); };
+    if (!opts.session.empty()) a.openSession(opts.session, console);
+    std::filesystem::path shownSession = L"?";
+    const HWND hwnd = static_cast<HWND>(window.nativeHandle());
 
     ui::MeterState meters;
     const auto started = std::chrono::steady_clock::now();
@@ -272,11 +446,39 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                 case ui::UiAction::Stop:         a.audio.stop(); break;
                 case ui::UiAction::ToggleLoop:   a.audio.setLoop(!a.audio.loop()); break;
                 case ui::UiAction::Seek:         break;   // collected below with takeSeek
+                case ui::UiAction::OpenSession: {
+                    const auto f = askOpenSession(hwnd, a.songFolder());
+                    if (!f.empty()) a.openSession(f, console);
+                    console.interaction().mouseUp();
+                    break;
+                }
+                case ui::UiAction::SaveSession: {
+                    std::filesystem::path f = a.session;
+                    if (f.empty()) f = askSaveFile(hwnd, L"Save session", L"Hybrid Core session", L"*.hcs", L"hcs", a.songFolder() / (a.songName() + L".hcs"));
+                    if (!f.empty()) a.saveSessionTo(f, console);
+                    console.interaction().mouseUp();
+                    break;
+                }
+                case ui::UiAction::ExportMix:    a.startExport(hwnd); console.interaction().mouseUp(); break;
                 case ui::UiAction::None:         break;
                 }
                 break;
             }
             case ui::InputEvent::Type::Key:
+                if (e.ctrl) {   // Ctrl+O open, Ctrl+S save, Ctrl+Shift+S save as, Ctrl+E export
+                    const bool shift = (::GetKeyState(VK_SHIFT) & 0x8000) != 0;
+                    if (e.key == 'O') {
+                        const auto f = askOpenSession(hwnd, a.songFolder());
+                        if (!f.empty()) a.openSession(f, console);
+                    } else if (e.key == 'S') {
+                        std::filesystem::path f = shift ? std::filesystem::path() : a.session;
+                        if (f.empty()) f = askSaveFile(hwnd, L"Save session", L"Hybrid Core session", L"*.hcs", L"hcs", a.songFolder() / (a.songName() + L".hcs"));
+                        if (!f.empty()) a.saveSessionTo(f, console);
+                    } else if (e.key == 'E') {
+                        a.startExport(hwnd);
+                    }
+                    break;
+                }
                 switch (e.key) {
                 case VK_SPACE:  a.playPause(); break;
                 case VK_HOME:   a.audio.seek(0); break;
@@ -317,6 +519,15 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             if (a.audio.source() != Source::Stems) a.audio.setSource(Source::Stems);
             a.audio.seek(static_cast<std::uint64_t>(f * static_cast<double>(a.stems.songFrames() - 1)));
         }
+        a.pollExport();
+        if (a.pendingSeek != UINT64_MAX && !a.stems.loading()) {
+            if (a.pendingSeek < a.stems.songFrames()) a.audio.seek(a.pendingSeek);
+            a.pendingSeek = UINT64_MAX;
+        }
+        if (a.session != shownSession) {   // title bar: version and session name
+            shownSession = a.session;
+            window.setTitle(L"The Hybrid Core " + app::fromUtf8(HC_VERSION_STR) + (a.session.empty() ? std::wstring() : L"  \u2014  " + a.session.stem().wstring()));
+        }
         a.tree.dispatchChanges();
         a.audio.poll();
         a.stems.pump();
@@ -351,7 +562,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         ui::ViewState vs;
         vs.deviceName   = st.deviceName.empty() ? "No device" : st.deviceName;
         vs.deviceFormat = formatLine(st, sourceLine(src, a.stems));
-        const std::string notice = a.stems.notice();
+        const std::string notice = !a.currentNotice().empty() ? a.currentNotice() : a.stems.notice();
         vs.status       = !notice.empty() ? notice : (st.alert ? st.line2 : st.line1) + "   \xC2\xB7   faceplate " + console.faceplateInfo();
         vs.alert        = st.alert;
         vs.running      = st.running;
@@ -379,6 +590,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         vs.overview            = a.stems.songOverview().empty() ? nullptr : &a.stems.songOverview();
         for (std::uint32_t s = 0; s < kStemCount; ++s) vs.gainReduction[s] = st.running ? a.audio.matrix().strip(s).gainReductionDb() : 0.0f;
         vs.limiterGr           = st.running ? a.audio.limiter().gainReductionDb() : 0.0f;
+        vs.exportProgress      = a.exporter.progress();
         vs.hover   = console.interaction().hoverWidget();
         vs.active  = console.interaction().activeWidget();
         vs.pressed = console.interaction().pressedWidget();

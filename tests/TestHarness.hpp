@@ -38,6 +38,8 @@ void testUiFont();
 void testUiParts();
 void testMediaFiles();
 void testChannelStrip();
+void testSession();
+void testExport();
 void testLimiter();
 void testStripInMatrix();
 void testStripParams();

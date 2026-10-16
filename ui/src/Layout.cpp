@@ -132,7 +132,12 @@ Layout::Layout(const params::ParameterTree& tree, float extraH) : extraH_(std::m
     overview_ = {130, by + 26, 2270, 90};
     limit_    = {2448, by + 47, 112, 48};
     widgets_.push_back({WidgetKind::Button, limit_, paramIndex(tree, params::busParamId(0, "limit")), 0, UiAction::None, "LIM"});
-    status_   = {1120, plate::kTopBar.y, 1960, plate::kTopBar.h};   // engraved in the top bar
+    status_   = {1320, plate::kTopBar.y, 1760, plate::kTopBar.h};   // engraved in the top bar
+    static const UiAction kCmd[3] = {UiAction::OpenSession, UiAction::SaveSession, UiAction::ExportMix};
+    static const char* const kCmdCap[3] = {"OPEN", "SAVE", "EXPORT"};
+    for (std::uint32_t i = 0; i < 3; ++i)
+        widgets_.push_back({WidgetKind::Command, {770.0f + 178.0f * static_cast<float>(i), plate::kTopBar.cy() - 32.0f, 160.0f, 64.0f}, -1, i, kCmd[i],
+                            kCmdCap[i]});
     widgets_.push_back({WidgetKind::MasterMeter, master_, -1, 0, UiAction::None, ""});
     widgets_.push_back({WidgetKind::Overview, overview_, -1, 0, UiAction::Seek, ""});
 }
@@ -185,7 +190,7 @@ UiAction Interaction::mouseDown(float x, float y, bool doubleClick, bool /*fine*
         seekAt(x);
         return UiAction::Seek;
     }
-    if (w.kind == WidgetKind::Transport || w.kind == WidgetKind::Tab || w.kind == WidgetKind::NamePanel) {
+    if (w.kind == WidgetKind::Transport || w.kind == WidgetKind::Tab || w.kind == WidgetKind::NamePanel || w.kind == WidgetKind::Command) {
         pressed_ = hit;
         if (actionIndex) *actionIndex = w.index;
         return w.action;

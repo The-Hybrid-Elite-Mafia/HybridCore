@@ -48,6 +48,25 @@ void StemMatrix::prepare(std::uint32_t maxFrames, double sampleRate) {
         prevBus_[b] = buses_[b].mute.load(kRelaxed) ? 0.0f : buses_[b].gain.load(kRelaxed);
 }
 
+void StemMatrix::snapToTargets() noexcept {
+    bool anySolo = false;
+    for (const auto& s : stems_) anySolo |= s.solo.load(kRelaxed);
+    for (std::uint32_t s = 0; s < kStems; ++s) {
+        const StemParams& p = stems_[s];
+        strips_[s].reset();
+        const float trim = p.trim.load(kRelaxed);
+        prevTrim_[s] = trim;
+        viaStrip_[s] = strips_[s].engaged();
+        const bool  silenced = p.mute.load(kRelaxed) || (anySolo && !p.solo.load(kRelaxed));
+        const float base = silenced ? 0.0f : (viaStrip_[s] ? 1.0f : trim) * (p.invert.load(kRelaxed) ? -1.0f : 1.0f);
+        for (std::uint32_t b = 0; b < kBuses; ++b) {
+            prevSend_[s][b][0] = base * p.balL.load(kRelaxed) * p.send[b].load(kRelaxed);
+            prevSend_[s][b][1] = base * p.balR.load(kRelaxed) * p.send[b].load(kRelaxed);
+        }
+    }
+    for (std::uint32_t b = 0; b < kBuses; ++b) prevBus_[b] = buses_[b].mute.load(kRelaxed) ? 0.0f : buses_[b].gain.load(kRelaxed);
+}
+
 // ---- setters (message thread) ------------------------------------------------
 
 void StemMatrix::setStemTrimDb(std::uint32_t s, float db) noexcept {

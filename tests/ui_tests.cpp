@@ -276,6 +276,20 @@ void testUiLayout() {
     }
     CHECK(in.mouseDown(ui::plate::kNamePanel.cx(), ui::plate::kNamePanel.cy(), false, false) == ui::UiAction::NextDevice);
     in.mouseUp();
+    {   // OPEN / SAVE / EXPORT sit in the top bar, between the title and the status line, without overlapping.
+        const ui::UiAction want[3] = {ui::UiAction::OpenSession, ui::UiAction::SaveSession, ui::UiAction::ExportMix};
+        int ok = 0;
+        float lastRight = 740.0f;   // end of the engraved title
+        for (const auto& w : L.widgets()) {
+            if (w.kind != ui::WidgetKind::Command) continue;
+            const bool inBar = w.rect.y > ui::plate::kTopBar.y && w.rect.bottom() < ui::plate::kTopBar.bottom();
+            if (inBar && w.rect.x > lastRight && w.rect.right() < L.statusArea().x && w.action == want[w.index] &&
+                in.mouseDown(w.rect.cx(), w.rect.cy(), false, false) == want[w.index]) ++ok;
+            in.mouseUp();
+            lastRight = w.rect.right();
+        }
+        CHECK(ok == 3);
+    }
     {   // Song overview: click = seek to that fraction, drag keeps seeking, release stops.
         const ui::Rect o = L.overview();
         float f = -1.0f;

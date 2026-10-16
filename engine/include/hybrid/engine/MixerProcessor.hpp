@@ -61,6 +61,8 @@ public:
     void stop() noexcept { pause(); seek(0); }
     void seek(std::uint64_t frame) noexcept { seekReq_.store(static_cast<std::int64_t>(frame), std::memory_order_release); }
     void setLoop(bool on) noexcept { loop_.store(on, std::memory_order_relaxed); }
+    // Offline rendering only (call before the first process()): start on the first sample, no fade-in.
+    void setStartFade(bool on) noexcept { startFadeOn_ = on; }
     [[nodiscard]] bool loop() const noexcept { return loop_.load(std::memory_order_relaxed); }
     [[nodiscard]] bool wantsPlay() const noexcept { return wantPlay_.load(std::memory_order_relaxed); }
     // Published by the audio thread after every block.
@@ -100,6 +102,7 @@ private:
     std::uint64_t                                     playhead_   = 0;
     std::uint64_t                                     songFrames_ = 0;
     bool                                              playing_    = false;   // audio-thread view of the transport
+    bool                                              startFadeOn_ = true;
     core::SpscRing<StemCommand, kStemQueue>           commands_;
     core::SpscRing<StemAudio*, kRetireQueue>          retired_;
     std::atomic<bool>                                 wantPlay_{false};

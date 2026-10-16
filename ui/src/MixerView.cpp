@@ -285,10 +285,15 @@ void MixerView::drawKnob(Renderer& r, const Widget& w, Rgba accent, bool hot) co
 
 void MixerView::drawButton(Renderer& r, const Widget& w, bool pressed) const {
     const params::Parameter& prm = tree_.at(static_cast<std::size_t>(w.param));
-    const bool  on  = prm.isOn();
+    Rgba lit = kLitRed;
+    if (w.caption == "S") lit = kLitAmber;
+    else if (w.caption != "M") lit = kLitCyan;
+    drawCap(r, w.rect, w.caption, prm.isOn(), pressed, lit);
+}
+
+void MixerView::drawCap(Renderer& r, Rect b, const std::string& caption, bool on, bool pressed, Rgba lit) const {
     const bool  in  = on || pressed;
     const float px  = r.pixelSize();
-    const Rect  b   = w.rect;
     // Pushed in: 1.5 px down-right, shadow shrinks.
     const float push = in ? 1.5f * px : 0.0f;
     const float sx = in ? 0.02f : 0.07f, sy = in ? 0.03f : 0.12f, grow = in ? 1.04f : 1.16f;
@@ -297,16 +302,13 @@ void MixerView::drawButton(Renderer& r, const Widget& w, bool pressed) const {
     const Rect cap{b.x - b.w * (128.0f / 116.0f - 1.0f) * 0.5f + push, b.y - b.h * (96.0f / 84.0f - 1.0f) * 0.5f + push,
                    b.w * 128.0f / 116.0f, b.h * 96.0f / 84.0f};
     r.sprite(Sprite::ButtonCap, cap, in ? Rgba{0.86f, 0.86f, 0.86f, 1} : Rgba{1, 1, 1, 1});
-    Rgba lit = kLitRed;
-    if (w.caption == "S") lit = kLitAmber;
-    else if (w.caption != "M") lit = kLitCyan;
     const float baseline = b.cy() + r.capHeight(TextStyle::Button) * 0.5f + push;
     if (on) {
         r.sprite(Sprite::ButtonLens, cap, lit.withAlpha(0.95f), Blend::Over, true);
         r.sprite(Sprite::ButtonHalo, {b.cx() - b.w * 0.69f + push, b.cy() - b.h * 0.76f + push, b.w * 1.38f, b.h * 1.52f}, lit.withAlpha(0.7f), Blend::Add, true);
-        r.text(TextStyle::Button, w.caption, b.cx() + push, baseline, rgb8(0xFFFFFF), Align::Center, TextFx::Plain);
+        r.text(TextStyle::Button, caption, b.cx() + push, baseline, rgb8(0xFFFFFF), Align::Center, TextFx::Plain);
     } else {
-        r.text(TextStyle::Button, w.caption, b.cx() + push, baseline, kEngrave, Align::Center, TextFx::Engraved);
+        r.text(TextStyle::Button, caption, b.cx() + push, baseline, kEngrave, Align::Center, TextFx::Engraved);
     }
 }
 
@@ -490,6 +492,12 @@ void MixerView::drawDynamic(Renderer& r, const ViewState& v, const MeterState& m
             break;
         }
         case WidgetKind::Button: drawButton(r, w, static_cast<int>(i) == v.pressed); break;
+        case WidgetKind::Command: {   // OPEN / SAVE / EXPORT in the top bar
+            const bool exporting = w.action == UiAction::ExportMix && v.exportProgress >= 0.0f;
+            const std::string cap = exporting ? fmt("%.0f%%", 100.0 * v.exportProgress) : w.caption;
+            drawCap(r, w.rect, cap, exporting, static_cast<int>(i) == v.pressed, kLitAmber);
+            break;
+        }
         case WidgetKind::Transport: drawTransport(r, w, v); break;
         case WidgetKind::Tab: {
             // Tabs 1-3 pick the knob page; tab 4 cycles the fader bank (lit when the faders are on a send).

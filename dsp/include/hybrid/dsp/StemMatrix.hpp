@@ -37,6 +37,9 @@ public:
 
     // ---- message thread ----------------------------------------------------
     void prepare(std::uint32_t maxFrames, double sampleRate = hc::kSampleRate);
+    // Offline rendering: start every gain and strip setting at its current target instead of
+    // ramping in from silence / defaults on the first block. Message thread, before process().
+    void snapToTargets() noexcept;
 
     void setStemTrimDb(std::uint32_t stem, float db) noexcept;
     void setStemBalance(std::uint32_t stem, float balance) noexcept;   // -1 .. +1

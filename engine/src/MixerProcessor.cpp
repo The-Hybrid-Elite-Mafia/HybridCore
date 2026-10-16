@@ -112,7 +112,7 @@ bool MixerProcessor::renderStems(std::uint32_t frames) noexcept {
     for (std::uint32_t s = 0; s < kStems * 2; ++s) {
         float* x = stemData_.data() + static_cast<std::size_t>(s) * maxFrames_;
         if (endFrame < frames) std::memset(x + endFrame, 0, sizeof(float) * (frames - endFrame));
-        if (startFade) fadeIn(x, frames);
+        if (startFade && startFadeOn_) fadeIn(x, frames);
         if (stopping) fadeOut(x, frames);
     }
     playhead_ = pos;

@@ -10,11 +10,13 @@
 // =============================================================================
 #include "hybrid/core/Config.hpp"
 #include "hybrid/engine/StemAudio.hpp"
+#include "hybrid/media/AudioFile.hpp"
 
 #include <array>
 #include <atomic>
 #include <condition_variable>
 #include <deque>
+#include <expected>
 #include <filesystem>
 #include <memory>
 #include <mutex>
@@ -32,6 +34,11 @@ namespace hc::media {
 // One short ASCII line for a loaded stem: codec, source rate if converted (else bit depth), length.
 // e.g. "MP3 44.1k 3:42", "WAV 24b 4:05", "WAV 32f 1:10".
 [[nodiscard]] std::string describeStem(const engine::StemAudio& stem);
+
+// Decode + convert one file to a ready StemAudio on the calling thread (what the workers run).
+// progress(0..1) may cancel by returning false.
+[[nodiscard]] std::expected<std::unique_ptr<engine::StemAudio>, std::string> buildStem(const std::filesystem::path& file, std::uint32_t outRate,
+                                                                                      const Progress& progress = {}) noexcept;
 
 class StemLoader {
 public:

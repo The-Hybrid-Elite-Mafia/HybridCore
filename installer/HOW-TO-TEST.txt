@@ -12,6 +12,15 @@ Turn your speakers/headphones DOWN first. Close any app that is playing audio
    - Round buttons, left to right: LOAD (pick your stems), START (back to the top),
      PLAY / PAUSE, STOP (stops and goes back to the top), LOOP (blue = loops the song),
      SOURCE (cycles TONES -> INPUTS -> STEMS).
+   - Top bar: OPEN / SAVE / EXPORT (also Ctrl+O, Ctrl+S, Ctrl+Shift+S = save as, Ctrl+E).
+       SAVE    keeps the song as a .hcs session file: which stems are loaded, every knob, fader
+               and button, loop, and where the song was. Keep it in the song's folder: if you
+               move or copy the whole folder, it still finds the stems.
+       OPEN    loads a session back (stems reload in the background).
+       EXPORT  renders the mix to a WAV file (48 kHz, 24-bit) exactly as long as the song,
+               with everything you set: EQ, compressors, faders, mutes, limiter. It runs in the
+               background (the button shows %); press EXPORT again to cancel. The music keeps
+               playing while it exports. The window title shows the session name.
    - Device: click the device name panel (top left) for the next sound device,
      right-click it for the previous one.
    - Bottom bar: the whole song as a waveform. Click or drag on it to jump there.

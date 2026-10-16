@@ -5,6 +5,7 @@ add_executable(hc_tests
     ui_tests.cpp
     media_tests.cpp
     strip_tests.cpp
+    session_tests.cpp
     AllocTracker.cpp)
 target_include_directories(hc_tests PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}"
