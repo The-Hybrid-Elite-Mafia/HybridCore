@@ -34,7 +34,12 @@ if ($WarningSummary) {
         Where-Object { $_ -match ': warning [A-Z]+\d+' } |
         ForEach-Object { ($_ -replace '\s*\[[^\]]*\.vcxproj\]\s*$', '').Trim() } |
         Sort-Object -Unique
+    $errors = $output -split "`n" |
+        Where-Object { $_ -match ': (fatal )?error [A-Z]+\d+' } |
+        ForEach-Object { ($_ -replace '\s*\[[^\]]*\.vcxproj\]\s*$', '').Trim() } |
+        Sort-Object -Unique | Select-Object -First 25
     $summary = "exit code $code`nunique compiler warnings: $($warnings.Count)`n" + ($warnings -join "`n")
+    if ($errors) { $summary += "`ncompiler errors:`n" + ($errors -join "`n") }
     Publish "$Title (exit $code)" $summary
 } else {
     Publish "$Title (exit $code)" $output

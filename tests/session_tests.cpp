@@ -8,6 +8,7 @@
 #include "hybrid/media/Session.hpp"
 #include "hybrid/params/MixerParams.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
