@@ -539,9 +539,12 @@ void MixerView::drawDynamic(Renderer& r, const ViewState& v, const MeterState& m
                 const Rect f = w.rect.inset(8, 9);
                 // Dark glass with a coloured rim and coloured letters. Nothing here goes to the bloom
                 // pass: on some GPUs an emissive face washed out to near-white with white text on it.
-                r.fillRound(f, plate::kTabFaceRadius - 6, rgb8(0x0B0B0E).withAlpha(0.88f), Blend::Over);
-                r.fillRound(f, plate::kTabFaceRadius - 6, tint.withAlpha(0.22f), Blend::Over);
-                r.glow(f, plate::kTabFaceRadius - 6, 6, tint.withAlpha(0.55f), false);
+                // glow() also fills the inside of its rect at full strength, so the dark face goes on top of it.
+                r.glow(f, plate::kTabFaceRadius - 6, 6, tint.withAlpha(0.5f), false);
+                r.fillRound(f, plate::kTabFaceRadius - 6, tint.withAlpha(0.95f), Blend::Over);              // coloured rim
+                const Rect face = f.inset(5, 5);
+                r.fillRound(face, plate::kTabFaceRadius - 11, rgb8(0x0B0B0E), Blend::Over);
+                r.fillRound(face, plate::kTabFaceRadius - 11, tint.withAlpha(0.18f), Blend::Over);
                 r.text(TextStyle::Tab, cap, w.rect.cx(), baseline, w.index == 3 ? rgb8(0xFFB070) : rgb8(0x9CC4FF), Align::Center,
                        TextFx::Shadowed);
             } else {

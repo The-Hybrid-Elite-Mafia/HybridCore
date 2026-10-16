@@ -1,3 +1,9 @@
+## The Hybrid Core — 0.11.3: selected page tab, second try
+
+0.11.2's tab fix didn't work: the tab's glow also filled its inside, so it still showed bright blue on your PC. In 0.11.3 the selected tab is a dark face with a coloured rim and coloured letters (blue for MIX / EQ / DYNAMICS, orange for BEAT FORGE). Everything else is the same as 0.11.2.
+
+---
+
 ## The Hybrid Core — 0.11.2: fixes from the first test on Steven's PC
 
 Private test build for Steven's rig (Windows 10/11 x64, Intel i7-14700HX). Fixes what showed up when 0.11.1 ran on the real PC (Realtek speakers, WASAPI exclusive, 144 frames = 3.0 ms, DSP load 2.5-3.8 %, 0 dropouts).
