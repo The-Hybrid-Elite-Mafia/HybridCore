@@ -1,5 +1,6 @@
 #include "hybrid/ui/Layout.hpp"
 #include "hybrid/params/MixerParams.hpp"
+#include "hybrid/forge/Forge.hpp"
 
 #include <algorithm>
 #include <stdexcept>
@@ -15,6 +16,11 @@ constexpr float kSendD       = 66.0f;
 constexpr float kSendPitch   = 70.0f;
 constexpr float kButtonW     = 60.0f, kButtonH = 46.0f, kButtonPitch = 66.0f;
 constexpr float kValueBoxH   = 52.0f;
+
+int optionalIndex(const params::ParameterTree& tree, const std::string& id) {
+    const params::Parameter* p = tree.find(id);
+    return p ? static_cast<int>(p->index()) : -1;
+}
 
 int paramIndex(const params::ParameterTree& tree, const std::string& id) {
     const params::Parameter* p = tree.find(id);
@@ -41,9 +47,9 @@ Layout::Layout(const params::ParameterTree& tree, float extraH) : extraH_(std::m
         const float R = plate::kSocketOuterRadius;
         widgets_.push_back({WidgetKind::Transport, {c.cx - R, c.cy - R, 2 * R, 2 * R}, -1, i, kSocketActions[i], kSocketCaps[i]});
     }
-    static const char* const kTabCaps[4] = {"MIX", "EQ", "DYNAMICS", "FADERS"};
+    static const char* const kTabCaps[4] = {"MIX", "EQ", "DYNAMICS", "BEAT FORGE"};
     for (std::uint32_t i = 0; i < plate::kTabFaces.size(); ++i)
-        widgets_.push_back({WidgetKind::Tab, plate::kTabFaces[i], -1, i, i < kPages ? UiAction::SelectPage : UiAction::FaderBank, kTabCaps[i]});
+        widgets_.push_back({WidgetKind::Tab, plate::kTabFaces[i], -1, i, UiAction::SelectPage, kTabCaps[i]});
 
     // ---- stem strips (main panel) ----
     const float bottomPad = kPanelMargin;
@@ -64,26 +70,24 @@ Layout::Layout(const params::ParameterTree& tree, float extraH) : extraH_(std::m
         for (std::uint32_t b = 0; b < kFaderBanks; ++b)
             stemFader_[s][b] = paramIndex(tree, params::stemParamId(s, b == 0 ? "main" : (b == 1 ? "aux1" : b == 2 ? "aux2" : "aux3")));
 
-        for (std::uint32_t pg = 0; pg < kPages; ++pg)
-            for (std::uint32_t k = 0; k < kStripKnobs; ++k) pageParam_[s][pg][k] = paramIndex(tree, params::stemParamId(s, kPageFields[pg][k]));
+        buildSlots(tree, s);
         for (std::uint32_t k = 0; k < 2; ++k) {
             knobWidget_[s][k] = static_cast<int>(widgets_.size());
             const float ky = y0 + (k == 0 ? 222.0f : 382.0f);
-            widgets_.push_back({WidgetKind::Knob, {cx - kKnobD / 2, ky - kKnobD / 2, kKnobD, kKnobD}, pageParam_[s][0][k], s, UiAction::None,
-                                kPageCaptions[0][k]});
+            const Slot& sl = knobSlot_[s][0][k];
+            widgets_.push_back({WidgetKind::Knob, {cx - kKnobD / 2, ky - kKnobD / 2, kKnobD, kKnobD}, sl.param, s, sl.action, sl.caption});
         }
         for (std::uint32_t a = 0; a < 3; ++a) {
             const float kx = cx + (static_cast<float>(a) - 1.0f) * kSendPitch;
             knobWidget_[s][2 + a] = static_cast<int>(widgets_.size());
-            widgets_.push_back({WidgetKind::SendKnob, {kx - kSendD / 2, y0 + 520 - kSendD / 2, kSendD, kSendD}, pageParam_[s][0][2 + a], s,
-                                UiAction::None, kPageCaptions[0][2 + a]});
+            const Slot& sl = knobSlot_[s][0][2 + a];
+            widgets_.push_back({WidgetKind::SendKnob, {kx - kSendD / 2, y0 + 520 - kSendD / 2, kSendD, kSendD}, sl.param, s, sl.action, sl.caption});
         }
-        static const char* const kBtn[3] = {"mute", "solo", "invert"};
-        static const char* const kBtnCap[3] = {"M", "S", "\xC3\x98"};   // UTF-8 "Ø"
-        for (int b = 0; b < 3; ++b) {
-            const float bx = cx + static_cast<float>(b - 1) * kButtonPitch;
-            widgets_.push_back({WidgetKind::Button, {bx - kButtonW / 2, y0 + 580, kButtonW, kButtonH},
-                                paramIndex(tree, params::stemParamId(s, kBtn[b])), s, UiAction::None, kBtnCap[b]});
+        for (std::uint32_t b = 0; b < 3; ++b) {
+            const float bx = cx + (static_cast<float>(b) - 1.0f) * kButtonPitch;
+            buttonWidget_[s][b] = static_cast<int>(widgets_.size());
+            const Slot& sl = buttonSlot_[s][0][b];
+            widgets_.push_back({WidgetKind::Button, {bx - kButtonW / 2, y0 + 580, kButtonW, kButtonH}, sl.param, s, sl.action, sl.caption});
         }
 
         const float fTop = y0 + 652, fBottom = y0 + stripH - kValueBoxH - 30;
@@ -123,6 +127,7 @@ Layout::Layout(const params::ParameterTree& tree, float extraH) : extraH_(std::m
         widgets_.push_back({WidgetKind::Fader, {cx - 28 - st.capW / 2, fTop, st.capW, fBottom - fTop},
                             paramIndex(tree, params::busParamId(b, "gain")), b, UiAction::None, "LEVEL"});
         widgets_.push_back({WidgetKind::BusMeter, st.meter, -1, b, UiAction::None, ""});
+        widgets_.push_back({WidgetKind::BusTitle, titleArea(st).inset(4, 30), -1, b, UiAction::FaderBank, st.title});
         strips_.push_back(st);
     }
 
@@ -148,21 +153,76 @@ void Layout::setFaderBank(std::uint32_t bank) noexcept {
         if (!st.isBus) widgets_[static_cast<std::size_t>(st.faderWidget)].param = stemFader_[st.index][bank_];
 }
 
+void Layout::buildSlots(const params::ParameterTree& tree, std::uint32_t s) {
+    // Mixer pages: the stem's own controls.
+    static const char* const kBtn[3]    = {"mute", "solo", "invert"};
+    static const char* const kBtnCap[3] = {"M", "S", "\xC3\x98"};   // UTF-8 "Ø"
+    for (std::uint32_t pg = 0; pg < kMixerPages; ++pg) {
+        for (std::uint32_t k = 0; k < kStripKnobs; ++k)
+            knobSlot_[s][pg][k] = {paramIndex(tree, params::stemParamId(s, kPageFields[pg][k])), UiAction::None, kPageCaptions[pg][k]};
+        for (std::uint32_t b = 0; b < 3; ++b)
+            buttonSlot_[s][pg][b] = {paramIndex(tree, params::stemParamId(s, kBtn[b])), UiAction::None, kBtnCap[b]};
+    }
+    // BEAT FORGE page (parameters missing from the tree simply leave the place empty).
+    const auto F = static_cast<std::uint32_t>(Page::Forge);
+    auto& ks = knobSlot_[s][F];
+    auto& bs = buttonSlot_[s][F];
+    auto knob = [&](std::uint32_t k, const std::string& id, const char* cap) { ks[k] = {optionalIndex(tree, id), UiAction::None, cap}; };
+    bs[0] = {paramIndex(tree, params::stemParamId(s, "mute")), UiAction::None, "M"};
+    bs[1] = {paramIndex(tree, params::stemParamId(s, "solo")), UiAction::None, "S"};
+    if (s < static_cast<std::uint32_t>(forge::kTracks)) {
+        const int t = static_cast<int>(s);
+        for (std::uint32_t k = 0; k < kStripKnobs; ++k)
+            knob(k, forge::id::knob(t, static_cast<int>(k)), k < 2 ? forge::knobSpecs(t)[k].caption : forge::knobSpecs(t)[k].shortCap);
+        bs[2] = {optionalIndex(tree, forge::id::lock(t)), UiAction::None, "LOCK"};
+    } else if (s == 8) {         // COMPOSE
+        knob(0, forge::id::genre, "GENRE"); knob(1, forge::id::key, "KEY");
+        knob(2, forge::id::scale, "SCL"); knob(3, forge::id::bars, "BARS"); knob(4, forge::id::bpm, "BPM");
+        bs[0] = {-1, UiAction::ForgeGenerate, "GEN"};
+        bs[1] = {-1, UiAction::ForgeUndo, "BACK"};
+        bs[2] = {optionalIndex(tree, forge::id::arrange), UiAction::None, "FULL"};
+    } else if (s == 9) {         // FEEL
+        knob(0, forge::id::density, "DENSITY"); knob(1, forge::id::variation, "VARIATION");
+        knob(2, forge::id::humanize, "HUM"); knob(3, forge::id::swing, "SWNG"); knob(4, forge::id::fxLevel, "FX");
+        bs[0] = {optionalIndex(tree, forge::id::on), UiAction::None, "ON"};
+        bs[1] = {-1, UiAction::ForgeClear, "CLR"};
+        bs[2] = {optionalIndex(tree, forge::id::setTempo), UiAction::None, "BPM"};
+    } else if (s == 10) {        // SPACE
+        knob(0, forge::id::revSize, "REVERB"); knob(1, forge::id::revTone, "TONE");
+        knob(2, forge::id::dlyTime, "DLY"); knob(3, forge::id::dlyFb, "FDBK");
+        bs = {};
+    } else if (s == 11) {        // SOUNDS
+        knob(0, forge::id::type(forge::bass), "BASS"); knob(1, forge::id::type(forge::keys), "KEYS");
+        knob(2, forge::id::type(forge::lead), "LEAD"); knob(3, forge::id::type(forge::pad), "PAD");
+        bs = {};
+    } else {
+        bs = {};
+    }
+    if (s >= static_cast<std::uint32_t>(forge::kTracks) && s != 8 && s != 9) { bs[0] = {}; bs[1] = {}; }
+}
+
 void Layout::setPage(Page page) noexcept {
     page_ = page;
     const auto pg = static_cast<std::uint32_t>(page);
-    for (std::uint32_t s = 0; s < hc::kStemCount; ++s)
+    for (std::uint32_t s = 0; s < hc::kStemCount; ++s) {
         for (std::uint32_t k = 0; k < kStripKnobs; ++k) {
             Widget& w = widgets_[static_cast<std::size_t>(knobWidget_[s][k])];
-            w.param   = pageParam_[s][pg][k];
-            w.caption = kPageCaptions[pg][k];
+            const Slot& sl = knobSlot_[s][pg][k];
+            w.param = sl.param; w.action = sl.action; w.caption = sl.caption;
         }
+        for (std::uint32_t b = 0; b < 3; ++b) {
+            Widget& w = widgets_[static_cast<std::size_t>(buttonWidget_[s][b])];
+            const Slot& sl = buttonSlot_[s][pg][b];
+            w.param = sl.param; w.action = sl.action; w.caption = sl.caption;
+        }
+    }
 }
 
 int Layout::hitTest(float x, float y) const noexcept {
     for (std::size_t i = 0; i < widgets_.size(); ++i) {
         const Widget& w = widgets_[i];
         if (w.kind == WidgetKind::StemMeter || w.kind == WidgetKind::BusMeter || w.kind == WidgetKind::MasterMeter) continue;
+        if (isEmptySlot(w)) continue;
         if (!w.rect.contains(x, y)) continue;
         if (w.kind == WidgetKind::Knob || w.kind == WidgetKind::SendKnob || w.kind == WidgetKind::Transport) {
             const float dx = x - w.rect.cx(), dy = y - w.rect.cy(), r = w.rect.w * 0.5f;
@@ -190,7 +250,8 @@ UiAction Interaction::mouseDown(float x, float y, bool doubleClick, bool /*fine*
         seekAt(x);
         return UiAction::Seek;
     }
-    if (w.kind == WidgetKind::Transport || w.kind == WidgetKind::Tab || w.kind == WidgetKind::NamePanel || w.kind == WidgetKind::Command) {
+    if (w.kind == WidgetKind::Transport || w.kind == WidgetKind::Tab || w.kind == WidgetKind::NamePanel || w.kind == WidgetKind::Command ||
+        w.kind == WidgetKind::BusTitle || (w.kind == WidgetKind::Button && w.param < 0)) {
         pressed_ = hit;
         if (actionIndex) *actionIndex = w.index;
         return w.action;
@@ -243,6 +304,7 @@ void Interaction::wheel(float x, float y, float notches, bool fine) {
     const Widget& w = layout_.get().widgets()[static_cast<std::size_t>(hit)];
     if (w.param < 0 || w.kind == WidgetKind::Button) return;
     params::Parameter& p = tree_.at(static_cast<std::size_t>(w.param));
+    if (p.spec().kind == params::Kind::Choice) { p.setPlain(p.plain() + (notches > 0 ? 1.0f : -1.0f)); return; }   // one choice per notch
     p.setNormalized(p.normalized() + notches * (fine ? 0.002f : 0.02f));
 }
 

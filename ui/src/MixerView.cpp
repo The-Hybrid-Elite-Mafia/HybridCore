@@ -1,4 +1,5 @@
 #include "hybrid/ui/MixerView.hpp"
+#include "hybrid/forge/Pattern.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -170,6 +171,7 @@ void MixerView::drawStatic(Renderer& r, const Canvas& canvas) const {
         switch (w.kind) {
         case WidgetKind::Knob:
         case WidgetKind::SendKnob: {
+            if (Layout::isEmptySlot(w)) break;
             drawKnobStatic(r, w);
             const TextStyle ls = w.kind == WidgetKind::Knob ? TextStyle::Label : TextStyle::Caption;
             r.text(ls, w.caption, w.rect.cx(), w.rect.y - (w.kind == WidgetKind::Knob ? 14.0f : 10.0f), kDimText, Align::Center, TextFx::Shadowed);
@@ -302,13 +304,15 @@ void MixerView::drawCap(Renderer& r, Rect b, const std::string& caption, bool on
     const Rect cap{b.x - b.w * (128.0f / 116.0f - 1.0f) * 0.5f + push, b.y - b.h * (96.0f / 84.0f - 1.0f) * 0.5f + push,
                    b.w * 128.0f / 116.0f, b.h * 96.0f / 84.0f};
     r.sprite(Sprite::ButtonCap, cap, in ? Rgba{0.86f, 0.86f, 0.86f, 1} : Rgba{1, 1, 1, 1});
-    const float baseline = b.cy() + r.capHeight(TextStyle::Button) * 0.5f + push;
+    // Words (LOCK, GEN, UNDO...) use the smaller caption type so they fit the cap.
+    const TextStyle ts = caption.size() > 2 && caption != "\xC3\x98" ? TextStyle::Caption : TextStyle::Button;
+    const float bl = b.cy() + r.capHeight(ts) * 0.5f + push;
     if (on) {
         r.sprite(Sprite::ButtonLens, cap, lit.withAlpha(0.95f), Blend::Over, true);
         r.sprite(Sprite::ButtonHalo, {b.cx() - b.w * 0.69f + push, b.cy() - b.h * 0.76f + push, b.w * 1.38f, b.h * 1.52f}, lit.withAlpha(0.7f), Blend::Add, true);
-        r.text(TextStyle::Button, caption, b.cx() + push, baseline, rgb8(0xFFFFFF), Align::Center, TextFx::Plain);
+        r.text(ts, caption, b.cx() + push, bl, rgb8(0xFFFFFF), Align::Center, TextFx::Plain);
     } else {
-        r.text(TextStyle::Button, caption, b.cx() + push, baseline, kEngrave, Align::Center, TextFx::Engraved);
+        r.text(ts, caption, b.cx() + push, bl, kEngrave, Align::Center, TextFx::Engraved);
     }
 }
 
@@ -430,13 +434,34 @@ void MixerView::drawDisplay(Renderer& r, const ViewState& v) const {
 void MixerView::drawOverview(Renderer& r, const ViewState& v) const {
     const Rect o = layout_.overview().inset(14, 12);
     const TransportView& t = v.transport;
-    if (!v.overview || v.overview->empty() || t.length <= 0) {
-        r.text(TextStyle::Caption, "DROP STEMS ON THE CONSOLE OR PRESS LOAD", o.cx(), o.cy() + r.capHeight(TextStyle::Caption) * 0.5f, kDimText,
-               Align::Center, TextFx::Shadowed);
+    const bool haveWave = v.overview && !v.overview->empty();
+    const bool haveForm = v.sections && !v.sections->empty() && v.barSeconds > 0.0;
+    if ((!haveWave && !haveForm) || t.length <= 0) {
+        r.text(TextStyle::Caption, "DROP STEMS ON THE CONSOLE, PRESS LOAD, OR MAKE A BEAT IN BEAT FORGE", o.cx(),
+               o.cy() + r.capHeight(TextStyle::Caption) * 0.5f, kDimText, Align::Center, TextFx::Shadowed);
         return;
     }
-    const auto& pk = *v.overview;
     const float frac = static_cast<float>(std::clamp(t.position / t.length, 0.0, 1.0));
+    if (haveForm) {   // Beat Forge song form: one coloured band per section, its name at the start
+        static const std::uint32_t kSectionColour[forge::kSections] = {0x3F8CFF, 0x18C9A6, 0xFF7A1A, 0xA35CF0, 0xF04848, 0x5C6B80};
+        const auto& sec = *v.sections;
+        const float barW = static_cast<float>(v.barSeconds / t.length) * o.w;
+        std::size_t b = 0;
+        while (b < sec.size()) {
+            std::size_t e = b;
+            while (e < sec.size() && sec[e] == sec[b]) ++e;
+            const float x0 = o.x + barW * static_cast<float>(b), x1 = std::min(o.right(), o.x + barW * static_cast<float>(e));
+            if (x0 >= o.right()) break;
+            const auto kind = std::min<std::uint8_t>(sec[b], forge::kSections - 1);
+            const Rgba c = rgb8(kSectionColour[kind]);
+            r.fillRound({x0 + 1, o.bottom() - 14, std::max(2.0f, x1 - x0 - 2), 10}, 4, c.withAlpha(0.85f), Blend::Over, true);
+            if (x1 - x0 > r.textWidth(TextStyle::Caption, forge::kSectionNames[kind]) + 12)
+                r.text(TextStyle::Caption, forge::kSectionNames[kind], x0 + 8, o.y + r.capHeight(TextStyle::Caption) + 2, c, Align::Left, TextFx::Neon);
+            b = e;
+        }
+    }
+    if (haveWave) {
+    const auto& pk = *v.overview;
     const int bars = std::max(16, static_cast<int>(o.w / 9.0f));
     const float pitch = o.w / static_cast<float>(bars), bw = pitch * 0.62f;
     for (int i = 0; i < bars; ++i) {
@@ -448,6 +473,7 @@ void MixerView::drawOverview(Renderer& r, const ViewState& v) const {
         const Rect bar{o.x + static_cast<float>(i) * pitch + (pitch - bw) * 0.5f, o.cy() - h * 0.5f, bw, h};
         const bool played = (static_cast<float>(i) + 0.5f) / static_cast<float>(bars) <= frac;
         r.sprite(Sprite::LedSegment, bar, played ? kNeon : kNeon.withAlpha(0.30f), Blend::Over, played);
+    }
     }
     const float x = o.x + frac * o.w;
     r.fillRound({x - 2.5f, o.y - 6, 5, o.h + 12}, 2.5f, rgb8(0xFFFFFF), Blend::Over, true);
@@ -486,12 +512,17 @@ void MixerView::drawDynamic(Renderer& r, const ViewState& v, const MeterState& m
         switch (w.kind) {
         case WidgetKind::Knob:
         case WidgetKind::SendKnob: {
+            if (Layout::isEmptySlot(w)) break;
             Rgba acc = stemAccent(w.index);
             if (w.kind == WidgetKind::SendKnob && layout_.page() == Page::Mix) acc = busAccent(static_cast<std::uint32_t>(w.caption[1] - '0'));
             drawKnob(r, w, acc, hot);
             break;
         }
-        case WidgetKind::Button: drawButton(r, w, static_cast<int>(i) == v.pressed); break;
+        case WidgetKind::Button:
+            if (Layout::isEmptySlot(w)) break;
+            if (w.param < 0) drawCap(r, w.rect, w.caption, false, static_cast<int>(i) == v.pressed, kLitAmber);   // GEN / UNDO / CLR
+            else drawButton(r, w, static_cast<int>(i) == v.pressed);
+            break;
         case WidgetKind::Command: {   // OPEN / SAVE / EXPORT in the top bar
             const bool exporting = w.action == UiAction::ExportMix && v.exportProgress >= 0.0f;
             const std::string cap = exporting ? fmt("%.0f%%", 100.0 * v.exportProgress) : w.caption;
@@ -500,13 +531,10 @@ void MixerView::drawDynamic(Renderer& r, const ViewState& v, const MeterState& m
         }
         case WidgetKind::Transport: drawTransport(r, w, v); break;
         case WidgetKind::Tab: {
-            // Tabs 1-3 pick the knob page; tab 4 cycles the fader bank (lit when the faders are on a send).
-            const bool faders = w.action == UiAction::FaderBank;
-            const bool sel = faders ? bank > 0 : static_cast<std::uint32_t>(layout_.page()) == w.index;
-            static const char* const kBankCap[4] = {"FADERS: MAIN", "FADERS: AUX 1", "FADERS: AUX 2", "FADERS: AUX 3"};
-            const std::string cap = faders ? kBankCap[std::min<std::uint32_t>(bank, 3)] : w.caption;
+            const bool sel = static_cast<std::uint32_t>(layout_.page()) == w.index;
+            const std::string& cap = w.caption;
             const float baseline = w.rect.cy() + r.capHeight(TextStyle::Tab) * 0.5f;
-            const Rgba tint = faders ? busAccent(bank) : kTabBlue;
+            const Rgba tint = w.index == 3 ? rgb8(0xFF7A1A) : kTabBlue;   // BEAT FORGE glows orange
             if (sel) {
                 const Rect f = w.rect.inset(8, 9);
                 r.fillRound(f, plate::kTabFaceRadius - 6, tint.withAlpha(0.62f), Blend::Over);
@@ -525,10 +553,16 @@ void MixerView::drawDynamic(Renderer& r, const ViewState& v, const MeterState& m
         // Title area: stem name (or "STEM n"), and its load state.
         const float cx = st.bed.cx(), tw = st.bed.w - 24;
         if (st.isBus) {
-            r.text(TextStyle::Title, st.title, cx, st.bed.y + 76, kLightText, Align::Center, TextFx::Shadowed);
+            if (st.index == bank)   // the bus whose sends the stem faders control
+                r.text(TextStyle::Title, st.title, cx, st.bed.y + 76, st.accent, Align::Center, TextFx::Neon);
+            else
+                r.text(TextStyle::Title, st.title, cx, st.bed.y + 76, kLightText, Align::Center, TextFx::Shadowed);
         } else {
             const StemSlotView& sv = v.slots[st.index];
             const std::string title = sv.name.empty() ? st.title : sv.name;
+            if (sv.glow > 0.02f)   // Beat Forge note hits flash the track name
+                r.text(TextStyle::Title, fit(r, TextStyle::Title, title, tw), cx, st.bed.y + 76, st.accent.withAlpha(std::min(1.0f, sv.glow)),
+                       Align::Center, TextFx::Neon);
             r.text(TextStyle::Title, fit(r, TextStyle::Title, title, tw), cx, st.bed.y + 76, kLightText, Align::Center, TextFx::Shadowed);
             if (sv.progress >= 0.0f) {
                 char b[32];

@@ -6,9 +6,11 @@
 // =============================================================================
 #include "AudioHost.hpp"
 #include "StemDeck.hpp"
+#include "ForgeController.hpp"
 
 #include "hybrid/core/RealtimeThread.hpp"
 #include "hybrid/io/DeviceProbe.hpp"
+#include "hybrid/forge/Forge.hpp"
 #include "hybrid/media/MixExporter.hpp"
 #include "hybrid/media/Session.hpp"
 #include "hybrid/params/MixerParams.hpp"
@@ -196,6 +198,7 @@ struct App {
     app::StemDeck         stems{audio};
     std::vector<app::DeviceChoice> devices;
     int                   deviceIndex = 0;
+    std::unique_ptr<app::ForgeController> forge;   // Beat Forge (created once the tree is bound)
     std::filesystem::path session;          // current .hcs ("" = not saved yet)
     std::uint64_t         pendingSeek = UINT64_MAX;   // applied once the stems of an opened session are loaded
     media::MixExporter    exporter;
@@ -230,6 +233,7 @@ struct App {
         d.faderBank = console.faderBank();
         d.source    = sourceName(audio.source());
         d.playhead  = audio.stemPlayhead();
+        if (forge && !forge->song().pattern.isEmpty()) { d.forgeSong = forge->songText(); d.forgeSeeds = forge->seedsText(); }
         std::string err;
         if (!media::saveSession(file, d, HC_VERSION_STR, &err)) { say("Save failed: " + err); return false; }
         session = file;
@@ -252,6 +256,7 @@ struct App {
         console.setFaderBank(l->data.faderBank);
         audio.setSource(sourceFromName(l->data.source));
         pendingSeek = l->data.playhead;
+        if (forge) forge->restore(l->data.forgeSong, l->data.forgeSeeds);
         session = file;
         settings.set("app", "session", app::toUtf8(file.wstring()));
         std::string msg = "Opened " + app::toUtf8(file.filename().wstring());
@@ -263,7 +268,8 @@ struct App {
     }
     void startExport(HWND owner) {
         if (exporter.busy()) { exporter.cancel(); return; }   // EXPORT while exporting = cancel
-        if (stems.loadedCount() == 0) { say("Load stems before exporting"); return; }
+        const bool beat = forge && audio.forgeActive() && !forge->song().pattern.isEmpty();
+        if (stems.loadedCount() == 0 && !beat) { say("Load stems or make a beat in BEAT FORGE before exporting"); return; }
         const auto target = askSaveFile(owner, L"Export the mix (WAV, 48 kHz, 24-bit)", L"WAV audio", L"*.wav", L"wav",
                                         songFolder() / (songName() + L" - Mix.wav"));
         if (target.empty()) return;
@@ -271,6 +277,7 @@ struct App {
         for (std::uint32_t s = 0; s < kStemCount; ++s)
             if (!stems.slot(s).name.empty()) req.stems[s] = stems.slot(s).file;
         req.params   = tree.serialize();
+        if (beat) req.forgeSong = forge->songText();
         req.out      = target;
         req.encoding = media::WavEncoding::Pcm24;
         if (exporter.start(std::move(req))) say("Exporting " + app::toUtf8(target.filename().wstring()) + "...");
@@ -304,6 +311,10 @@ struct App {
         settings.set("app", "page", std::to_string(page));
         settings.set("app", "loop", audio.loop() ? "1" : "0");
         for (std::uint32_t s = 0; s < kStemCount; ++s) settings.set("stems", slotKey(s), app::toUtf8(stems.slot(s).file.wstring()));
+        if (forge) {
+            settings.setSectionText("forge", forge->songText());
+            settings.set("forge.meta", "seeds", forge->seedsText());
+        }
         settings.save(params::Settings::defaultFile());
     }
     void restoreStems() {
@@ -323,6 +334,20 @@ struct App {
     }
     void clearAll(const char* field) {
         for (std::uint32_t s = 0; s < kStemCount; ++s) tree.find(params::stemParamId(s, field))->setPlain(0.0f);
+    }
+    bool forgeOn() const { const params::Parameter* p = tree.find(forge::id::on); return p && p->isOn(); }
+    // BEAT FORGE buttons.
+    void forgeGenerate() {
+        forge->generate();
+        if (audio.source() != Source::Stems) audio.setSource(Source::Stems);
+        const auto* g = tree.find(forge::id::genre);
+        const auto* b = tree.find(forge::id::bpm);
+        say("BEAT FORGE  \xC2\xB7  " + (g ? g->format() : std::string()) + "  \xC2\xB7  " + forge->chords() + "  \xC2\xB7  " +
+            (b ? b->format() : std::string()) + "  \xC2\xB7  " + forge->form());
+    }
+    void forgeReroll(int track) {
+        forge->reroll(track);
+        say(std::string("BEAT FORGE  \xC2\xB7  new ") + forge::kTrackNames[track] + " part (UNDO takes it back)");
     }
     // Transport. Any transport command switches the source to the loaded stems.
     void playPause() {
@@ -403,10 +428,14 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     App a;
     a.settings.load(params::Settings::defaultFile());
     params::addMixerParameters(a.tree);
+    forge::addForgeParameters(a.tree);
     a.tree.deserialize(a.settings.sectionText("params"));
     const params::MixerBindings bindings(a.tree);
     params::bindMixerParameters(a.tree, bindings, a.audio.matrix(), &a.audio.limiter());
     a.tree.dispatchChanges();   // push every value into the matrix before audio starts
+    a.audio.forge().bind(a.tree);
+    a.forge = std::make_unique<app::ForgeController>(a.tree, a.audio.forge());
+    a.forge->restore(a.settings.sectionText("forge"), a.settings.get("forge.meta", "seeds"));
 
     if (opts.session.empty()) a.restoreStems();   // background loads; the saved source below wins over the "switch to stems" a load does
     a.session = app::fromUtf8(a.settings.get("app", "session"));
@@ -443,6 +472,10 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     auto lastFrame = started;
     auto lastSave  = lastFrame;
     std::uint64_t savedVersion = a.tree.version();
+    std::uint64_t savedForge   = a.forge->version();
+    std::array<std::uint32_t, forge::kTracks> lastHits{};
+    std::array<float, forge::kTracks> hitGlow{};
+    std::vector<std::uint8_t> sections;
     std::uint32_t savedBank    = uiState();
     bool          savedLoop    = a.audio.loop();
 
@@ -461,10 +494,21 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                 case ui::UiAction::NextDevice:   a.selectDevice(+1); break;
                 case ui::UiAction::LoadStems: {
                     const auto files = askForStems(static_cast<HWND>(window.nativeHandle()));
-                    if (!files.empty()) a.stems.replaceAll(files);
+                    if (!files.empty()) {
+                        if (a.forgeOn()) {   // Beat Forge owns strips 1-8: your stems (vocals) go to 9-13
+                            for (std::uint32_t s = forge::kTracks; s < kStemCount; ++s) a.stems.clear(s);
+                            a.stems.load(forge::kTracks, files);
+                            a.say("BEAT FORGE is on: your stems were loaded from strip 9 (strips 1-8 play the beat)");
+                        } else {
+                            a.stems.replaceAll(files);
+                        }
+                    }
                     console.interaction().mouseUp();
                     break;
                 }
+                case ui::UiAction::ForgeGenerate: a.forgeGenerate(); break;
+                case ui::UiAction::ForgeUndo:     a.forge->undo(); a.say(a.forge->canUndo() ? "" : "BEAT FORGE  \xC2\xB7  undone"); break;
+                case ui::UiAction::ForgeClear:    a.forge->clear(); a.say("BEAT FORGE  \xC2\xB7  pattern cleared (UNDO brings it back)"); break;
                 case ui::UiAction::CycleSource: {
                     const Source s = a.audio.source();
                     a.audio.setSource(s == Source::TestTones ? Source::Hardware : s == Source::Hardware ? Source::Stems : Source::TestTones);
@@ -472,7 +516,14 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                 }
                 case ui::UiAction::ClearSolo:    a.clearAll("solo"); break;
                 case ui::UiAction::ClearMute:    a.clearAll("mute"); break;
-                case ui::UiAction::FaderBank:    console.setFaderBank((console.faderBank() + 1) % ui::kFaderBanks); break;
+                case ui::UiAction::FaderBank:    console.setFaderBank(idx); break;
+                case ui::UiAction::None: {   // BEAT FORGE page: click a track's name (strips 1-8) = a new part for that track
+                    const int at = console.layout().stemStripAt(x, y);
+                    if (console.page() == ui::Page::Forge && at >= 0 && at < forge::kTracks &&
+                        ui::Layout::titleArea(console.layout().strips()[static_cast<std::size_t>(at)]).contains(x, y))
+                        a.forgeReroll(at);
+                    break;
+                }
                 case ui::UiAction::SelectPage:   console.setPage(static_cast<ui::Page>(idx)); break;
                 case ui::UiAction::ToStart:      a.audio.seek(0); break;
                 case ui::UiAction::PlayPause:    a.playPause(); break;
@@ -493,7 +544,6 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                     break;
                 }
                 case ui::UiAction::ExportMix:    a.startExport(hwnd); console.interaction().mouseUp(); break;
-                case ui::UiAction::None:         break;
                 }
                 break;
             }
@@ -514,6 +564,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                 }
                 switch (e.key) {
                 case VK_SPACE:  a.playPause(); break;
+                case 'G':       a.forgeGenerate(); break;
                 case VK_HOME:   a.audio.seek(0); break;
                 case VK_END:    a.audio.stop(); break;
                 case 'L':       a.audio.setLoop(!a.audio.loop()); break;
@@ -551,13 +602,14 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             }
         }
 
-        if (float f = 0; console.interaction().takeSeek(f) && a.stems.songFrames() > 0) {
+        const std::uint64_t songLen = std::max(a.stems.songFrames(), a.audio.stemSongFrames());   // stems or the Beat Forge song
+        if (float f = 0; console.interaction().takeSeek(f) && songLen > 0) {
             if (a.audio.source() != Source::Stems) a.audio.setSource(Source::Stems);
-            a.audio.seek(static_cast<std::uint64_t>(f * static_cast<double>(a.stems.songFrames() - 1)));
+            a.audio.seek(static_cast<std::uint64_t>(f * static_cast<double>(songLen - 1)));
         }
         a.pollExport();
         if (a.pendingSeek != UINT64_MAX && !a.stems.loading()) {
-            if (a.pendingSeek < a.stems.songFrames()) a.audio.seek(a.pendingSeek);
+            if (a.pendingSeek < songLen) a.audio.seek(a.pendingSeek);
             a.pendingSeek = UINT64_MAX;
         }
         if (a.session != shownSession) {   // title bar: version and session name
@@ -583,8 +635,10 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         // Persist settings at most every 5 s, only when something changed (crash-safe file replace).
         if (now - lastSave > std::chrono::seconds(5)) {
             lastSave = now;
-            if (a.tree.version() != savedVersion || uiState() != savedBank || a.audio.loop() != savedLoop || a.stems.loading()) {
+            if (a.tree.version() != savedVersion || uiState() != savedBank || a.audio.loop() != savedLoop || a.stems.loading() ||
+                a.forge->version() != savedForge) {
                 a.saveSettings(uiState());
+                savedForge   = a.forge->version();
                 savedVersion = a.tree.version();
                 savedBank    = uiState();
                 savedLoop    = a.audio.loop();
@@ -611,6 +665,38 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             vs.slots[s].progress = a.stems.progress(s);
             vs.slots[s].failed   = !sl.error.empty();
         }
+        if (console.page() == ui::Page::Forge)   // empty strips 9-12 carry the composer controls on this page
+            for (std::uint32_t s = 8; s < 12; ++s)
+                if (vs.slots[s].name.empty() && vs.slots[s].progress < 0.0f) {
+                    static const char* const kNames[4] = {"COMPOSE", "FEEL", "SPACE", "SOUNDS"};
+                    vs.slots[s].name = kNames[s - 8];
+                    vs.slots[s].info = "BEAT FORGE";
+                }
+        // BEAT FORGE: strips 1-8 show its tracks; names flash on every note; the overview shows the song form.
+        if (a.audio.forgeActive()) {
+            const bool onPage = console.page() == ui::Page::Forge;
+            for (int t = 0; t < forge::kTracks; ++t) {
+                const std::uint32_t h = a.audio.forge().trackHit[static_cast<std::size_t>(t)].load(std::memory_order_relaxed);
+                if (h != lastHits[static_cast<std::size_t>(t)]) hitGlow[static_cast<std::size_t>(t)] = 1.0f;
+                lastHits[static_cast<std::size_t>(t)] = h;
+                hitGlow[static_cast<std::size_t>(t)] *= std::pow(0.02f, std::min(dt, 0.1f));   // fades in ~0.25 s
+                ui::StemSlotView& sv = vs.slots[static_cast<std::size_t>(t)];
+                sv.name = forge::kTrackNames[t];
+                const params::Parameter* ty = forge::hasType(t) ? a.tree.find(forge::id::type(t)) : nullptr;
+                const bool empty = a.forge->song().pattern.tracks[static_cast<std::size_t>(t)].count == 0;
+                sv.info = onPage ? std::string(empty ? "CLICK: NEW PART" : "CLICK: RE-ROLL") : (ty ? ty->format() : std::string("BEAT FORGE"));
+                sv.progress = -1.0f;
+                sv.failed = false;
+                sv.glow = hitGlow[static_cast<std::size_t>(t)];
+            }
+            const forge::Song& song = a.forge->song();
+            const params::Parameter* full = a.tree.find(forge::id::arrange);
+            sections.clear();
+            if (song.arrangement.active() && full && full->isOn())
+                sections.assign(song.arrangement.section.begin(), song.arrangement.section.begin() + song.arrangement.bars);
+            vs.sections   = sections.empty() ? nullptr : &sections;
+            vs.barSeconds = 16.0 * forge::ForgeEngine::stepSamples(kSampleRate, a.tree.find(forge::id::bpm)->plain()) / kSampleRate;
+        }
         vs.engine.valid        = st.running;
         vs.engine.driver       = st.driver;
         vs.engine.sampleRate   = st.sampleRate;
@@ -622,7 +708,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         vs.transport.playing   = a.audio.wantsPlay();
         vs.transport.loop      = a.audio.loop();
         vs.transport.position  = static_cast<double>(a.audio.stemPlayhead()) / kSampleRate;
-        vs.transport.length    = static_cast<double>(a.stems.songFrames()) / kSampleRate;
+        vs.transport.length    = static_cast<double>(songLen) / kSampleRate;
         vs.overview            = a.stems.songOverview().empty() ? nullptr : &a.stems.songOverview();
         for (std::uint32_t s = 0; s < kStemCount; ++s) vs.gainReduction[s] = st.running ? a.audio.matrix().strip(s).gainReductionDb() : 0.0f;
         vs.limiterGr           = st.running ? a.audio.limiter().gainReductionDb() : 0.0f;

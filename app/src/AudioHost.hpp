@@ -51,6 +51,8 @@ public:
 
     [[nodiscard]] dsp::StemMatrix& matrix() noexcept { return mixer_->matrix(); }
     [[nodiscard]] dsp::BusLimiter& limiter() noexcept { return mixer_->limiter(); }
+    [[nodiscard]] forge::ForgeEngine& forge() noexcept { return mixer_->forge(); }
+    [[nodiscard]] bool forgeActive() const noexcept { return mixer_->forgeActive(); }
     [[nodiscard]] engine::MixerProcessor::Source source() const noexcept { return mixer_->source(); }
     void setSource(engine::MixerProcessor::Source s) noexcept { mixer_->setSource(s); }
 

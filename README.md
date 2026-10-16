@@ -18,6 +18,7 @@ Rig-wide constants (sample rate, 13 stems, 4 buses, limits) live in ONE file:
 | 7 | Transport (play / pause / stop / seek / loop, click-free), song overview with click-to-seek, keyboard | Built, unit-tested (500 random transport changes, 0 allocations); playing in the CI snapshots. Not yet heard on the rig. |
 | 8 | Per-stem EQ (low cut, low/high shelf, sweep mid) + compressor, main look-ahead limiter, MIX / EQ / DYNAMICS pages, VST3 parity | Built, unit-tested (EQ curves, compressor curve and timing, limiter ceiling, 0 allocations, full-chain CPU). Not yet heard on the rig. |
 | 9 | Sessions (`.hcs`), offline WAV export in the background, OPEN / SAVE / EXPORT | Built, unit-tested (round trip, moved folders, export = sum of stems, byte-identical renders). Dialogs not yet clicked on the rig. |
+| 11 | BEAT FORGE (from Hybrid Studio 2.0.9, rebuilt without JUCE): 8 synthesized tracks on strips 1–8, genre composer, song form, FORGE page | Built, unit-tested (composer, form, sounds, timing, zero allocations, export). Not yet heard on the rig. |
 | 10 | `.hcs` file association, single instance (double-click hands the song to the open console), version in the title bar | Installer check in CI (association added and removed). Hand-over not yet tried on the rig. |
 
 The roadmap's 10 phases are built. Next steps depend on what Steven hears and sees on the rig.
@@ -30,6 +31,7 @@ The roadmap's 10 phases are built. Next steps depend on what Steven hears and se
 | `dsp/` | `hc::dsp` | AVX2 kernels, `StemMatrix` (13 stems × 4 stereo buses, ramps, meters), `ChannelStrip` (EQ + compressor), `BusLimiter` (look-ahead) |
 | `engine/` | `hc::engine` | Lock-free `Engine`, `AudioProcessor`, `MixerProcessor` (tones / inputs / stems), `StemAudio`, `ToneProcessor` |
 | `media/` | `hc::media` | WAV/RF64 decoder + writer, MP3/FLAC (dr_libs), `Resampler` (Kaiser windowed sinc, AVX2), `StemLoader` (background), `Session` (.hcs), `MixExporter` (offline render) |
+| `forge/` | `hc::forge` | BEAT FORGE: synth voices, `Composer` (genres, chords, bass, melody, song form), `ForgeEngine` (lock-free playback, reverb, delay) |
 | `params/` | `hc::params` | Parameter tree (atomics + dispatch), `Settings` INI, mixer parameter set + bindings |
 | `ui/` | `hc::ui` | Faceplate chassis + canvas, parts atlas, Poppins atlas, layout/interaction, GL renderer (sRGB, MSAA, bloom, static cache), `MixerView`, `Console` — see `docs/UI_RENDERING.md` |
 | `assets/` | — | `faceplates/Main-Faceplate.png` (HEM art), Poppins fonts (OFL) |

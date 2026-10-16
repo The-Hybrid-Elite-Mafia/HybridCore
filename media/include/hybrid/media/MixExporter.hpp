@@ -7,8 +7,9 @@
 //  taken when the export starts — the same matrix, EQ, compressors and limiter code as
 //  live playback, so the file is what you hear (minus your audio interface).
 //  Output: the Main bus, 48 kHz stereo, 24-bit PCM (rounded) or 32-bit float, exactly
-//  as long as the longest stem, starting on its first sample (the limiter look-ahead is
-//  compensated; no fade-in). Rendering never touches the live audio thread.
+//  as long as the longest stem (or the Beat Forge song, plus 2 s for its reverb / delay tails),
+//  starting on its first sample (the limiter look-ahead is compensated; no fade-in).
+//  Rendering never touches the live audio thread.
 // =============================================================================
 #include "hybrid/core/Config.hpp"
 #include "hybrid/media/AudioFile.hpp"
@@ -26,7 +27,8 @@ namespace hc::media {
 
 struct ExportRequest {
     std::array<std::filesystem::path, hc::kStemCount> stems{};   // empty = slot not used
-    std::string           params;                                // ParameterTree::serialize() snapshot
+    std::string           params;                                // ParameterTree::serialize() snapshot (mixer + forge.*)
+    std::string           forgeSong;                             // forge::songToText(); used when forge.on
     std::filesystem::path out;
     WavEncoding           encoding = WavEncoding::Pcm24;
 };

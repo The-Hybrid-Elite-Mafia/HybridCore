@@ -2,6 +2,8 @@
 #include "hybrid/media/StemLoader.hpp"
 #include "hybrid/engine/MixerProcessor.hpp"
 #include "hybrid/params/MixerParams.hpp"
+#include "hybrid/forge/Forge.hpp"
+#include "hybrid/forge/ForgeEngine.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -18,6 +20,7 @@ std::expected<ExportResult, std::string> renderMix(const ExportRequest& req, con
         // 1) Parameters: a private tree, so later changes in the app do not leak into the render.
         params::ParameterTree tree;
         params::addMixerParameters(tree);
+        forge::addForgeParameters(tree);
         tree.deserialize(req.params);
         const params::MixerBindings bindings(tree);
 
@@ -29,18 +32,28 @@ std::expected<ExportResult, std::string> renderMix(const ExportRequest& req, con
         mp->setStartFade(false);   // the file starts on the song's first sample
         bindings.applyAll(tree, mp->matrix(), &mp->limiter());
         mp->matrix().snapToTargets();
+        mp->forge().bind(tree);
+        forge::Song fsong;
+        const bool forgeOn = tree.find(forge::id::on)->isOn() && forge::songFromText(req.forgeSong, fsong) && !fsong.pattern.isEmpty();
+        if (forgeOn) mp->forge().setSong(fsong);
+        else tree.find(forge::id::on)->setPlain(0.0f);
+        const std::uint64_t forgeFrames = forgeOn ? forge::ForgeEngine::songLength(fsong, hc::kSampleRate, tree.find(forge::id::bpm)->plain(),
+                                                                                     tree.find(forge::id::arrange)->isOn())
+                                                  : 0;
+        const std::uint64_t tail = forgeOn ? 2 * hc::kSampleRate : 0;   // reverb / delay tails
 
         // 2) Stems, decoded again (first half of the progress bar).
         std::uint32_t used = 0;
         for (const auto& p : req.stems) used += !p.empty();
-        if (used == 0) return std::unexpected(std::string("no stems to export"));
+        if (used == 0 && forgeFrames == 0) return std::unexpected(std::string("nothing to export (no stems, Beat Forge off or empty)"));
         std::uint64_t song = 0;
         std::uint32_t done = 0;
         std::string   warning;
         for (std::uint32_t s = 0; s < hc::kStemCount; ++s) {
             if (req.stems[s].empty()) continue;
+            if (forgeOn && s < static_cast<std::uint32_t>(forge::kTracks)) continue;   // strips 1–8 play Beat Forge
             auto stem = buildStem(req.stems[s], hc::kSampleRate,
-                                  [&](float f) { return report(0.5f * (static_cast<float>(done) + f) / static_cast<float>(used)); });
+                                  [&](float f) { return report(0.5f * (static_cast<float>(done) + f) / static_cast<float>(std::max<std::uint32_t>(used, 1))); });
             ++done;
             if (!stem) {
                 if (stem.error() == "cancelled") return std::unexpected(std::string("cancelled"));
@@ -51,7 +64,8 @@ std::expected<ExportResult, std::string> renderMix(const ExportRequest& req, con
             song = std::max(song, (*stem)->frames);
             if (!mp->submitStem(s, *stem)) return std::unexpected(std::string("internal: stem queue full"));
         }
-        if (song == 0) return std::unexpected("none of the stems could be read: " + warning);
+        if (song == 0 && forgeFrames == 0) return std::unexpected("none of the stems could be read: " + warning);
+        song = std::max(song, forgeFrames) + tail;
 
         // 3) Render: song + limiter look-ahead, dropping the first look-ahead samples.
         const std::uint64_t lat = mp->latencyFrames();

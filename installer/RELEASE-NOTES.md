@@ -1,3 +1,28 @@
+## The Hybrid Core — 0.11.0: BEAT FORGE (your instrumental maker) rebuilt inside The Hybrid Core
+
+Private test build for Steven's rig (Windows 10/11 x64, Intel i7-14700HX).
+
+Beat Forge comes from Hybrid Studio 2.0.9 (that code is untouched in its own repo). It was rebuilt here without JUCE and improved:
+
+**New / better than in Hybrid Studio**
+- **Each Beat Forge track is a full console strip:** KICK, SNARE, HATS, PERC, BASS, KEYS, LEAD, PAD play through strips 1-8 with their own EQ, compressor, fader, pan, mute / solo and meters (in Hybrid Studio they were mixed down inside Beat Forge).
+- **Whole songs, not just loops:** FULL builds a song form for the genre (intro, verses, hooks, a drop before each hook, outro). The bottom bar shows the sections.
+- **Plays with your vocals:** stems on strips 9-13 run on the same clock; one EXPORT renders everything, including the reverb / delay tails (no PRINT TO LANES step needed).
+- Reverb / delay sends now follow each strip's fader, mute and solo.
+- The beat is saved in sessions (.hcs) and restored when the app opens.
+
+**Same as Hybrid Studio:** 8 genres (trap, pop trap, drill, boom bap, outlaw country, folk, gospel, cinematic), key / scale / bars, density / variation / humanize / swing, LOCK, re-roll one track, 4 sounds each for bass / keys / lead / pad, all synthesized (nothing to license).
+
+**Not in this build yet:** the note grid / piano roll for editing single notes, ASK CLAUDE, and humming / beatboxing into the mic. They come next if you want them.
+
+**Measured in the tests** (CI machine): 192 genre / scale / length combinations composed and arranged with every note in range and in key; all 48 sounds render; notes land on the exact sample with swing; 0 memory allocations on the audio thread; a beat exported twice is byte-identical.
+
+**Not tested yet:** how it sounds on your speakers, your graphics card, your ASIO driver.
+
+Not code-signed: Windows SmartScreen will warn. Click "More info" → "Run anyway".
+
+---
+
 ## The Hybrid Core — 0.10.0: Phase 10 — all ten roadmap phases built (1.0 after it is proven on the rig)
 
 Private test build for Steven's rig (Windows 10/11 x64, Intel i7-14700HX).

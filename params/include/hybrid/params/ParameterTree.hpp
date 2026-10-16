@@ -28,6 +28,7 @@ enum class Kind : std::uint8_t {
     Toggle,    // 0 / 1
     Linear,    // min..max, linear
     Log,       // min..max on a logarithmic taper (frequency, time, ratio); min > 0
+    Choice,    // 0..choices-1 (whole numbers), shown by name
 };
 
 struct ParamSpec {
@@ -43,6 +44,7 @@ struct ParamSpec {
     float       anchorNorm  = 0.0f;    // 0 = linear taper
     std::string unit;                  // "dB", "Hz", "ms", ":1" — display / host unit ("" = none)
     bool        offLabel = false;      // Log / Linear: the bottom of travel shows "OFF"
+    std::vector<std::string> choices;  // Choice: the names (min/max are set from it)
 };
 
 class Parameter {

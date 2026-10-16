@@ -219,6 +219,9 @@ int main(int argc, char** argv) {
     testTransport();
     testSession();
     testExport();
+    testForgeComposer();
+    testForgeEngine();
+    testForgeInMixer();
     testUiImage();
     testUiLayout();
     testUiFaceplate();

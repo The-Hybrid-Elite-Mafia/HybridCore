@@ -41,7 +41,22 @@ Turn your speakers/headphones DOWN first. Close any app that is playing audio
                   MID (boost / cut), FREQ (where the MID works, 150 Hz - 8 kHz)
        DYNAMICS = compressor: THRESH, RATIO (all the way left = off), ATK, REL, GAIN (makeup)
      An orange bar hanging from the top of a stem meter = how much the compressor is turning it down.
-     FADERS tab: click to switch the stem faders between MAIN, AUX 1, AUX 2, AUX 3 sends.
+     Click a bus name (MAIN, AUX 1, AUX 2, AUX 3 at the top of the left panel) to switch the 13 stem
+     faders between the main mix and that aux send. The lit name is the one the faders control.
+   - BEAT FORGE tab (makes instrumentals, all sounds built in, nothing to license):
+       1. Pick GENRE, KEY, SCALE (strip "COMPOSE"; turn the knob or use the mouse wheel).
+       2. Press GEN (or the G key), then PLAY. Strips 1-8 become KICK, SNARE, HATS, PERC, BASS, KEYS,
+          LEAD, PAD - each with its own EQ, compressor, fader, mute / solo like any stem.
+       3. Don't like one part? Click that track's name to re-roll just it. LOCK keeps a track when
+          you press GEN again. BACK undoes the last GEN / re-roll / CLR.
+       4. FULL (lit) = a whole song: intro, verses, hooks, a drop before each hook, outro. The bottom
+          bar shows the sections. FULL off = the pattern loops.
+       5. FEEL: DENSITY (busier), VARIATION, HUM (humanize), SWNG (swing), FX (reverb/delay level).
+          SPACE: reverb size / tone, delay time / feedback. SOUNDS: the bass / keys / lead / pad sound.
+          BPM lit = GEN also sets the genre's tempo; BPM knob on COMPOSE sets it by hand.
+       6. Vocals: with Beat Forge on, LOAD puts your stems on strips 9-13.
+       7. EXPORT renders the beat (and your stems 9-13) to a WAV, with the reverb tails.
+       Your beat is saved with the session (SAVE) and comes back when you reopen the app.
    - LIM (bottom bar, blue = on) is a safety limiter on the main output: nothing goes over
      -0.3 dB. GR next to it shows how much it is turning down. It adds 1 ms of delay.
    - Knobs: drag up/down. Hold Shift for fine moves. Double-click = reset. Mouse wheel works too.

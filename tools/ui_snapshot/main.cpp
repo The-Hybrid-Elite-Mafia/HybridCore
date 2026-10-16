@@ -16,6 +16,8 @@
 // drawn on top, meters lit by the engine, glass display populated.
 #include "AudioHost.hpp"
 #include "StemDeck.hpp"
+#include "ForgeController.hpp"
+#include "hybrid/forge/Forge.hpp"
 
 #include "hybrid/io/DeviceProbe.hpp"
 #include "hybrid/params/MixerParams.hpp"
@@ -149,6 +151,7 @@ int wmain(int argc, wchar_t** argv) {
     bool   offline = true;
     std::filesystem::path stemsDir;
     ui::Page page = ui::Page::Mix;
+    int forgeGenre = -1;   // --forge <0..7>: make a Beat Forge song in that genre and play it
     std::string           prefix = "HybridCore";
     for (int i = 1; i < argc; ++i) {
         const std::wstring k = argv[i];
@@ -156,7 +159,11 @@ int wmain(int argc, wchar_t** argv) {
         else if (k == L"--seconds" && i + 1 < argc) seconds = std::wcstod(argv[++i], nullptr);
         else if (k == L"--device" && i + 1 < argc) offline = std::wstring(argv[++i]) != L"default";
         else if (k == L"--stems" && i + 1 < argc) stemsDir = argv[++i];
-        else if (k == L"--page" && i + 1 < argc) { const std::wstring p = argv[++i]; page = p == L"eq" ? ui::Page::Eq : p == L"dyn" ? ui::Page::Dynamics : ui::Page::Mix; }
+        else if (k == L"--page" && i + 1 < argc) {
+            const std::wstring p = argv[++i];
+            page = p == L"eq" ? ui::Page::Eq : p == L"dyn" ? ui::Page::Dynamics : p == L"forge" ? ui::Page::Forge : ui::Page::Mix;
+        }
+        else if (k == L"--forge" && i + 1 < argc) forgeGenre = static_cast<int>(std::wcstol(argv[++i], nullptr, 10));
         else if (k == L"--name" && i + 1 < argc) { prefix.clear(); for (const wchar_t* c = argv[++i]; *c; ++c) prefix.push_back(*c < 128 ? static_cast<char>(*c) : '_'); }
         else if (k == L"--sizes" && i + 1 < argc) {
             sizes.clear();
@@ -173,7 +180,7 @@ int wmain(int argc, wchar_t** argv) {
                 pos = comma + 1;
             }
         } else {
-            std::wprintf(L"usage: hc_ui_snapshot [--out <folder>] [--sizes 3840x2160,1389x868] [--seconds 2] [--device offline|default] [--stems <folder>] [--name <prefix>] [--page mix|eq|dyn]\n");
+            std::wprintf(L"usage: hc_ui_snapshot [--out <folder>] [--sizes 3840x2160,1389x868] [--seconds 2] [--device offline|default] [--stems <folder>] [--name <prefix>] [--page mix|eq|dyn|forge] [--forge <genre 0-7>]\n");
             return 1;
         }
     }
@@ -185,9 +192,12 @@ int wmain(int argc, wchar_t** argv) {
     // ---- live engine -----------------------------------------------------------------------
     params::ParameterTree tree;
     params::addMixerParameters(tree);
+    forge::addForgeParameters(tree);
     app::AudioHost host;
     const params::MixerBindings bindings(tree);
     params::bindMixerParameters(tree, bindings, host.matrix(), &host.limiter());
+    host.forge().bind(tree);
+    app::ForgeController forgeCtl(tree, host.forge());
     setUserControls(tree);
     tree.dispatchChanges();
     const auto devices = app::AudioHost::listDevices();
@@ -209,6 +219,16 @@ int wmain(int argc, wchar_t** argv) {
             const app::StemSlot& sl = deck.slot(s2);
             if (!sl.file.empty()) std::wprintf(L"          slot %2u: %hs  %hs%hs\n", s2 + 1, sl.name.empty() ? "(failed)" : sl.name.c_str(), sl.info.c_str(), sl.error.c_str());
         }
+    }
+    if (forgeGenre >= 0) {
+        tree.find(forge::id::genre)->setPlain(static_cast<float>(std::clamp(forgeGenre, 0, forge::kGenres - 1)));
+        forgeCtl.generate();
+        host.setSource(engine::MixerProcessor::Source::Stems);
+        host.seek(0);
+        host.play();
+        std::wprintf(L"Beat Forge: %hs, %hs, chords %hs, form %hs, %d notes\n", tree.find(forge::id::genre)->format().c_str(),
+                     tree.find(forge::id::bpm)->format().c_str(), forgeCtl.chords().c_str(), forgeCtl.form().c_str(),
+                     forgeCtl.song().pattern.noteCount());
     }
     std::wprintf(L"Engine  : %hs\n          %hs\n", host.status().line1.c_str(), host.status().line2.c_str());
     std::wprintf(L"Controls set before the shots: stem 2 fader -6 dB, stem 3 mute, stem 5 phase, stem 6 pan L60, stem 7 pan R80,\n"
@@ -253,6 +273,7 @@ int wmain(int argc, wchar_t** argv) {
     if (!art) { std::wprintf(L"faceplate reload failed: %hs\n", plateErr.c_str()); return 2; }
 
     int failures = 0;
+    std::vector<std::uint8_t> forgeSections;
     for (const Size sz : sizes) {
         if (!console.resize(sz.w, sz.h, &err)) { std::wprintf(L"resize failed: %hs\n", err.c_str()); return 2; }
         const app::HostStatus& st = host.status();
@@ -279,7 +300,25 @@ int wmain(int argc, wchar_t** argv) {
             vs.transport.playing  = host.wantsPlay();
             vs.transport.loop     = host.loop();
             vs.transport.position = static_cast<double>(host.stemPlayhead()) / hc::kSampleRate;
-            vs.transport.length   = static_cast<double>(deck.songFrames()) / hc::kSampleRate;
+            vs.transport.length   = static_cast<double>(std::max(deck.songFrames(), host.stemSongFrames())) / hc::kSampleRate;
+            if (page == ui::Page::Forge)
+                for (std::uint32_t s = 8; s < 12; ++s)
+                    if (vs.slots[s].name.empty()) {
+                        static const char* const kNames[4] = {"COMPOSE", "FEEL", "SPACE", "SOUNDS"};
+                        vs.slots[s].name = kNames[s - 8];
+                        vs.slots[s].info = "BEAT FORGE";
+                    }
+            if (host.forgeActive()) {
+                for (int t = 0; t < forge::kTracks; ++t) {
+                    vs.slots[static_cast<std::size_t>(t)].name = forge::kTrackNames[t];
+                    const params::Parameter* ty = forge::hasType(t) ? tree.find(forge::id::type(t)) : nullptr;
+                    vs.slots[static_cast<std::size_t>(t)].info = page == ui::Page::Forge ? std::string("CLICK: RE-ROLL") : (ty ? ty->format() : std::string("BEAT FORGE"));
+                }
+                const forge::Arrangement& arr = forgeCtl.song().arrangement;
+                forgeSections.assign(arr.section.begin(), arr.section.begin() + arr.bars);
+                vs.sections   = forgeSections.empty() ? nullptr : &forgeSections;
+                vs.barSeconds = 16.0 * forge::ForgeEngine::stepSamples(hc::kSampleRate, tree.find(forge::id::bpm)->plain()) / hc::kSampleRate;
+            }
             vs.overview           = deck.songOverview().empty() ? nullptr : &deck.songOverview();
             for (std::uint32_t s2 = 0; s2 < kStemCount; ++s2) vs.gainReduction[s2] = host.matrix().strip(s2).gainReductionDb();
             vs.limiterGr          = host.limiter().gainReductionDb();

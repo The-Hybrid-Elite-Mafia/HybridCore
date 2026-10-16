@@ -8,8 +8,9 @@
 //    name panel   : device + format (click: next device, right-click: previous)
 //    6 sockets    : LOAD stems, |◀ to start, PLAY / PAUSE, STOP, LOOP, SOURCE (tones / inputs / stems)
 //    glass display: song position + length, DSP load, driver / buffer / latency / dropouts
-//    4 tabs       : knob page MIX (trim, pan, aux sends) / EQ / DYNAMICS, and FADERS (cycles what
-//                   the 13 stem faders control: MAIN / AUX 1 / AUX 2 / AUX 3 sends)
+//    4 tabs       : knob page MIX (trim, pan, aux sends) / EQ / DYNAMICS / FORGE (Beat Forge:
+//                   strips 1–8 = the 8 tracks' sound knobs + LOCK, strips 9–12 = composer, space, sounds)
+//    bus titles   : click MAIN / AUX 1–3 = what the 13 stem faders control (main mix or that aux send)
 //    left panel   : 4 bus strips (Main, Aux 1–3)
 //    main panel   : 13 stem strips
 //    top bar      : title, OPEN / SAVE / EXPORT, status line (engraved)
@@ -30,20 +31,21 @@
 namespace hc::ui {
 
 enum class WidgetKind : std::uint8_t { Knob, SendKnob, Fader, Button, StemMeter, BusMeter, MasterMeter, Transport, Tab, NamePanel, Overview,
-                                       Command };
+                                       Command, BusTitle };
 enum class UiAction : std::uint8_t { None, PrevDevice, NextDevice, LoadStems, CycleSource, ClearSolo, ClearMute, FaderBank,
                                      ToStart, PlayPause, Stop, ToggleLoop, Seek, SelectPage,
-                                     OpenSession, SaveSession, ExportMix };
+                                     OpenSession, SaveSession, ExportMix, ForgeGenerate, ForgeUndo, ForgeClear };
 
 // What the 5 knobs of every stem strip control.
-enum class Page : std::uint8_t { Mix, Eq, Dynamics };
-inline constexpr std::uint32_t kPages      = 3;
+enum class Page : std::uint8_t { Mix, Eq, Dynamics, Forge };
+inline constexpr std::uint32_t kPages      = 4;
+inline constexpr std::uint32_t kMixerPages = 3;   // pages whose knobs are the stem's own controls
 inline constexpr std::uint32_t kStripKnobs = 5;   // 2 large + 3 small per stem strip
 // Parameter field ("stemNN.<field>") and caption of each knob on each page.
-inline constexpr const char* kPageFields[kPages][kStripKnobs]   = {{"trim", "pan", "aux1", "aux2", "aux3"},
+inline constexpr const char* kPageFields[kMixerPages][kStripKnobs]   = {{"trim", "pan", "aux1", "aux2", "aux3"},
                                                                    {"lo", "hi", "hpf", "mid", "midf"},
                                                                    {"thr", "ratio", "att", "rel", "mkup"}};
-inline constexpr const char* kPageCaptions[kPages][kStripKnobs] = {{"TRIM", "PAN", "A1", "A2", "A3"},
+inline constexpr const char* kPageCaptions[kMixerPages][kStripKnobs] = {{"TRIM", "PAN", "A1", "A2", "A3"},
                                                                    {"LOW", "HIGH", "CUT", "MID", "FREQ"},
                                                                    {"THRESH", "RATIO", "ATK", "REL", "GAIN"}};
 
@@ -94,6 +96,10 @@ public:
     void setFaderBank(std::uint32_t bank) noexcept;
     // Rebinds the 5 knobs of every stem strip (parameters and captions).
     void setPage(Page page) noexcept;
+    // Knob slots with no parameter on the current page are empty: not drawn, not clickable.
+    [[nodiscard]] static bool isEmptySlot(const Widget& w) noexcept {
+        return (w.kind == WidgetKind::Knob || w.kind == WidgetKind::SendKnob || w.kind == WidgetKind::Button) && w.param < 0 && w.action == UiAction::None;
+    }
     [[nodiscard]] Page page() const noexcept { return page_; }
     [[nodiscard]] int faderParam(std::uint32_t stem, std::uint32_t bank) const noexcept { return stemFader_[stem][bank]; }
 
@@ -103,13 +109,17 @@ public:
     [[nodiscard]] Rect limiterButton() const noexcept { return limit_; }
 
 private:
+    void buildSlots(const params::ParameterTree& tree, std::uint32_t stem);
     std::vector<Widget>      widgets_;
     std::vector<StripLayout> strips_;
     std::array<std::array<int, kFaderBanks>, hc::kStemCount> stemFader_{};
     std::uint32_t bank_   = 0;
     Page          page_   = Page::Mix;
+    struct Slot { int param = -1; UiAction action = UiAction::None; std::string caption; };   // what a knob / button does on a page
     std::array<std::array<int, kStripKnobs>, hc::kStemCount> knobWidget_{};
-    std::array<std::array<std::array<int, kStripKnobs>, kPages>, hc::kStemCount> pageParam_{};
+    std::array<std::array<int, 3>, hc::kStemCount>           buttonWidget_{};
+    std::array<std::array<std::array<Slot, kStripKnobs>, kPages>, hc::kStemCount> knobSlot_{};
+    std::array<std::array<std::array<Slot, 3>, kPages>, hc::kStemCount>           buttonSlot_{};
     Rect          limit_;
     float         extraH_ = 0;
     Rect          master_, status_, overview_;

@@ -10,6 +10,9 @@
 //                returns to the start). Song length = longest loaded stem; shorter stems play
 //                silence after their end. Starts and seeks fade in over 64 samples, pause / stop
 //                fade out over one block, so the transport never clicks.
+//  Beat Forge (source Stems, forge.on): its 8 tracks replace stems 1–8 (KICK .. PAD) on the
+//  same transport; its reverb / delay return is added to Main before the limiter. The song is
+//  as long as the longest stem or the Beat Forge song, whichever is longer.
 //  Bus b is written to output channels 2b / 2b+1 when the device has them (bus 0 = Main = outs 1/2),
 //  after dsp::BusLimiter: every bus is delayed by the limiter look-ahead (latencyFrames()), Main is limited.
 //
@@ -25,6 +28,7 @@
 #include "hybrid/core/SpscRing.hpp"
 #include "hybrid/dsp/StemMatrix.hpp"
 #include "hybrid/dsp/BusLimiter.hpp"
+#include "hybrid/forge/ForgeEngine.hpp"
 
 #include <array>
 #include <atomic>
@@ -48,6 +52,10 @@ public:
     [[nodiscard]] dsp::BusLimiter&       limiter() noexcept { return limiter_; }
     [[nodiscard]] const dsp::BusLimiter& limiter() const noexcept { return limiter_; }
     [[nodiscard]] std::uint32_t latencyFrames() const noexcept { return limiter_.latency(); }
+    [[nodiscard]] forge::ForgeEngine&       forge() noexcept { return forge_; }
+    [[nodiscard]] const forge::ForgeEngine& forge() const noexcept { return forge_; }
+    // Published by the audio thread: Beat Forge is playing into strips 1–8.
+    [[nodiscard]] bool forgeActive() const noexcept { return forgePub_.load(std::memory_order_relaxed); }
 
     // ---- stems (message thread) ----------------------------------------------------
     // Queues `audio` for `slot` (nullptr clears the slot). On success ownership moves to
@@ -92,6 +100,11 @@ private:
     std::atomic<Source>                               source_;
     dsp::StemMatrix                                   matrix_;
     dsp::BusLimiter                                   limiter_;
+    forge::ForgeEngine                                forge_;
+    core::AlignedBuffer<float>                        mainMix_;    // 2 × maxFrames: Main + Beat Forge FX return
+    bool                                              forgeActive_ = false, forgeWasOn_ = false, forgeRendered_ = false;
+    std::atomic<bool>                                 forgePub_{false};
+    std::uint64_t                                     stemFrames_ = 0;   // longest loaded stem
     core::AlignedBuffer<float>                        toneData_;
     core::AlignedBuffer<float>                        stemData_;   // 13 × 2 × maxFrames
     std::array<Osc, dsp::StemMatrix::kStems>          osc_{};

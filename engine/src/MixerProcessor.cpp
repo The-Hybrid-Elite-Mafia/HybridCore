@@ -46,10 +46,9 @@ void MixerProcessor::drainStemCommands() noexcept {
         changed = true;
     }
     if (changed) {
-        songFrames_ = 0;
+        stemFrames_ = 0;
         for (const StemAudio* s : slots_)
-            if (s) songFrames_ = std::max(songFrames_, s->frames);
-        if (songFrames_ == 0 || playhead_ >= songFrames_) playhead_ = 0;
+            if (s) stemFrames_ = std::max(stemFrames_, s->frames);
     }
 }
 
@@ -102,6 +101,7 @@ bool MixerProcessor::renderStems(std::uint32_t frames) noexcept {
                 std::memset(R + have, 0, sizeof(float) * (chunk - have));
             }
         }
+        if (forgeActive_) { forge_.render(done, chunk, pos, true); forgeRendered_ = true; }
         done += chunk;
         pos += chunk;
         if (pos >= songFrames_) {
@@ -134,6 +134,8 @@ double MixerProcessor::testToneHz(std::uint32_t stem) noexcept {
 void MixerProcessor::prepare(const io::StreamConfig& config) {
     maxFrames_ = config.blockFrames;
     matrix_.prepare(maxFrames_, static_cast<double>(config.sampleRate));
+    forge_.prepare(static_cast<double>(config.sampleRate), maxFrames_);
+    mainMix_.allocate(static_cast<std::size_t>(2) * maxFrames_);
     limiter_.prepare(static_cast<double>(config.sampleRate), maxFrames_);
     toneData_.allocate(static_cast<std::size_t>(dsp::StemMatrix::kStems) * maxFrames_);
     stemData_.allocate(static_cast<std::size_t>(dsp::StemMatrix::kStems) * 2 * maxFrames_);
@@ -153,6 +155,15 @@ void MixerProcessor::process(const ProcessContext& ctx) noexcept {
     drainStemCommands();
     const Source src = source_.load(std::memory_order_relaxed);
 
+    // Beat Forge: on with the Stems source and forge.on.
+    const bool forgeOn = src == Source::Stems && forge_.enabled();
+    if (forgeOn && !forgeWasOn_) forge_.prepareVoicesForStart();
+    forgeWasOn_ = forgeActive_ = forgeOn;
+    forgeRendered_ = false;
+    if (forgeOn) forge_.beginBlock(ctx.frames);
+    songFrames_ = std::max(stemFrames_, forgeOn ? forge_.songFrames() : 0);
+    if (songFrames_ == 0 || playhead_ >= songFrames_) playhead_ = 0;
+
     if (src == Source::Stems) {
         if (renderStems(ctx.frames)) {
             for (std::uint32_t s = 0; s < kStems; ++s) {
@@ -160,6 +171,14 @@ void MixerProcessor::process(const ProcessContext& ctx) noexcept {
                 R[s] = L[s] + maxFrames_;
             }
         }   // stopped or nothing loaded: every stem is silent (nullptr)
+        if (forgeOn) {
+            if (!forgeRendered_) forge_.render(0, ctx.frames, playhead_, false);   // stopped: tails and hand-played notes
+            forge_.endBlock(ctx.frames);
+            for (int t = 0; t < forge::kTracks; ++t) {
+                L[static_cast<std::size_t>(t)] = forge_.track(t, 0);
+                R[static_cast<std::size_t>(t)] = forge_.track(t, 1);
+            }
+        }
     } else if (src == Source::TestTones) {
         for (std::uint32_t s = 0; s < kStems; ++s) {
             float* out = toneData_.data() + static_cast<std::size_t>(s) * maxFrames_;
@@ -192,6 +211,15 @@ void MixerProcessor::process(const ProcessContext& ctx) noexcept {
     std::array<const float*, dsp::BusLimiter::kChannels> buses{};
     for (std::uint32_t b = 0; b < dsp::StemMatrix::kBuses; ++b)
         for (std::uint32_t c = 0; c < 2; ++c) buses[2 * b + c] = matrix_.busChannel(b, c);
+    if (forgeOn) {   // Beat Forge's reverb / delay return joins Main before the limiter
+        for (std::uint32_t c = 0; c < 2; ++c) {
+            float* m = mainMix_.data() + static_cast<std::size_t>(c) * maxFrames_;
+            dsp::copy(m, matrix_.busChannel(0, c), ctx.frames);
+            dsp::mixAdd(m, forge_.fxReturn(static_cast<int>(c)), 1.0f, ctx.frames);
+            buses[c] = m;
+        }
+    }
+    forgePub_.store(forgeOn, std::memory_order_relaxed);
     limiter_.process(buses.data(), ctx.frames);
 
     for (std::uint32_t b = 0; b < dsp::StemMatrix::kBuses; ++b)

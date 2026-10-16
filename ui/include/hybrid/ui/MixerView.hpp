@@ -53,6 +53,7 @@ struct StemSlotView {
     std::string info;              // e.g. "MP3 44.1k 3:42"
     float       progress = -1.0f;  // 0..1 while loading
     bool        failed   = false;
+    float       glow     = 0.0f;   // 0..1 name flash (Beat Forge note hits)
 };
 
 struct TransportView {
@@ -76,6 +77,8 @@ struct ViewState {
     std::array<float, hc::kStemCount> gainReduction{};   // compressor gain reduction per stem, dB >= 0
     float         limiterGr = 0.0f;                       // main limiter gain reduction, dB >= 0
     float         exportProgress = -1.0f;                 // 0..1 while a WAV export runs, -1 otherwise
+    const std::vector<std::uint8_t>* sections = nullptr;  // Beat Forge song form: forge::Section per bar (null = none)
+    double        barSeconds = 0.0;                       // length of one bar at the Beat Forge tempo
     EngineReadout engine;
     int           hover   = -1;    // widget indices from Interaction
     int           active  = -1;

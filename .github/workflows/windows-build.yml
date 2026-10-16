@@ -81,6 +81,8 @@ jobs:
           tools\ci\run-and-report.ps1 -Title "ui: snapshot with stems" -Exe .\build\rig-full\tools\ui_snapshot\Release\hc_ui_snapshot.exe -ArgList '--out','shots','--sizes','1389x868','--seconds','2','--stems','tests\data','--name','HybridCore-stems'
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           tools\ci\run-and-report.ps1 -Title "ui: snapshot, dynamics page" -Exe .\build\rig-full\tools\ui_snapshot\Release\hc_ui_snapshot.exe -ArgList '--out','shots','--sizes','1389x868','--seconds','2','--stems','tests\data','--page','dyn','--name','HybridCore-dynamics'
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          tools\ci\run-and-report.ps1 -Title "ui: snapshot, Beat Forge page" -Exe .\build\rig-full\tools\ui_snapshot\Release\hc_ui_snapshot.exe -ArgList '--out','shots','--sizes','3840x2160,1389x868','--seconds','3','--forge','0','--page','forge','--name','HybridCore-forge'
 
       - name: Start the real app (HybridCore.exe) and capture its window
         env:

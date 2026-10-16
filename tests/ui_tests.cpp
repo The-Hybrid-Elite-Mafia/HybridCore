@@ -5,6 +5,7 @@
 #include "TestHarness.hpp"
 
 #include "hybrid/params/MixerParams.hpp"
+#include "hybrid/forge/Forge.hpp"
 #include "hybrid/params/ParameterTree.hpp"
 #include "hybrid/ui/Faceplate.hpp"
 #include "hybrid/ui/FontAtlas.hpp"
@@ -232,6 +233,7 @@ void testUiLayout() {
     std::printf("[ui layout + interaction]\n");
     params::ParameterTree tree;
     params::addMixerParameters(tree);
+    forge::addForgeParameters(tree);
     for (float extra : {0.0f, 240.0f}) {
         ui::Layout L(tree, extra);
         CHECK(L.strips().size() == kStemCount + kBusCount);
@@ -305,7 +307,7 @@ void testUiLayout() {
     }
     CHECK(in.mouseDown(ui::plate::kTabFaces[2].cx(), ui::plate::kTabFaces[2].cy(), false, false, &idx) == ui::UiAction::SelectPage && idx == 2);
     in.mouseUp();
-    CHECK(in.mouseDown(ui::plate::kTabFaces[3].cx(), ui::plate::kTabFaces[3].cy(), false, false, &idx) == ui::UiAction::FaderBank && idx == 3);
+    CHECK(in.mouseDown(ui::plate::kTabFaces[3].cx(), ui::plate::kTabFaces[3].cy(), false, false, &idx) == ui::UiAction::SelectPage && idx == 3);
     in.mouseUp();
     {   // LIM button in the bottom bar toggles the main limiter.
         const ui::Rect lb = L.limiterButton();
@@ -320,7 +322,7 @@ void testUiLayout() {
     // Knob pages: every stem knob rebinds to that page's parameter and caption, and back.
     {
         int ok = 0, total = 0;
-        for (std::uint32_t pg = 0; pg < ui::kPages; ++pg) {
+        for (std::uint32_t pg = 0; pg < ui::kMixerPages; ++pg) {
             L.setPage(static_cast<ui::Page>(pg));
             for (const auto& w : L.widgets()) {
                 if (w.kind != ui::WidgetKind::Knob && w.kind != ui::WidgetKind::SendKnob) continue;
@@ -334,6 +336,59 @@ void testUiLayout() {
         }
         L.setPage(ui::Page::Mix);
         CHECK(total == static_cast<int>(3 * kStemCount * 5) && ok == total);
+    }
+
+    // BEAT FORGE page: strips 1–8 = each track's 5 sound knobs + LOCK; strip 9 composer + GEN / UNDO;
+    // strip 13 empty (not drawn, not clickable); the MIX page comes back unchanged.
+    {
+        L.setPage(ui::Page::Forge);
+        int soundOk = 0, empty13 = 0, lockOk = 0;
+        const ui::Widget* gen = nullptr;
+        const ui::Widget* genre = nullptr;
+        for (const auto& w : L.widgets()) {
+            if ((w.kind == ui::WidgetKind::Knob || w.kind == ui::WidgetKind::SendKnob) && w.index < 8 && w.param >= 0) {
+                const std::string& pid = tree.at(static_cast<std::size_t>(w.param)).spec().id;
+                if (pid.rfind(std::string("forge.") + forge::kTrackKeys[w.index] + ".", 0) == 0) ++soundOk;
+            }
+            if (w.index == 12 && w.kind != ui::WidgetKind::Fader && w.kind != ui::WidgetKind::StemMeter && ui::Layout::isEmptySlot(w)) ++empty13;
+            if (w.kind == ui::WidgetKind::Button && w.index < 8 && w.caption == "LOCK" && w.param >= 0 &&
+                tree.at(static_cast<std::size_t>(w.param)).spec().id == forge::id::lock(static_cast<int>(w.index))) ++lockOk;
+            if (w.kind == ui::WidgetKind::Button && w.index == 8 && w.action == ui::UiAction::ForgeGenerate) gen = &w;
+            if (w.kind == ui::WidgetKind::Knob && w.index == 8 && w.caption == "GENRE") genre = &w;
+        }
+        CHECK(soundOk == 8 * 5 && lockOk == 8 && empty13 == 8 && gen && genre);   // strip 13: 5 knobs + 3 buttons empty
+        if (gen) {
+            CHECK(in.mouseDown(gen->rect.cx(), gen->rect.cy(), false, false) == ui::UiAction::ForgeGenerate);
+            in.mouseUp();
+        }
+        for (const auto& w : L.widgets())
+            if (w.index == 12 && w.kind == ui::WidgetKind::Knob) CHECK(L.hitTest(w.rect.cx(), w.rect.cy()) < 0);
+        if (genre) {   // a choice knob steps one genre per wheel notch
+            params::Parameter& g = tree.at(static_cast<std::size_t>(genre->param));
+            g.setPlain(0.0f);
+            in.wheel(genre->rect.cx(), genre->rect.cy(), 1.0f, false);
+            CHECK(g.plain() == 1.0f && g.format() == "POP TRAP");
+            g.setPlain(0.0f);
+        }
+        L.setPage(ui::Page::Mix);
+        int mixOk = 0;
+        for (const auto& w : L.widgets())
+            if (w.kind == ui::WidgetKind::Button && w.index < kStemCount && w.param >= 0 &&
+                tree.at(static_cast<std::size_t>(w.param)).spec().id == params::stemParamId(w.index, w.caption == "M" ? "mute" : w.caption == "S" ? "solo" : "invert"))
+                ++mixOk;
+        CHECK(mixOk == static_cast<int>(3 * kStemCount));
+    }
+
+    // Bus titles pick what the stem faders control.
+    {
+        int ok = 0;
+        for (const auto& w : L.widgets())
+            if (w.kind == ui::WidgetKind::BusTitle) {
+                std::uint32_t bi = 99;
+                if (in.mouseDown(w.rect.cx(), w.rect.cy(), false, false, &bi) == ui::UiAction::FaderBank && bi == w.index) ++ok;
+                in.mouseUp();
+            }
+        CHECK(ok == static_cast<int>(kBusCount));
     }
 
     // Fader bank: the 13 stem faders follow the selected send.

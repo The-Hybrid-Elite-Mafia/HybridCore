@@ -21,6 +21,11 @@ std::string_view trim(std::string_view s) {
 Parameter::Parameter(ParamSpec spec, std::uint32_t index) : spec_(std::move(spec)), index_(index) {
     if (!(spec_.max > spec_.min)) throw std::invalid_argument("parameter range must be max > min: " + spec_.id);
     if (spec_.kind == Kind::Toggle) { spec_.min = 0.0f; spec_.max = 1.0f; }
+    if (spec_.kind == Kind::Choice) {
+        if (spec_.choices.size() < 2) throw std::invalid_argument("choice parameter needs 2+ choices: " + spec_.id);
+        spec_.min = 0.0f;
+        spec_.max = static_cast<float>(spec_.choices.size() - 1);
+    }
     if (spec_.kind == Kind::Log && !(spec_.min > 0.0f)) throw std::invalid_argument("log parameter needs min > 0: " + spec_.id);
     if (spec_.anchorNorm > 0.0f && spec_.anchorNorm < 1.0f && spec_.anchorPlain > spec_.min && spec_.anchorPlain < spec_.max) {
         const float t = (spec_.anchorPlain - spec_.min) / (spec_.max - spec_.min);
@@ -33,6 +38,7 @@ float Parameter::clampPlain(float v) const noexcept {
     if (!std::isfinite(v)) v = (v < 0.0f) ? spec_.min : spec_.def;
     v = std::clamp(v, spec_.min, spec_.max);
     if (spec_.kind == Kind::Toggle) v = v >= 0.5f ? 1.0f : 0.0f;
+    if (spec_.kind == Kind::Choice) v = std::round(v);
     return v;
 }
 
@@ -80,6 +86,8 @@ std::string Parameter::formatValue(float v) const {
         if (spec_.minIsOff && v <= spec_.min) return "-inf";
         std::snprintf(buf, sizeof(buf), "%+.1f dB", static_cast<double>(v));
         return buf;
+    case Kind::Choice:
+        return spec_.choices[static_cast<std::size_t>(std::clamp(static_cast<int>(std::lround(v)), 0, static_cast<int>(spec_.choices.size()) - 1))];
     case Kind::Log:
     case Kind::Linear:
     default: {
@@ -93,6 +101,12 @@ std::string Parameter::formatValue(float v) const {
             std::snprintf(buf, sizeof(buf), d < 10.0 ? "%.1f ms" : "%.0f ms", d);
         } else if (u == ":1") {
             std::snprintf(buf, sizeof(buf), "%.1f:1", d);
+        } else if (u == "%") {
+            std::snprintf(buf, sizeof(buf), "%.0f%%", d);
+        } else if (u == "st") {
+            std::snprintf(buf, sizeof(buf), "%+.1f st", d);
+        } else if (u == "bpm") {
+            std::snprintf(buf, sizeof(buf), "%.0f BPM", d);
         } else if (u == "dB") {
             std::snprintf(buf, sizeof(buf), spec_.min < 0.0f && spec_.max > 0.0f ? "%+.1f dB" : "%.1f dB", d);
         } else {

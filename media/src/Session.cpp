@@ -42,6 +42,8 @@ bool saveSession(const std::filesystem::path& file, const SessionData& d, const 
     s.set("state", "faderBank", std::to_string(d.faderBank));
     s.set("state", "source", d.source);
     s.set("state", "playhead", std::to_string(d.playhead));
+    if (!d.forgeSong.empty()) s.setSectionText("forge", d.forgeSong);
+    if (!d.forgeSeeds.empty()) s.set("forge.meta", "seeds", d.forgeSeeds);
     if (!s.save(file)) {
         if (error) *error = "could not write " + toUtf8(file.filename()) + " (folder read-only or disk full?)";
         return false;
@@ -72,10 +74,12 @@ std::expected<LoadedSession, std::string> loadSession(const std::filesystem::pat
     }
     out.data.params    = s.sectionText("params");
     out.data.loop      = s.get("state", "loop", "1") != "0";
-    out.data.page      = static_cast<std::uint32_t>(std::clamp(std::atoi(s.get("state", "page", "0").c_str()), 0, 2));
+    out.data.page      = static_cast<std::uint32_t>(std::clamp(std::atoi(s.get("state", "page", "0").c_str()), 0, 3));
     out.data.faderBank = static_cast<std::uint32_t>(std::clamp(std::atoi(s.get("state", "faderBank", "0").c_str()), 0, 3));
     out.data.source    = s.get("state", "source", "stems");
     out.data.playhead  = std::strtoull(s.get("state", "playhead", "0").c_str(), nullptr, 10);
+    out.data.forgeSong  = s.sectionText("forge");
+    out.data.forgeSeeds = s.get("forge.meta", "seeds");
     return out;
 }
 
