@@ -39,7 +39,7 @@ if ($WarningSummary) {
 } else {
     Publish "$Title (exit $code)" $output
     # Failed checks can sit in the trimmed middle of a long output: publish them on their own.
-    $fails = $output -split "`n" | Where-Object { $_ -match '^\s*FAIL\b' } | Select-Object -First 40
+    $fails = $output -split "`n" | Where-Object { $_ -match '\bFAIL\s+\S+\.(cpp|hpp):' } | Select-Object -First 40
     if ($fails) { Publish "$Title failed checks" ($fails -join "`n") }
 }
 
