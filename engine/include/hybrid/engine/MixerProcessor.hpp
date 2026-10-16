@@ -5,9 +5,11 @@
 //  Stem sources:
 //    Hardware  : stem s <- input channels 2s / 2s+1 (mono if only 2s exists, silent if neither)
 //    TestTones : stem s <- internal sine, A2 (110 Hz) stacked in minor thirds, -30 dBFS each
-//    Stems     : stem s <- loaded audio (StemAudio), all slots on one playhead that loops
-//                at the length of the longest loaded stem (shorter stems play silence after
-//                their end). Transport controls arrive in Phase 7.
+//    Stems     : stem s <- loaded audio (StemAudio), all slots on one transport: play / pause /
+//                stop / seek, loop on (wraps at the end of the song) or off (stops at the end and
+//                returns to the start). Song length = longest loaded stem; shorter stems play
+//                silence after their end. Starts and seeks fade in over 64 samples, pause / stop
+//                fade out over one block, so the transport never clicks.
 //  Bus b is written to output channels 2b / 2b+1 when the device has them (bus 0 = Main = outs 1/2).
 //
 //  Stem hand-off is lock-free and allocation-free on the audio thread:
@@ -48,11 +50,18 @@ public:
     [[nodiscard]] bool submitStem(std::uint32_t slot, std::unique_ptr<StemAudio>& audio) noexcept;
     // Deletes stems the audio thread has released. Call regularly (each UI frame).
     void collectRetired() noexcept;
-    // Moves the stem playhead back to the start (applied at the next block).
-    void restartStems() noexcept { restart_.store(true, std::memory_order_release); }
+    // ---- transport (message thread; applied at the next block) ----------------------
+    void play() noexcept { wantPlay_.store(true, std::memory_order_release); }
+    void pause() noexcept { wantPlay_.store(false, std::memory_order_release); }
+    void stop() noexcept { pause(); seek(0); }
+    void seek(std::uint64_t frame) noexcept { seekReq_.store(static_cast<std::int64_t>(frame), std::memory_order_release); }
+    void setLoop(bool on) noexcept { loop_.store(on, std::memory_order_relaxed); }
+    [[nodiscard]] bool loop() const noexcept { return loop_.load(std::memory_order_relaxed); }
+    [[nodiscard]] bool wantsPlay() const noexcept { return wantPlay_.load(std::memory_order_relaxed); }
     // Published by the audio thread after every block.
+    [[nodiscard]] bool          playing() const noexcept { return playingPub_.load(std::memory_order_relaxed); }
     [[nodiscard]] std::uint64_t stemPlayhead() const noexcept { return playheadPub_.load(std::memory_order_relaxed); }
-    [[nodiscard]] std::uint64_t stemLoopFrames() const noexcept { return loopPub_.load(std::memory_order_relaxed); }
+    [[nodiscard]] std::uint64_t stemSongFrames() const noexcept { return songPub_.load(std::memory_order_relaxed); }
 
     // Test-tone frequency for a stem (Hz). Exposed for tests and UI labels.
     [[nodiscard]] static double testToneHz(std::uint32_t stem) noexcept;
@@ -71,7 +80,7 @@ private:
     };
 
     void drainStemCommands() noexcept;   // audio thread
-    void renderStems(std::uint32_t frames) noexcept;
+    bool renderStems(std::uint32_t frames) noexcept;   // false: silent this block
 
     std::atomic<Source>                               source_;
     dsp::StemMatrix                                   matrix_;
@@ -82,13 +91,17 @@ private:
 
     // Stems: slots_ and playhead_ are audio-thread state (message thread only touches them in the destructor).
     std::array<StemAudio*, dsp::StemMatrix::kStems>   slots_{};
-    std::uint64_t                                     playhead_  = 0;
-    std::uint64_t                                     loopFrames_ = 0;
+    std::uint64_t                                     playhead_   = 0;
+    std::uint64_t                                     songFrames_ = 0;
+    bool                                              playing_    = false;   // audio-thread view of the transport
     core::SpscRing<StemCommand, kStemQueue>           commands_;
     core::SpscRing<StemAudio*, kRetireQueue>          retired_;
-    std::atomic<bool>                                 restart_{false};
+    std::atomic<bool>                                 wantPlay_{false};
+    std::atomic<bool>                                 loop_{true};
+    std::atomic<std::int64_t>                         seekReq_{-1};
+    std::atomic<bool>                                 playingPub_{false};
     std::atomic<std::uint64_t>                        playheadPub_{0};
-    std::atomic<std::uint64_t>                        loopPub_{0};
+    std::atomic<std::uint64_t>                        songPub_{0};
 };
 
 } // namespace hc::engine

@@ -262,10 +262,32 @@ void testUiLayout() {
     ui::Interaction in(L, tree);
     // Sockets and tabs sit on the measured faceplate positions.
     std::uint32_t idx = 99;
-    CHECK(in.mouseDown(ui::plate::kSockets[0].cx, ui::plate::kSockets[0].cy, false, false, &idx) == ui::UiAction::PrevDevice && idx == 0);
+    {
+        const ui::UiAction want[6] = {ui::UiAction::LoadStems, ui::UiAction::ToStart, ui::UiAction::PlayPause,
+                                      ui::UiAction::Stop, ui::UiAction::ToggleLoop, ui::UiAction::CycleSource};
+        int ok = 0;
+        for (std::uint32_t i = 0; i < 6; ++i) {
+            idx = 99;
+            if (in.mouseDown(ui::plate::kSockets[i].cx + 50, ui::plate::kSockets[i].cy, false, false, &idx) == want[i] && idx == i) ++ok;
+            in.mouseUp();
+        }
+        CHECK(ok == 6);
+    }
+    CHECK(in.mouseDown(ui::plate::kNamePanel.cx(), ui::plate::kNamePanel.cy(), false, false) == ui::UiAction::NextDevice);
     in.mouseUp();
-    CHECK(in.mouseDown(ui::plate::kSockets[5].cx + 50, ui::plate::kSockets[5].cy, false, false) == ui::UiAction::ClearMute);
-    in.mouseUp();
+    {   // Song overview: click = seek to that fraction, drag keeps seeking, release stops.
+        const ui::Rect o = L.overview();
+        float f = -1.0f;
+        CHECK(!in.takeSeek(f));
+        CHECK(in.mouseDown(o.x + o.w * 0.25f, o.cy(), false, false) == ui::UiAction::Seek);
+        CHECK(in.takeSeek(f) && std::fabs(f - 0.25f) < 1e-4f);
+        in.mouseMove(o.x + o.w * 2.0f, o.cy(), false);   // past the end clamps to 1
+        CHECK(in.takeSeek(f) && f == 1.0f);
+        in.mouseUp();
+        in.mouseMove(o.x + o.w * 0.5f, o.cy(), false);
+        CHECK(!in.takeSeek(f));
+        CHECK(o.x >= ui::plate::kBottomBar.x && o.right() <= L.masterMeter().x);
+    }
     CHECK(in.mouseDown(ui::plate::kTabFaces[2].cx(), ui::plate::kTabFaces[2].cy(), false, false, &idx) == ui::UiAction::FaderBank && idx == 2);
     in.mouseUp();
 

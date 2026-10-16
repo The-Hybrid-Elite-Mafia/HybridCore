@@ -7,15 +7,23 @@ Turn your speakers/headphones DOWN first. Close any app that is playing audio
 1) Desktop: "The Hybrid Core"  (the main app)
    - The console opens on your Main-Faceplate art: 13 stems in the big panel,
      Main / Aux 1-3 buses in the left panel.
-   - Glass display (top right): output latency in ms, DSP load %, driver, buffer, dropouts.
-   - Round buttons, left to right: previous device, next device, LOAD (pick your stems),
-     SOURCE (cycles TONES -> INPUTS -> STEMS), CLR SOLO, CLR MUTE.
+   - Glass display (top right): song position / length, DSP load %, driver, buffer,
+     latency in ms, dropouts.
+   - Round buttons, left to right: LOAD (pick your stems), START (back to the top),
+     PLAY / PAUSE, STOP (stops and goes back to the top), LOOP (blue = loops the song),
+     SOURCE (cycles TONES -> INPUTS -> STEMS).
+   - Device: click the device name panel (top left) for the next sound device,
+     right-click it for the previous one.
+   - Bottom bar: the whole song as a waveform. Click or drag on it to jump there.
+   - Keys: Space = play/pause, Home = start, End = stop, L = loop on/off,
+     Left/Right arrow = 5 s back/forward (hold Ctrl: 30 s).
+   - Right-click any S button = clear every solo; right-click any stem M = clear every mute.
    - YOUR STEMS: click LOAD and pick up to 13 WAV / MP3 / FLAC files (they go in name order:
      name them 01 Kick, 02 Snare... to control the order). Or drag files or a whole folder from
      Explorer onto the console: dropped on a strip they start at that strip, elsewhere at the
      first empty strip. Each strip shows LOADING %, then the file name, format and length.
-     Anything not 48 kHz is converted to 48 kHz while it loads. All stems loop together from
-     the start at the length of the longest one (play / stop / seek come in the next phase).
+     Anything not 48 kHz is converted to 48 kHz while it loads. Loading never starts playback:
+     press PLAY. All stems play together; the song is as long as the longest stem.
      Right-click a strip's name to empty it. Your stems come back next time you open the app.
    - Tabs: MAIN MIX / AUX 1 / AUX 2 / AUX 3 SENDS = what the 13 stem faders control.
    - Knobs: drag up/down. Hold Shift for fine moves. Double-click = reset. Mouse wheel works too.

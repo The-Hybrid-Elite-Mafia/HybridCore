@@ -10,6 +10,7 @@
 #include <atomic>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace hc::engine {
 
@@ -24,6 +25,8 @@ struct StemAudio {
     std::string   format;                      // e.g. "WAV 24-bit", "MP3", "FLAC 16-bit"
     std::uint32_t sourceRate     = 0;
     std::uint32_t sourceChannels = 0;
+    std::vector<float> overview;               // kOverviewBins peak values 0..1 across the stem (for the song overview)
+    static constexpr std::size_t kOverviewBins = 2048;
 
     StemAudio() noexcept { liveCount().fetch_add(1, std::memory_order_relaxed); }
     ~StemAudio() { liveCount().fetch_sub(1, std::memory_order_relaxed); }

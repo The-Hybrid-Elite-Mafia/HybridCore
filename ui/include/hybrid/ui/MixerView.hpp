@@ -14,6 +14,7 @@
 #include <array>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace hc::ui {
 
@@ -54,6 +55,13 @@ struct StemSlotView {
     bool        failed   = false;
 };
 
+struct TransportView {
+    bool   playing  = false;
+    bool   loop     = true;
+    double position = 0.0;   // seconds
+    double length   = 0.0;   // seconds (0 = nothing loaded)
+};
+
 struct ViewState {
     std::string   deviceName;      // name panel, line 1
     std::string   deviceFormat;    // name panel, line 2
@@ -63,6 +71,8 @@ struct ViewState {
     SourceView    source  = SourceView::Tones;
     bool          loading = false; // any stem loading
     std::array<StemSlotView, hc::kStemCount> slots{};
+    TransportView transport;
+    const std::vector<float>* overview = nullptr;   // song overview, peak 0..1 per bin (null = nothing loaded)
     EngineReadout engine;
     int           hover   = -1;    // widget indices from Interaction
     int           active  = -1;
@@ -91,6 +101,7 @@ private:
     void drawMeterRow(Renderer& r, Rect row, float level, float hold, bool lit) const;
     void drawTransport(Renderer& r, const Widget& w, const ViewState& v) const;
     void drawDisplay(Renderer& r, const ViewState& v) const;
+    void drawOverview(Renderer& r, const ViewState& v) const;
     void drawGlassOverlay(Renderer& r, Rect glass) const;
 
     const Layout&                layout_;

@@ -13,13 +13,15 @@
 namespace hc::ui {
 
 struct InputEvent {
-    enum class Type : std::uint8_t { MouseDown, MouseUp, MouseMove, Wheel, Resize, Close, RightDown, Drop };
+    enum class Type : std::uint8_t { MouseDown, MouseUp, MouseMove, Wheel, Resize, Close, RightDown, Drop, Key };
     Type  type        = Type::MouseMove;
     float x           = 0.0f;   // client pixels
     float y           = 0.0f;
     float wheel       = 0.0f;   // notches (+ = away from user)
     bool  doubleClick = false;
     bool  fine        = false;  // Shift or Ctrl held
+    bool  ctrl        = false;  // Ctrl held (Key)
+    std::uint32_t key = 0;      // Key: Windows virtual-key code
     std::vector<std::filesystem::path> files;   // Drop: files dragged in from Explorer
 };
 

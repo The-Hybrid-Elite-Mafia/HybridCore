@@ -32,9 +32,10 @@ Rgba busAccent(std::uint32_t b) noexcept { return rgb8(kBusColours[b % std::size
 
 Layout::Layout(const params::ParameterTree& tree, float extraH) : extraH_(std::max(0.0f, extraH)) {
     // ---- transport sockets and tabs ----
-    static const UiAction kSocketActions[6] = {UiAction::PrevDevice, UiAction::NextDevice, UiAction::LoadStems,
-                                               UiAction::CycleSource, UiAction::ClearSolo, UiAction::ClearMute};
-    static const char* const kSocketCaps[6] = {"DEVICE", "DEVICE", "LOAD", "SOURCE", "CLR SOLO", "CLR MUTE"};
+    static const UiAction kSocketActions[6] = {UiAction::LoadStems, UiAction::ToStart, UiAction::PlayPause,
+                                               UiAction::Stop, UiAction::ToggleLoop, UiAction::CycleSource};
+    static const char* const kSocketCaps[6] = {"LOAD", "START", "PLAY", "STOP", "LOOP", "SOURCE"};
+    widgets_.push_back({WidgetKind::NamePanel, plate::kNamePanel, -1, 0, UiAction::NextDevice, "DEVICE"});
     for (std::uint32_t i = 0; i < plate::kSockets.size(); ++i) {
         const Circle c = plate::kSockets[i];
         const float R = plate::kSocketOuterRadius;
@@ -124,9 +125,11 @@ Layout::Layout(const params::ParameterTree& tree, float extraH) : extraH_(std::m
 
     // ---- bottom bar ----
     const float by = plate::kBottomBar.y + extraH_;
-    master_ = {2900, by + 34, 820, 74};
-    status_ = {150, by, 2700, plate::kBottomBar.h};
+    master_   = {2900, by + 34, 820, 74};
+    overview_ = {130, by + 26, 2430, 90};
+    status_   = {1120, plate::kTopBar.y, 1960, plate::kTopBar.h};   // engraved in the top bar
     widgets_.push_back({WidgetKind::MasterMeter, master_, -1, 0, UiAction::None, ""});
+    widgets_.push_back({WidgetKind::Overview, overview_, -1, 0, UiAction::Seek, ""});
 }
 
 void Layout::setFaderBank(std::uint32_t bank) noexcept {
@@ -161,7 +164,12 @@ UiAction Interaction::mouseDown(float x, float y, bool doubleClick, bool /*fine*
     pressed_ = -1;
     if (hit < 0) return UiAction::None;
     const Widget& w = layout_.get().widgets()[static_cast<std::size_t>(hit)];
-    if (w.kind == WidgetKind::Transport || w.kind == WidgetKind::Tab) {
+    if (w.kind == WidgetKind::Overview) {
+        seeking_ = true;
+        seekAt(x);
+        return UiAction::Seek;
+    }
+    if (w.kind == WidgetKind::Transport || w.kind == WidgetKind::Tab || w.kind == WidgetKind::NamePanel) {
         pressed_ = hit;
         if (actionIndex) *actionIndex = w.index;
         return w.action;
@@ -182,7 +190,14 @@ UiAction Interaction::mouseDown(float x, float y, bool doubleClick, bool /*fine*
     return UiAction::None;
 }
 
+void Interaction::seekAt(float x) noexcept {
+    const Rect o = layout_.get().overview();
+    seek_    = std::clamp((x - o.x) / o.w, 0.0f, 1.0f);
+    hasSeek_ = true;
+}
+
 void Interaction::mouseMove(float x, float y, bool fine) {
+    if (seeking_) { seekAt(x); return; }
     if (active_ < 0) {
         hover_ = layout_.get().hitTest(x, y);
         return;

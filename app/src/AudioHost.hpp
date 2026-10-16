@@ -55,9 +55,17 @@ public:
 
     // Stems: hand a loaded stem to the audio thread (nullptr clears the slot). False = queue full, retry.
     [[nodiscard]] bool submitStem(std::uint32_t slot, std::unique_ptr<engine::StemAudio>& audio) noexcept { return mixer_->submitStem(slot, audio); }
-    void restartStems() noexcept { mixer_->restartStems(); }
+    // Transport (stems).
+    void play() noexcept { mixer_->play(); }
+    void pause() noexcept { mixer_->pause(); }
+    void stop() noexcept { mixer_->stop(); }
+    void seek(std::uint64_t frame) noexcept { mixer_->seek(frame); }
+    void setLoop(bool on) noexcept { mixer_->setLoop(on); }
+    [[nodiscard]] bool loop() const noexcept { return mixer_->loop(); }
+    [[nodiscard]] bool wantsPlay() const noexcept { return mixer_->wantsPlay(); }
+    [[nodiscard]] bool playing() const noexcept { return mixer_->playing(); }
     [[nodiscard]] std::uint64_t stemPlayhead() const noexcept { return mixer_->stemPlayhead(); }
-    [[nodiscard]] std::uint64_t stemLoopFrames() const noexcept { return mixer_->stemLoopFrames(); }
+    [[nodiscard]] std::uint64_t stemSongFrames() const noexcept { return mixer_->stemSongFrames(); }
 
     [[nodiscard]] static std::vector<DeviceChoice> listDevices();
 

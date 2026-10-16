@@ -518,6 +518,32 @@ Raster iconWave() {   // stem waveform: bars of varying height
     });
 }
 
+Raster iconPlay() {
+    return icon([](float x, float y) {
+        const float tri[6] = {34.0f, 22.0f, 74.0f, 48.0f, 34.0f, 74.0f};
+        return sdTriangle(x, y, tri) - 2.0f;
+    });
+}
+Raster iconPause() {
+    return icon([](float x, float y) {
+        return std::min(sdRoundRect(x - 36.0f, y - 48.0f, 7.0f, 25.0f, 2.5f), sdRoundRect(x - 60.0f, y - 48.0f, 7.0f, 25.0f, 2.5f));
+    });
+}
+Raster iconStop() {
+    return icon([](float x, float y) { return sdRoundRect(x - 48.0f, y - 48.0f, 22.0f, 22.0f, 4.0f); });
+}
+Raster iconLoop() {   // two arrows chasing round a rounded rectangle
+    return icon([](float x, float y) {
+        const float ring = std::fabs(sdRoundRect(x - 48.0f, y - 48.0f, 30.0f, 18.0f, 14.0f)) - 3.6f;
+        const float gapA = sdRoundRect(x - 34.0f, y - 30.0f, 7.0f, 7.0f, 0.0f);    // break in the top run
+        const float gapB = sdRoundRect(x - 62.0f, y - 66.0f, 7.0f, 7.0f, 0.0f);    // break in the bottom run
+        const float body = std::max(ring, -std::min(gapA, gapB));
+        const float headA[6] = {42.0f, 19.0f, 54.0f, 30.0f, 42.0f, 41.0f};
+        const float headB[6] = {54.0f, 55.0f, 42.0f, 66.0f, 54.0f, 77.0f};
+        return std::min(body, std::min(sdTriangle(x, y, headA), sdTriangle(x, y, headB)) - 0.5f);
+    });
+}
+
 // ---- packing ----------------------------------------------------------------------------
 struct Item {
     Sprite      id;
@@ -567,6 +593,10 @@ PartsAtlas buildPartsAtlas(const Image& fp) {
     add(Sprite::IconInput, iconInput());
     add(Sprite::IconFolder, iconFolder());
     add(Sprite::IconWave, iconWave());
+    add(Sprite::IconPlay, iconPlay());
+    add(Sprite::IconPause, iconPause());
+    add(Sprite::IconStop, iconStop());
+    add(Sprite::IconLoop, iconLoop());
 
     // Shelf packing, tallest first, 4 px transparent gutters.
     constexpr int kAtlasW = 1024, kPad = 4;

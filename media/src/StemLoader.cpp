@@ -191,6 +191,12 @@ void StemLoader::run(const Job& job) noexcept {
                 a->format         = d.format + (d.note.empty() ? "" : " (" + d.note + ")");
                 a->sourceRate     = srcRate;
                 a->sourceChannels = d.channels;
+                a->overview.assign(engine::StemAudio::kOverviewBins, 0.0f);
+                for (std::uint64_t i = 0; i < a->frames; ++i) {
+                    const std::size_t bin = static_cast<std::size_t>(i * engine::StemAudio::kOverviewBins / std::max<std::uint64_t>(a->frames, 1));
+                    const float v = std::max(std::fabs(d.left[static_cast<std::size_t>(i)]), std::fabs(d.right[static_cast<std::size_t>(i)]));
+                    if (v > a->overview[bin]) a->overview[bin] = std::min(v, 1.0f);
+                }
                 res.audio = std::move(a);
             }
         }

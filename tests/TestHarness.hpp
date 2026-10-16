@@ -40,6 +40,7 @@ void testMediaFiles();
 void testResampler();
 void testStemLoader();
 void testStemPlayback();
+void testTransport();
 
 // Folder with faceplates/ and fonts/: <exe dir>/assets (build tree) or <exe dir>/../assets (installed).
 void setExePath(const char* argv0);

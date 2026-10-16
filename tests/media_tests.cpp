@@ -323,6 +323,10 @@ void testStemLoader() {
             if (r.slot == 2 && r.audio) {
                 const Fit f = fitSine(r.audio->left.data(), 1000, 47000, 900, 48000);
                 CHECK(std::fabs(f.amp - 0.4) < 1e-3 && f.residualDb < -90.0);
+                // Overview: 2048 peak bins; a steady 0.4 sine reads ~0.4 in every bin.
+                float lo = 1.0f, hi = 0.0f;
+                for (float v : r.audio->overview) { lo = std::min(lo, v); hi = std::max(hi, v); }
+                CHECK(r.audio->overview.size() == engine::StemAudio::kOverviewBins && hi < 0.41f && lo > 0.35f);
             }
             if (r.slot == 3) std::printf("  broken file -> \"%s\"\n", r.error.c_str());
         }
@@ -375,8 +379,10 @@ void testStemPlayback() {
 
         // Nothing loaded: silence.
         mp.process(ctx);
-        CHECK(rmsDb(outs[0], 0, F) < -200.0 && mp.stemLoopFrames() == 0);
+        CHECK(rmsDb(outs[0], 0, F) < -200.0 && mp.stemSongFrames() == 0);
 
+        mp.setLoop(true);
+        mp.play();
         auto s0 = make(1000, 0.1f), s1 = make(1500, 0.2f);
         CHECK(mp.submitStem(0, s0) && !s0);
         CHECK(mp.submitStem(1, s1) && !s1);
@@ -385,7 +391,7 @@ void testStemPlayback() {
             mp.process(ctx);
             heard.insert(heard.end(), outs[0], outs[0] + F);
         }
-        CHECK(mp.stemLoopFrames() == 1500);
+        CHECK(mp.stemSongFrames() == 1500);
         // Stem 1 (1000 frames) then 500 frames of silence, repeating every 1500 frames, at unity gain.
         // The first block fades in (the matrix ramps a stem in from silence), so compare from block 2.
         int bad = 0;
@@ -417,19 +423,103 @@ void testStemPlayback() {
         CHECK(allocs == 0 && submitted == 40);
         CHECK(engine::StemAudio::liveCount().load() == live0 + 3);   // slots 0..2 hold the last three
 
-        mp.restartStems();
+        mp.seek(0);
         mp.process(ctx);
         CHECK(mp.stemPlayhead() == F);
         std::unique_ptr<engine::StemAudio> none;
         CHECK(mp.submitStem(0, none) && mp.submitStem(1, none) && mp.submitStem(2, none));
         mp.process(ctx);
         mp.collectRetired();
-        CHECK(mp.stemLoopFrames() == 0 && engine::StemAudio::liveCount().load() == live0);
+        CHECK(mp.stemSongFrames() == 0 && engine::StemAudio::liveCount().load() == live0);
 
         auto pending = make(100, 0.0f);
         CHECK(mp.submitStem(7, pending));   // still queued when the processor is destroyed
     }
     CHECK(engine::StemAudio::liveCount().load() == live0);   // destructor frees queued and loaded stems
+}
+
+void testTransport() {
+    std::printf("[transport]\n");
+    constexpr std::uint32_t F = 256;
+    auto make = [](std::uint64_t frames) {
+        auto s = std::make_unique<engine::StemAudio>();
+        s->frames = frames;
+        s->left.allocate(static_cast<std::size_t>(frames));
+        s->right.allocate(static_cast<std::size_t>(frames));
+        for (std::uint64_t i = 0; i < frames; ++i) s->left[static_cast<std::size_t>(i)] = s->right[static_cast<std::size_t>(i)] = 0.5f;
+        return s;
+    };
+    engine::MixerProcessor mp(engine::MixerProcessor::Source::Stems);
+    io::StreamConfig cfg;
+    cfg.sampleRate = 48000; cfg.blockFrames = F; cfg.numOutputs = 2;
+    mp.prepare(cfg);
+    std::vector<float> out(2 * F);
+    float* outs[2] = {out.data(), out.data() + F};
+    engine::ProcessContext ctx;
+    ctx.outputs = outs; ctx.numOutputs = 2; ctx.frames = F;
+    auto st = make(10 * F);
+    CHECK(mp.submitStem(0, st));
+
+    // Stopped by default: silence, playhead stays.
+    for (int i = 0; i < 3; ++i) mp.process(ctx);
+    CHECK(!mp.playing() && mp.stemPlayhead() == 0 && mp.stemSongFrames() == 10 * F && std::fabs(outs[0][100]) < 1e-9f);
+
+    // Play: the first block fades in (no click), then steady.
+    mp.play();
+    mp.process(ctx);
+    CHECK(mp.playing() && std::fabs(outs[0][0]) < 1e-6f && outs[0][F - 1] > 0.4f);
+    float maxStep = 0;
+    for (std::uint32_t i = 1; i < F; ++i) maxStep = std::max(maxStep, std::fabs(outs[0][i] - outs[0][i - 1]));
+    mp.process(ctx);
+    CHECK(mp.stemPlayhead() == 2 * F && maxStep < 0.01f);
+
+    // Pause: one faded block, then silence; the position is kept.
+    mp.pause();
+    mp.process(ctx);
+    CHECK(!mp.playing() && mp.stemPlayhead() == 3 * F && outs[0][F - 1] < 0.01f && outs[0][0] > 0.3f);
+    mp.process(ctx);
+    CHECK(mp.stemPlayhead() == 3 * F && std::fabs(outs[0][10]) < 1e-9f);
+
+    // Seek while stopped, then play from there.
+    mp.seek(7 * F);
+    mp.process(ctx);
+    CHECK(mp.stemPlayhead() == 7 * F && !mp.playing());
+    mp.play();
+    mp.process(ctx);
+    CHECK(mp.stemPlayhead() == 8 * F);
+
+    // Loop off: stops at the end of the song and returns to the start.
+    mp.setLoop(false);
+    for (int i = 0; i < 4; ++i) mp.process(ctx);
+    CHECK(!mp.playing() && !mp.wantsPlay() && mp.stemPlayhead() == 0);
+
+    // Loop on: wraps.
+    mp.setLoop(true);
+    mp.play();
+    for (int i = 0; i < 12; ++i) mp.process(ctx);
+    CHECK(mp.playing() && mp.stemPlayhead() == 2 * F);
+
+    // Stop while playing: fades out from the current place, then sits at the start.
+    mp.stop();
+    mp.process(ctx);
+    CHECK(!mp.playing() && mp.stemPlayhead() == 0 && outs[0][0] > 0.3f && outs[0][F - 1] < 0.01f);
+
+    // Transport changes never allocate on the audio thread.
+    std::uint64_t allocs = 0;
+    {
+        AllocScope scope;
+        for (int i = 0; i < 500; ++i) {
+            if (i % 7 == 0) mp.play();
+            if (i % 11 == 0) mp.pause();
+            if (i % 13 == 0) mp.seek(static_cast<std::uint64_t>(i) * 37u);
+            if (i % 17 == 0) mp.setLoop(i % 2 == 0);
+            mp.process(ctx);
+        }
+        allocs = scope.count();
+    }
+    std::printf("  play / pause / stop / seek / loop: 500 blocks of random transport changes, %llu heap allocations\n",
+                static_cast<unsigned long long>(allocs));
+    CHECK(allocs == 0);
 }
 
 } // namespace hc::test

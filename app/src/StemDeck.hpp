@@ -26,6 +26,8 @@ struct StemSlot {
     std::string           info;      // describeStem()
     std::string           error;     // set when the load failed
     std::uint64_t         bytes = 0; // RAM held by the loaded audio
+    std::uint64_t         frames = 0;
+    std::vector<float>    overview;  // StemAudio::overview, copied before the audio goes to the audio thread
 };
 
 class StemDeck {
@@ -48,11 +50,17 @@ public:
     [[nodiscard]] bool  loading() const noexcept { return loader_.busy() || !pending_.empty(); }
     [[nodiscard]] std::uint32_t loadedCount() const noexcept;
     [[nodiscard]] std::uint64_t loadedBytes() const noexcept;
+    // Peaks across the whole song (longest stem = full width), kSongBins values 0..1; empty when nothing is loaded.
+    [[nodiscard]] const std::vector<float>& songOverview() const noexcept { return song_; }
+    [[nodiscard]] std::uint64_t songFrames() const noexcept;
+    static constexpr std::size_t kSongBins = 1024;
     // Notice for the status bar, empty when there is nothing recent to say.
     [[nodiscard]] std::string notice() const;
 
 private:
     void setNotice(std::string text);
+    void rebuildOverview();
+    std::vector<float> song_;
 
     AudioHost&         host_;
     media::StemLoader  loader_;

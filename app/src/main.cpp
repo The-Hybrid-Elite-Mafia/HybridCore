@@ -129,6 +129,7 @@ struct App {
         settings.set("app", "device.id", app::toUtf8(d.id));
         settings.set("app", "source", sourceName(audio.source()));
         settings.set("app", "faderBank", std::to_string(bank));
+        settings.set("app", "loop", audio.loop() ? "1" : "0");
         for (std::uint32_t s = 0; s < kStemCount; ++s) settings.set("stems", slotKey(s), app::toUtf8(stems.slot(s).file.wstring()));
         settings.save(params::Settings::defaultFile());
     }
@@ -149,6 +150,17 @@ struct App {
     }
     void clearAll(const char* field) {
         for (std::uint32_t s = 0; s < kStemCount; ++s) tree.find(params::stemParamId(s, field))->setPlain(0.0f);
+    }
+    // Transport. Any transport command switches the source to the loaded stems.
+    void playPause() {
+        if (audio.source() != Source::Stems) audio.setSource(Source::Stems);
+        if (audio.wantsPlay()) audio.pause(); else audio.play();
+    }
+    void seekSeconds(double delta) {
+        const double song = static_cast<double>(stems.songFrames());
+        if (song <= 0) return;
+        const double at = std::clamp(static_cast<double>(audio.stemPlayhead()) + delta * kSampleRate, 0.0, song - 1.0);
+        audio.seek(static_cast<std::uint64_t>(at));
     }
 };
 
@@ -192,6 +204,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
 
     a.restoreStems();   // background loads; the saved source below wins over the "switch to stems" a load does
     a.audio.setSource(sourceFromName(a.settings.get("app", "source", "tones")));
+    a.audio.setLoop(a.settings.get("app", "loop", "1") != "0");
     a.devices = app::AudioHost::listDevices();
     a.deviceIndex = opts.offline ? static_cast<int>(a.devices.size()) - 1
                                  : findDevice(a.devices, a.settings.get("app", "device.kind", "wasapi"), a.settings.get("app", "device.id"));
@@ -219,6 +232,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     auto lastSave  = lastFrame;
     std::uint64_t savedVersion = a.tree.version();
     std::uint32_t savedBank    = console.faderBank();
+    bool          savedLoop    = a.audio.loop();
 
     while (window.pump()) {
         const int fbW = window.pixelWidth(), fbH = window.pixelHeight();
@@ -247,10 +261,26 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                 case ui::UiAction::ClearSolo:    a.clearAll("solo"); break;
                 case ui::UiAction::ClearMute:    a.clearAll("mute"); break;
                 case ui::UiAction::FaderBank:    console.setFaderBank(idx); break;
+                case ui::UiAction::ToStart:      a.audio.seek(0); break;
+                case ui::UiAction::PlayPause:    a.playPause(); break;
+                case ui::UiAction::Stop:         a.audio.stop(); break;
+                case ui::UiAction::ToggleLoop:   a.audio.setLoop(!a.audio.loop()); break;
+                case ui::UiAction::Seek:         break;   // collected below with takeSeek
                 case ui::UiAction::None:         break;
                 }
                 break;
             }
+            case ui::InputEvent::Type::Key:
+                switch (e.key) {
+                case VK_SPACE:  a.playPause(); break;
+                case VK_HOME:   a.audio.seek(0); break;
+                case VK_END:    a.audio.stop(); break;
+                case 'L':       a.audio.setLoop(!a.audio.loop()); break;
+                case VK_LEFT:   a.seekSeconds(e.ctrl ? -30.0 : -5.0); break;
+                case VK_RIGHT:  a.seekSeconds(e.ctrl ? 30.0 : 5.0); break;
+                default:        break;
+                }
+                break;
             case ui::InputEvent::Type::MouseMove: console.interaction().mouseMove(x, y, e.fine); break;
             case ui::InputEvent::Type::MouseUp:   console.interaction().mouseUp(); break;
             case ui::InputEvent::Type::Wheel:     console.interaction().wheel(x, y, e.wheel, e.fine); break;
@@ -260,9 +290,15 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                 a.stems.load(static_cast<std::uint32_t>(first), e.files);
                 break;
             }
-            case ui::InputEvent::Type::RightDown: {   // right-click a stem title: empty that slot
+            case ui::InputEvent::Type::RightDown: {
+                // Right-click: stem title = empty that slot; name panel = previous device; any S / M = clear all solos / mutes.
+                const int hit = console.layout().hitTest(x, y);
+                const ui::Widget* w = hit >= 0 ? &console.layout().widgets()[static_cast<std::size_t>(hit)] : nullptr;
                 const int at = console.layout().stemStripAt(x, y);
-                if (at >= 0 && ui::Layout::titleArea(console.layout().strips()[static_cast<std::size_t>(at)]).contains(x, y))
+                if (w && w->kind == ui::WidgetKind::NamePanel) a.selectDevice(-1);
+                else if (w && w->kind == ui::WidgetKind::Button && w->caption == "S") a.clearAll("solo");
+                else if (w && w->kind == ui::WidgetKind::Button && w->caption == "M" && at >= 0) a.clearAll("mute");
+                else if (at >= 0 && ui::Layout::titleArea(console.layout().strips()[static_cast<std::size_t>(at)]).contains(x, y))
                     a.stems.clear(static_cast<std::uint32_t>(at));
                 break;
             }
@@ -271,6 +307,10 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             }
         }
 
+        if (float f = 0; console.interaction().takeSeek(f) && a.stems.songFrames() > 0) {
+            if (a.audio.source() != Source::Stems) a.audio.setSource(Source::Stems);
+            a.audio.seek(static_cast<std::uint64_t>(f * static_cast<double>(a.stems.songFrames() - 1)));
+        }
         a.tree.dispatchChanges();
         a.audio.poll();
         a.stems.pump();
@@ -288,10 +328,11 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         // Persist settings at most every 5 s, only when something changed (crash-safe file replace).
         if (now - lastSave > std::chrono::seconds(5)) {
             lastSave = now;
-            if (a.tree.version() != savedVersion || console.faderBank() != savedBank || a.stems.loading()) {
+            if (a.tree.version() != savedVersion || console.faderBank() != savedBank || a.audio.loop() != savedLoop || a.stems.loading()) {
                 a.saveSettings(console.faderBank());
                 savedVersion = a.tree.version();
                 savedBank    = console.faderBank();
+                savedLoop    = a.audio.loop();
             }
         }
 
@@ -323,6 +364,11 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         vs.engine.loadPct      = st.loadAvg * 100.0f;
         vs.engine.peakLoadPct  = st.loadPeak * 100.0f;
         vs.engine.dropouts     = st.dropouts;
+        vs.transport.playing   = a.audio.wantsPlay();
+        vs.transport.loop      = a.audio.loop();
+        vs.transport.position  = static_cast<double>(a.audio.stemPlayhead()) / kSampleRate;
+        vs.transport.length    = static_cast<double>(a.stems.songFrames()) / kSampleRate;
+        vs.overview            = a.stems.songOverview().empty() ? nullptr : &a.stems.songOverview();
         vs.hover   = console.interaction().hoverWidget();
         vs.active  = console.interaction().activeWidget();
         vs.pressed = console.interaction().pressedWidget();

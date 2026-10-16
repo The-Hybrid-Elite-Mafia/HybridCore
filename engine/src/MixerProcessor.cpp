@@ -46,38 +46,85 @@ void MixerProcessor::drainStemCommands() noexcept {
         changed = true;
     }
     if (changed) {
-        loopFrames_ = 0;
+        songFrames_ = 0;
         for (const StemAudio* s : slots_)
-            if (s) loopFrames_ = std::max(loopFrames_, s->frames);
-        if (loopFrames_ == 0 || playhead_ >= loopFrames_) playhead_ = 0;
+            if (s) songFrames_ = std::max(songFrames_, s->frames);
+        if (songFrames_ == 0 || playhead_ >= songFrames_) playhead_ = 0;
     }
 }
 
-void MixerProcessor::renderStems(std::uint32_t frames) noexcept {
-    for (std::uint32_t s = 0; s < dsp::StemMatrix::kStems; ++s) {
-        float* L = stemData_.data() + (static_cast<std::size_t>(s) * 2) * maxFrames_;
-        float* R = L + maxFrames_;
-        const StemAudio* a = slots_[s];
-        std::uint64_t pos = playhead_;
-        std::uint32_t done = 0;
-        while (done < frames) {
-            const auto chunk = static_cast<std::uint32_t>(std::min<std::uint64_t>(frames - done, loopFrames_ - pos));
+namespace {
+constexpr std::uint32_t kFadeIn = 64;
+void fadeIn(float* x, std::uint32_t n) noexcept {
+    const std::uint32_t m = std::min(n, kFadeIn);
+    for (std::uint32_t i = 0; i < m; ++i) x[i] *= static_cast<float>(i) / static_cast<float>(kFadeIn);
+}
+void fadeOut(float* x, std::uint32_t n) noexcept {
+    for (std::uint32_t i = 0; i < n; ++i) x[i] *= 1.0f - static_cast<float>(i + 1) / static_cast<float>(n);
+}
+} // namespace
+
+bool MixerProcessor::renderStems(std::uint32_t frames) noexcept {
+    constexpr std::uint32_t kStems = dsp::StemMatrix::kStems;
+    if (songFrames_ == 0) {   // everything unloaded
+        playing_  = false;
+        playhead_ = 0;
+        seekReq_.store(-1, std::memory_order_relaxed);
+        return false;
+    }
+    const std::int64_t seek = seekReq_.exchange(-1, std::memory_order_acq_rel);
+    auto clampSeek = [&] { return songFrames_ ? std::min<std::uint64_t>(static_cast<std::uint64_t>(seek), songFrames_ - 1) : 0; };
+    const bool want = wantPlay_.load(std::memory_order_acquire) && songFrames_ > 0;
+    bool startFade = false, stopping = false;
+    if (want && !playing_) { playing_ = true; startFade = true; }
+    else if (!want && playing_) stopping = true;   // finish this block from where we are, faded out, then stop
+    if (seek >= 0 && !stopping) { playhead_ = clampSeek(); startFade = true; }
+    if (!playing_) return false;
+
+    std::uint64_t pos = playhead_;
+    std::uint32_t done = 0;
+    bool endedAt = false;
+    std::uint32_t endFrame = frames;
+    while (done < frames) {
+        const auto chunk = static_cast<std::uint32_t>(std::min<std::uint64_t>(frames - done, songFrames_ - pos));
+        for (std::uint32_t s = 0; s < kStems; ++s) {
+            float* L = stemData_.data() + (static_cast<std::size_t>(s) * 2) * maxFrames_ + done;
+            float* R = L + maxFrames_;
+            const StemAudio* a = slots_[s];
             std::uint32_t have = 0;
             if (a && pos < a->frames) {
                 have = static_cast<std::uint32_t>(std::min<std::uint64_t>(chunk, a->frames - pos));
-                std::memcpy(L + done, a->left.data() + pos, sizeof(float) * have);
-                std::memcpy(R + done, a->right.data() + pos, sizeof(float) * have);
+                std::memcpy(L, a->left.data() + pos, sizeof(float) * have);
+                std::memcpy(R, a->right.data() + pos, sizeof(float) * have);
             }
             if (have < chunk) {
-                std::memset(L + done + have, 0, sizeof(float) * (chunk - have));
-                std::memset(R + done + have, 0, sizeof(float) * (chunk - have));
+                std::memset(L + have, 0, sizeof(float) * (chunk - have));
+                std::memset(R + have, 0, sizeof(float) * (chunk - have));
             }
-            done += chunk;
-            pos += chunk;
-            if (pos >= loopFrames_) pos = 0;
+        }
+        done += chunk;
+        pos += chunk;
+        if (pos >= songFrames_) {
+            pos = 0;
+            if (!loop_.load(std::memory_order_relaxed)) { endedAt = true; endFrame = done; break; }
         }
     }
-    playhead_ = (playhead_ + frames) % loopFrames_;
+    for (std::uint32_t s = 0; s < kStems * 2; ++s) {
+        float* x = stemData_.data() + static_cast<std::size_t>(s) * maxFrames_;
+        if (endFrame < frames) std::memset(x + endFrame, 0, sizeof(float) * (frames - endFrame));
+        if (startFade) fadeIn(x, frames);
+        if (stopping) fadeOut(x, frames);
+    }
+    playhead_ = pos;
+    if (stopping) {
+        playing_ = false;
+        if (seek >= 0) playhead_ = clampSeek();   // e.g. STOP: the jump to the start happens after the fade
+    }
+    if (endedAt) {   // loop off: the song ended — stop and go back to the start
+        playing_ = false;
+        wantPlay_.store(false, std::memory_order_release);
+    }
+    return true;
 }
 
 double MixerProcessor::testToneHz(std::uint32_t stem) noexcept {
@@ -103,17 +150,15 @@ void MixerProcessor::process(const ProcessContext& ctx) noexcept {
     std::array<const float*, kStems> R{};
 
     drainStemCommands();
-    if (restart_.exchange(false, std::memory_order_acq_rel)) playhead_ = 0;
     const Source src = source_.load(std::memory_order_relaxed);
 
     if (src == Source::Stems) {
-        if (loopFrames_ > 0) {
-            renderStems(ctx.frames);
+        if (renderStems(ctx.frames)) {
             for (std::uint32_t s = 0; s < kStems; ++s) {
                 L[s] = stemData_.data() + (static_cast<std::size_t>(s) * 2) * maxFrames_;
                 R[s] = L[s] + maxFrames_;
             }
-        }   // nothing loaded: every stem is silent (nullptr)
+        }   // stopped or nothing loaded: every stem is silent (nullptr)
     } else if (src == Source::TestTones) {
         for (std::uint32_t s = 0; s < kStems; ++s) {
             float* out = toneData_.data() + static_cast<std::size_t>(s) * maxFrames_;
@@ -140,7 +185,8 @@ void MixerProcessor::process(const ProcessContext& ctx) noexcept {
 
     matrix_.process(L.data(), R.data(), ctx.frames);
     playheadPub_.store(playhead_, std::memory_order_relaxed);
-    loopPub_.store(loopFrames_, std::memory_order_relaxed);
+    songPub_.store(songFrames_, std::memory_order_relaxed);
+    playingPub_.store(playing_, std::memory_order_relaxed);
 
     for (std::uint32_t b = 0; b < dsp::StemMatrix::kBuses; ++b)
         for (std::uint32_t c = 0; c < 2; ++c) {

@@ -5,12 +5,14 @@
 //  sits on a measured faceplate region (Faceplate.hpp):
 //    top bar      : status lamp in the logo socket, engraved title
 //    name panel   : device + format (engraved)
-//    6 sockets    : ◀ device, device ▶, LOAD stems, SOURCE (tones / inputs / stems), clear SOLO, clear MUTE
-//    glass display: live engine numbers (latency, DSP load, buffer, dropouts)
+//    name panel   : device + format (click: next device, right-click: previous)
+//    6 sockets    : LOAD stems, |◀ to start, PLAY / PAUSE, STOP, LOOP, SOURCE (tones / inputs / stems)
+//    glass display: song position + length, DSP load, driver / buffer / latency / dropouts
 //    4 tabs       : fader bank — MAIN MIX / AUX 1 / AUX 2 / AUX 3 sends on the stem faders
 //    left panel   : 4 bus strips (Main, Aux 1–3)
 //    main panel   : 13 stem strips
-//    bottom bar   : status line + main bus L/R meter
+//    top bar      : title, status line (engraved)
+//    bottom bar   : song overview (click / drag to seek) + main bus L/R meter
 //  The left/main panels grow with Canvas::extraH (windows taller than 16:9).
 // =============================================================================
 #include "hybrid/core/Config.hpp"
@@ -26,8 +28,9 @@
 
 namespace hc::ui {
 
-enum class WidgetKind : std::uint8_t { Knob, SendKnob, Fader, Button, StemMeter, BusMeter, MasterMeter, Transport, Tab };
-enum class UiAction : std::uint8_t { None, PrevDevice, NextDevice, LoadStems, CycleSource, ClearSolo, ClearMute, FaderBank };
+enum class WidgetKind : std::uint8_t { Knob, SendKnob, Fader, Button, StemMeter, BusMeter, MasterMeter, Transport, Tab, NamePanel, Overview };
+enum class UiAction : std::uint8_t { None, PrevDevice, NextDevice, LoadStems, CycleSource, ClearSolo, ClearMute, FaderBank,
+                                     ToStart, PlayPause, Stop, ToggleLoop, Seek };
 
 inline constexpr std::uint32_t kFaderBanks = hc::kBusCount;   // MAIN + AUX 1..3
 
@@ -78,6 +81,7 @@ public:
 
     [[nodiscard]] Rect masterMeter() const noexcept { return master_; }
     [[nodiscard]] Rect statusArea() const noexcept { return status_; }
+    [[nodiscard]] Rect overview() const noexcept { return overview_; }
 
 private:
     std::vector<Widget>      widgets_;
@@ -85,7 +89,7 @@ private:
     std::array<std::array<int, kFaderBanks>, hc::kStemCount> stemFader_{};
     std::uint32_t bank_   = 0;
     float         extraH_ = 0;
-    Rect          master_, status_;
+    Rect          master_, status_, overview_;
 };
 
 // Mouse handling. Pointer positions are in design units.
@@ -96,7 +100,14 @@ public:
     // Returns the action of a clicked socket/tab (FaderBank: index in `actionIndex`).
     UiAction mouseDown(float x, float y, bool doubleClick, bool fine, std::uint32_t* actionIndex = nullptr);
     void     mouseMove(float x, float y, bool fine);
-    void     mouseUp() noexcept { active_ = -1; pressed_ = -1; }
+    void     mouseUp() noexcept { active_ = -1; pressed_ = -1; seeking_ = false; }
+    // Song overview: a click or drag there leaves a seek position (0..1 of the song) to collect.
+    [[nodiscard]] bool takeSeek(float& fraction) noexcept {
+        if (!hasSeek_) return false;
+        hasSeek_ = false;
+        fraction = seek_;
+        return true;
+    }
     void     wheel(float x, float y, float notches, bool fine);
     void     rebind(Layout& layout) noexcept { layout_ = std::ref(layout); active_ = hover_ = pressed_ = -1; }
 
@@ -114,6 +125,10 @@ private:
     int   hover_   = -1;
     int   pressed_ = -1;
     float lastY_   = 0.0f;
+    bool  seeking_ = false;
+    bool  hasSeek_ = false;
+    float seek_    = 0.0f;
+    void  seekAt(float x) noexcept;
 };
 
 } // namespace hc::ui

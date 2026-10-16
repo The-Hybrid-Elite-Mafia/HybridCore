@@ -189,6 +189,10 @@ void MixerView::drawStatic(Renderer& r, const Canvas& canvas) const {
     drawMeterRow(r, {in.x, in.y + rh + 6, in.w, rh}, 0, 0, false);
     r.text(TextStyle::Caption, "L", m.x + 30, in.y + rh * 0.5f + r.capHeight(TextStyle::Caption) * 0.5f, kDimText, Align::Center, TextFx::Shadowed);
     r.text(TextStyle::Caption, "R", m.x + 30, in.y + rh * 1.5f + 6 + r.capHeight(TextStyle::Caption) * 0.5f, kDimText, Align::Center, TextFx::Shadowed);
+    const Rect ov = layout_.overview();
+    r.nineSlice(Sprite::DropShadow, {ov.x - 22 + 5, ov.y - 22 + 8, ov.w + 44, ov.h + 44}, 0.55f, {1, 1, 1, 0.8f});
+    r.nineSlice(Sprite::Glass, ov, 0.35f);
+    r.nineSlice(Sprite::InnerShadow, ov.inset(6), 0.35f);
     r.text(TextStyle::Status, "MAIN OUT", m.x - 24, m.cy() + r.capHeight(TextStyle::Status) * 0.5f, kEngrave, Align::Right, TextFx::Engraved);
 }
 
@@ -337,6 +341,8 @@ void MixerView::drawTransport(Renderer& r, const Widget& w, const ViewState& v) 
     switch (w.action) {
     case UiAction::LoadStems:    active = v.loading; lit = kLitAmber; break;
     case UiAction::CycleSource:  active = true; break;
+    case UiAction::PlayPause:    active = v.transport.playing; break;
+    case UiAction::ToggleLoop:   active = v.transport.loop; lit = kLitCyan; break;
     case UiAction::ClearSolo:    active = anySolo; lit = kLitAmber; break;
     case UiAction::ClearMute:    active = anyMute; lit = kLitRed; break;
     default: break;
@@ -354,8 +360,12 @@ void MixerView::drawTransport(Renderer& r, const Widget& w, const ViewState& v) 
     const float iy = cy - 12 + push, ix = cx + push;
     const float is = 62.0f;
     switch (w.action) {
-    case UiAction::PrevDevice:   r.sprite(Sprite::IconPrev, {ix - is / 2, iy - is / 2, is, is}, ic, Blend::Over, active); break;
-    case UiAction::NextDevice:   r.sprite(Sprite::IconNext, {ix - is / 2, iy - is / 2, is, is}, ic, Blend::Over, active); break;
+    case UiAction::ToStart:      r.sprite(Sprite::IconPrev, {ix - is / 2, iy - is / 2, is, is}, ic, Blend::Over, active); break;
+    case UiAction::PlayPause:
+        r.sprite(v.transport.playing ? Sprite::IconPause : Sprite::IconPlay, {ix - is / 2, iy - is / 2, is, is}, ic, Blend::Over, active);
+        break;
+    case UiAction::Stop:         r.sprite(Sprite::IconStop, {ix - is / 2, iy - is / 2, is, is}, ic, Blend::Over, active); break;
+    case UiAction::ToggleLoop:   r.sprite(Sprite::IconLoop, {ix - is / 2, iy - is / 2, is, is}, ic, Blend::Over, active); break;
     case UiAction::LoadStems:    r.sprite(Sprite::IconFolder, {ix - is / 2, iy - is / 2, is, is}, ic, Blend::Over, active); break;
     case UiAction::CycleSource: {
         const Sprite icon = v.source == SourceView::Tones ? Sprite::IconSine : v.source == SourceView::Inputs ? Sprite::IconInput : Sprite::IconWave;
@@ -371,6 +381,7 @@ void MixerView::drawTransport(Renderer& r, const Widget& w, const ViewState& v) 
     }
     const char* cap = w.caption.c_str();
     if (w.action == UiAction::CycleSource) cap = v.source == SourceView::Tones ? "TONES" : v.source == SourceView::Inputs ? "INPUTS" : "STEMS";
+    if (w.action == UiAction::PlayPause) cap = v.transport.playing ? "PAUSE" : "PLAY";
     r.text(TextStyle::Caption, cap, ix, cy + 44 + push, active ? lit : rgb8(0xE6EAEF), Align::Center, TextFx::Plain);
 }
 
@@ -386,23 +397,58 @@ void MixerView::drawDisplay(Renderer& r, const ViewState& v) const {
         r.text(TextStyle::Display, num, x, bigY, c, Align::Left, TextFx::Neon);
         r.text(TextStyle::DisplayCap, unit, x + r.textWidth(TextStyle::Display, num) + 10, bigY, dim, Align::Left, TextFx::Neon);
     };
-    if (e.valid) {
-        bigNumber(g.x + 46, e.latencyMs >= 0 ? fmt("%.2f", e.latencyMs) : fmt("%.2f", 1000.0 * e.bufferFrames / std::max(1.0, e.sampleRate)),
-                  "ms", e.latencyMs >= 0 ? "OUTPUT LATENCY" : "BUFFER TIME");
-        bigNumber(g.x + 430, fmt("%.1f", e.loadPct), "%", "DSP LOAD");
-    } else {
-        bigNumber(g.x + 46, "--", "ms", "OUTPUT LATENCY");
-        bigNumber(g.x + 430, "--", "%", "DSP LOAD");
-    }
-    const float rx = g.x + 760;
+    auto clock = [](double sec, bool tenths) {
+        if (sec < 0) sec = 0;
+        const auto total = static_cast<long long>(sec * 10.0 + 1e-6);
+        const long long m = total / 600, s10 = total % 600;
+        char b[32];
+        if (tenths) std::snprintf(b, sizeof b, "%lld:%02lld.%lld", m, s10 / 10, s10 % 10);
+        else        std::snprintf(b, sizeof b, "%lld:%02lld", m, s10 / 10);
+        return std::string(b);
+    };
+    const TransportView& t = v.transport;
+    if (v.source == SourceView::Stems && t.length > 0)
+        bigNumber(g.x + 46, clock(t.position, true), ("/ " + clock(t.length, false)).c_str(), t.playing ? "PLAYING" : "STOPPED");
+    else
+        bigNumber(g.x + 46, "-:--.-", "", v.source == SourceView::Stems ? "NO STEMS LOADED" : v.source == SourceView::Tones ? "TEST TONES" : "HARDWARE INPUTS");
+    bigNumber(g.x + 520, e.valid ? fmt("%.1f", e.loadPct) : std::string("--"), "%", "DSP LOAD");
+    const float rx = g.x + 790;
     const std::string l1 = e.valid ? e.driver : "NO STREAM";
     const std::string l2 = e.valid ? fmt("%.1f kHz", e.sampleRate / 1000.0) + "   " + std::to_string(e.bufferFrames) + " SMP" : "--";
-    const std::string l3 = e.valid ? "PEAK " + fmt("%.1f%%", e.peakLoadPct) : "";
+    const std::string l3 = !e.valid ? "" : e.latencyMs >= 0 ? "LATENCY " + fmt("%.2f ms", e.latencyMs)
+                                                            : "BUFFER " + fmt("%.2f ms", 1000.0 * e.bufferFrames / std::max(1.0, e.sampleRate));
     const std::string l4 = e.valid ? "DROPOUTS " + std::to_string(e.dropouts) : "";
     r.text(TextStyle::DisplayCap, fit(r, TextStyle::DisplayCap, l1, g.right() - rx - 30), rx, capY, c, Align::Left, TextFx::Neon);
     r.text(TextStyle::DisplayCap, l2, rx, capY + 40, dim, Align::Left, TextFx::Neon);
     r.text(TextStyle::DisplayCap, l3, rx, capY + 80, dim, Align::Left, TextFx::Neon);
     r.text(TextStyle::DisplayCap, l4, rx, capY + 120, e.dropouts ? kNeonAlert : dim, Align::Left, TextFx::Neon);
+}
+
+void MixerView::drawOverview(Renderer& r, const ViewState& v) const {
+    const Rect o = layout_.overview().inset(14, 12);
+    const TransportView& t = v.transport;
+    if (!v.overview || v.overview->empty() || t.length <= 0) {
+        r.text(TextStyle::Caption, "DROP STEMS ON THE CONSOLE OR PRESS LOAD", o.cx(), o.cy() + r.capHeight(TextStyle::Caption) * 0.5f, kDimText,
+               Align::Center, TextFx::Shadowed);
+        return;
+    }
+    const auto& pk = *v.overview;
+    const float frac = static_cast<float>(std::clamp(t.position / t.length, 0.0, 1.0));
+    const int bars = std::max(16, static_cast<int>(o.w / 9.0f));
+    const float pitch = o.w / static_cast<float>(bars), bw = pitch * 0.62f;
+    for (int i = 0; i < bars; ++i) {
+        const std::size_t b0 = pk.size() * static_cast<std::size_t>(i) / static_cast<std::size_t>(bars);
+        const std::size_t b1 = std::max(b0 + 1, pk.size() * static_cast<std::size_t>(i + 1) / static_cast<std::size_t>(bars));
+        float p = 0;
+        for (std::size_t b = b0; b < b1 && b < pk.size(); ++b) p = std::max(p, pk[b]);
+        const float h = std::max(2.0f, o.h * std::min(1.0f, p));
+        const Rect bar{o.x + static_cast<float>(i) * pitch + (pitch - bw) * 0.5f, o.cy() - h * 0.5f, bw, h};
+        const bool played = (static_cast<float>(i) + 0.5f) / static_cast<float>(bars) <= frac;
+        r.sprite(Sprite::LedSegment, bar, played ? kNeon : kNeon.withAlpha(0.30f), Blend::Over, played);
+    }
+    const float x = o.x + frac * o.w;
+    r.fillRound({x - 2.5f, o.y - 6, 5, o.h + 12}, 2.5f, rgb8(0xFFFFFF), Blend::Over, true);
+    r.sprite(Sprite::GlowDot, {x - 22, o.y - 22, 44, 44}, rgb8(0xFFFFFF, 0.8f), Blend::Add, true);
 }
 
 void MixerView::drawDynamic(Renderer& r, const ViewState& v, const MeterState& m) const {
@@ -502,9 +548,11 @@ void MixerView::drawDynamic(Renderer& r, const ViewState& v, const MeterState& m
     drawMeterRow(r, {in.x, in.y, in.w, rh}, m.busL[0], m.busHoldL[0], true);
     drawMeterRow(r, {in.x, in.y + rh + 6, in.w, rh}, m.busR[0], m.busHoldR[0], true);
     drawGlassOverlay(r, mm.inset(6));
+    drawOverview(r, v);
+    drawGlassOverlay(r, layout_.overview().inset(6));
     const Rect sa = layout_.statusArea();
-    r.text(TextStyle::Status, fit(r, TextStyle::Status, v.status, sa.w - 300), sa.x, sa.cy() + r.capHeight(TextStyle::Status) * 0.5f,
-           v.alert ? rgb8(0x8A1C14) : kEngrave, Align::Left, TextFx::Engraved);
+    r.text(TextStyle::Status, fit(r, TextStyle::Status, v.status, sa.w - 40), sa.x, sa.cy() + r.capHeight(TextStyle::Status) * 0.5f,
+           v.alert ? rgb8(0x8A1C14) : kEngraveLo, Align::Left, TextFx::Engraved);
 }
 
 } // namespace hc::ui

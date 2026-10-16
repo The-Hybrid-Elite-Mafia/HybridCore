@@ -212,6 +212,7 @@ int main(int argc, char** argv) {
     testResampler();
     testStemLoader();
     testStemPlayback();
+    testTransport();
     testUiImage();
     testUiLayout();
     testUiFaceplate();

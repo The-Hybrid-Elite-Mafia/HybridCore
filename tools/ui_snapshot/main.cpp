@@ -190,6 +190,7 @@ int wmain(int argc, wchar_t** argv) {
             deck.pump();
         }
         const double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+        host.play();
         std::wprintf(L"Stems   : %zu file(s) from %ls loaded in %.2f s (%.1f MB RAM)\n", n, stemsDir.c_str(), secs,
                      static_cast<double>(deck.loadedBytes()) / 1048576.0);
         for (std::uint32_t s2 = 0; s2 < kStemCount; ++s2) {
@@ -259,6 +260,11 @@ int wmain(int argc, wchar_t** argv) {
             pump(0.05);   // keep the meters live between frames
             vs.status = st.line1 + "   \xC2\xB7   faceplate " + console.faceplateInfo();
             vs.engine = {st.running, st.driver, st.sampleRate, st.blockFrames, st.outLatencyMs, st.loadAvg * 100.0f, st.loadPeak * 100.0f, st.dropouts};
+            vs.transport.playing  = host.wantsPlay();
+            vs.transport.loop     = host.loop();
+            vs.transport.position = static_cast<double>(host.stemPlayhead()) / hc::kSampleRate;
+            vs.transport.length   = static_cast<double>(deck.songFrames()) / hc::kSampleRate;
+            vs.overview           = deck.songOverview().empty() ? nullptr : &deck.songOverview();
             const auto t0 = std::chrono::steady_clock::now();
             console.renderToCapture(vs, meters);
             const auto t1 = std::chrono::steady_clock::now();

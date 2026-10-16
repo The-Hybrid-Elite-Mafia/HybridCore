@@ -83,6 +83,12 @@ struct GlWindow::Impl {
             events.push_back(e);
             return 0;
         }
+        case WM_KEYDOWN:
+            e.type = InputEvent::Type::Key;
+            e.key  = static_cast<std::uint32_t>(wp);
+            e.ctrl = (::GetKeyState(VK_CONTROL) & 0x8000) != 0;
+            events.push_back(e);
+            return 0;
         case WM_RBUTTONDOWN:
             e.type = InputEvent::Type::RightDown;
             e.x = static_cast<float>(GET_X_LPARAM(lp));
