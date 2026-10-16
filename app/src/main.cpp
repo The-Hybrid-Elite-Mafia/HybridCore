@@ -122,14 +122,15 @@ std::vector<std::filesystem::path> askForStems(HWND owner) {
     return out;
 }
 
-// Windows save dialog. Empty when cancelled.
-std::filesystem::path askSaveFile(HWND owner, const wchar_t* title, const wchar_t* filterName, const wchar_t* pattern, const wchar_t* ext,
-                                  const std::filesystem::path& suggested) {
+// Windows save dialog with a "Save as type" list. *type (1-based) picks the starting entry and
+// returns the one chosen. Empty when cancelled.
+std::filesystem::path askSaveFileTyped(HWND owner, const wchar_t* title, const COMDLG_FILTERSPEC* filters, UINT count, UINT* type,
+                                       const wchar_t* ext, const std::filesystem::path& suggested) {
     std::filesystem::path out;
     IFileSaveDialog* dlg = nullptr;
     if (FAILED(::CoCreateInstance(CLSID_FileSaveDialog, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&dlg)))) return out;
-    const COMDLG_FILTERSPEC filters[] = {{filterName, pattern}};
-    dlg->SetFileTypes(1, filters);
+    dlg->SetFileTypes(count, filters);
+    if (type && *type >= 1 && *type <= count) dlg->SetFileTypeIndex(*type);
     dlg->SetDefaultExtension(ext);
     dlg->SetTitle(title);
     FILEOPENDIALOGOPTIONS o = 0;
@@ -152,9 +153,16 @@ std::filesystem::path askSaveFile(HWND owner, const wchar_t* title, const wchar_
             ::CoTaskMemFree(path);
         }
         if (it) it->Release();
+        if (type && !out.empty()) dlg->GetFileTypeIndex(type);
     }
     dlg->Release();
     return out;
+}
+
+std::filesystem::path askSaveFile(HWND owner, const wchar_t* title, const wchar_t* filterName, const wchar_t* pattern, const wchar_t* ext,
+                                  const std::filesystem::path& suggested) {
+    const COMDLG_FILTERSPEC filters[] = {{filterName, pattern}};
+    return askSaveFileTyped(owner, title, filters, 1, nullptr, ext, suggested);
 }
 
 std::filesystem::path askOpenSession(HWND owner, const std::filesystem::path& folder) {
@@ -204,6 +212,7 @@ struct App {
     std::uint64_t         pendingSeek = UINT64_MAX;   // applied once the stems of an opened session are loaded
     media::MixExporter    exporter;
     std::string           notice;
+    bool                  lastExportMastered = true;
     std::chrono::steady_clock::time_point noticeUntil{};
 
     void say(std::string text) {
@@ -299,9 +308,14 @@ struct App {
                 if (b) name += L" " + std::to_wstring(static_cast<int>(std::lround(b->plain()))) + L" BPM";
             }
         }
-        const auto target = askSaveFile(owner, L"Export the mix (WAV, 48 kHz, 24-bit)", L"WAV audio", L"*.wav", L"wav",
-                                        folder / (name + L".wav"));
+        // "Save as type" is the mastering switch: song loudness (default) or the clean mix,
+        // untouched, for mastering later (Playground, Suno). The choice is remembered.
+        const COMDLG_FILTERSPEC kinds[] = {{L"WAV, mastered to song loudness (-14 LUFS)", L"*.wav"},
+                                           {L"WAV, clean, no mastering (for mastering later)", L"*.wav"}};
+        UINT kind = settings.get("export", "master", "1") != "0" ? 1u : 2u;
+        const auto target = askSaveFileTyped(owner, L"Export the mix (WAV, 48 kHz, 24-bit)", kinds, 2, &kind, L"wav", folder / (name + L".wav"));
         if (target.empty()) return;
+        settings.set("export", "master", kind == 2 ? "0" : "1");
         settings.set("app", "exportDir", app::toUtf8(target.parent_path().wstring()));
         media::ExportRequest req;
         for (std::uint32_t s = 0; s < kStemCount; ++s)
@@ -310,9 +324,10 @@ struct App {
         if (beat) req.forgeSong = forge->songText();
         req.out      = target;
         req.encoding = media::WavEncoding::Pcm24;
-        // Song-level loudness on export (settings.ini [export] master=0 turns it off, target=-14 sets the level).
-        req.master = settings.get("export", "master", "1") != "0";
+        // Song-level loudness (settings.ini [export] target=-14 sets the level).
+        req.master = kind != 2;
         req.masterSettings.targetLufs = std::clamp(std::atof(settings.get("export", "target", "-14").c_str()), -30.0, -6.0);
+        lastExportMastered = req.master;
         if (exporter.start(std::move(req))) say("Exporting " + app::toUtf8(target.filename().wstring()) + "...");
     }
     void pollExport() {
@@ -328,8 +343,10 @@ struct App {
                       x.master.lufsAfter, x.peak > 0 ? 20.0 * std::log10(x.peak) : -144.0);
         std::string msg = "Exported " + app::toUtf8(x.file.filename().wstring()) + b;
         if (x.master.gainDb > 0.05) {
-            std::snprintf(b, sizeof b, "  \xC2\xB7  raised %.1f dB to song level", x.master.gainDb);
+            std::snprintf(b, sizeof b, "  \xC2\xB7  mastered: raised %.1f dB to song level", x.master.gainDb);
             msg += b;
+        } else if (!lastExportMastered) {
+            msg += "  \xC2\xB7  clean, no mastering";
         }
         if (x.clipped) msg += "  \xC2\xB7  " + std::to_string(x.clipped) + " samples clipped (turn LIM on)";
         if (!x.warning.empty()) msg += "  \xC2\xB7  " + x.warning;

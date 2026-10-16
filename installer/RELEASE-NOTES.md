@@ -1,3 +1,13 @@
+## The Hybrid Core — 0.11.5: choose mastered or clean on every export
+
+In the EXPORT window, **"Save as type"** now has two choices:
+- **WAV, mastered to song loudness (-14 LUFS)** — the default; ready to play next to finished songs.
+- **WAV, clean, no mastering (for mastering later)** — the mix exactly as it plays, with all its headroom, for mastering in the Playground or uploading to Suno.
+
+The app remembers the one you picked last. Everything else is the same as 0.11.4.
+
+---
+
 ## The Hybrid Core — 0.11.4: exports at song loudness, hooks that hit harder
 
 - **EXPORT now makes the WAV as loud as a finished song** (-14 LUFS, the level Spotify / YouTube play at), with a limiter keeping peaks at -1 dB so nothing distorts or clips. A mix that is already that loud or louder is left exactly as it is. The message after export shows the loudness and how much it was raised. Playback in the app is not changed. (To turn it off: settings.ini, section [export], master=0.)
