@@ -1,4 +1,4 @@
-## The Hybrid Core — 0.6.0: your stems (Phase 6)
+## The Hybrid Core — 0.6.1: sharper look (from Steven's HD reference) + Phase 6 stems
 
 Private test build for Steven's rig (Windows 10/11 x64, Intel i7-14700HX).
 

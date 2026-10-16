@@ -210,7 +210,7 @@ Raster knobBody() {
         const float chamfer = 0.42f * (1.0f + 0.12f * g);
         const float ridge   = 0.5f + 0.5f * std::cos(th * 64.0f);
         const float t       = clamp01((rb - kGroove) / (1.0f - kGroove));
-        const float skirt   = 0.30f * mix(0.30f, 1.15f, std::pow(ridge, 0.8f)) * (1.0f - 0.25f * t);
+        const float skirt   = 0.38f * mix(0.30f, 1.15f, std::pow(ridge, 0.8f)) * (1.0f - 0.25f * t);
         float v = mix(cap, chamfer, smooth(kCapEdge - 0.008f, kCapEdge + 0.008f, rb));
         v = mix(v, skirt, smooth(kGroove - 0.004f, kGroove + 0.010f, rb));
         const float gd = (rb - kGroove) * 127.0f / 1.3f;
@@ -252,7 +252,7 @@ Raster knobLight() {
         const float chW = smooth(kCapEdge - 0.01f, kCapEdge + 0.01f, rb) * (1.0f - smooth(kGroove - 0.01f, kGroove + 0.005f, rb));
         spec += chW * (1.1f * std::pow(std::max(dot(R, kBox), 0.0f), 6.0f) + 0.22f * env(R));
         const float skW = smooth(kGroove, kGroove + 0.015f, rb);
-        spec += skW * 0.55f * env(R);
+        spec += skW * 0.75f * env(R);
         const float rim = smooth(0.95f, 0.99f, rb) * std::pow(std::max(-(dx * 0.62f + dy * 0.78f), 0.0f), 2.0f);
         spec += 0.35f * rim;
         return Pix{spec * a, spec * a, spec * 1.02f * a, dark * a};
@@ -285,7 +285,7 @@ Raster capDark() {
         const V3 n = {dx * std::sin(tilt), dy * std::sin(tilt), std::cos(tilt)};
         const V3 R = reflectView(n);
         float v = 0.012f * (0.4f + 0.6f * lambert(n));
-        v += 0.16f * env(R) * (0.6f + 0.4f * smooth(0.6f, 1.0f, rn));
+        v += 0.08f * env(R) * (0.6f + 0.4f * smooth(0.6f, 1.0f, rn));
         v += 1.40f * std::pow(std::max(dot(R, kBox), 0.0f), 90.0f);
         v += smooth(0.90f, 0.97f, rn) * 0.45f * env(R);
         return Pix{v * a, v * a, v * 1.05f * a, a};
@@ -298,7 +298,7 @@ Raster ringGlow() {
     c.each([](float x, float y) {
         const float rn = std::sqrt(x * x + y * y) / 96.0f;
         const float t1 = (rn - 0.86f) / 0.06f, t2 = (rn - 0.86f) / 0.17f;
-        return addOnly(std::exp(-t1 * t1) + 0.35f * std::exp(-t2 * t2));
+        return addOnly(std::exp(-t1 * t1) + 0.12f * std::exp(-t2 * t2));
     });
     return c;
 }

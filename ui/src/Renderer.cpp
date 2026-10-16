@@ -13,7 +13,7 @@ namespace {
 
 constexpr float kModeTexture = 0, kModeText = 1, kModeTextBlur = 2, kModeArc = 3, kModeGlow = 4, kModeFill = 5;
 constexpr float kTexChassis = 0, kTexParts = 1, kTexStatic = 2;
-constexpr float kBloomStrength = 0.45f;
+constexpr float kBloomStrength = 0.32f;
 
 constexpr const char* kVertexSrc = R"(#version 330 core
 layout(location = 0) in vec2 aPos;
@@ -48,8 +48,10 @@ void main() {
     vec2 gx = dFdx(vUv), gy = dFdy(vUv);
     vec4 c = vColor;
     if (mode == 0) {
-        vec4 t = tex == 0 ? textureGrad(uChassis, vUv, gx, gy)
-               : tex == 1 ? textureGrad(uParts, vUv, gx, gy)
+        // Chassis and parts are minified with a sharper footprint (0.6 x the pixel's): crisper chrome
+        // when the window is smaller than 4K; at 4K the chassis is still sampled 1:1 from level 0.
+        vec4 t = tex == 0 ? textureGrad(uChassis, vUv, gx * 0.6, gy * 0.6)
+               : tex == 1 ? textureGrad(uParts, vUv, gx * 0.6, gy * 0.6)
                           : textureGrad(uStatic, vUv, gx, gy);
         c *= t;
     } else if (mode == 1) {
@@ -111,7 +113,7 @@ void main() {
         frag = texture(uA, vUv);
     } else {                                     // composite + sRGB encode
         vec3 scene = texture(uA, vUv).rgb;
-        vec3 bloom = texture(uB, vUv).rgb + 0.6 * texture(uC, vUv).rgb;
+        vec3 bloom = texture(uB, vUv).rgb + 0.4 * texture(uC, vUv).rgb;
         frag = vec4(encode(scene + uStrength * bloom), 1.0);
     }
 }
@@ -636,7 +638,7 @@ void Renderer::text(TextStyle style, std::string_view s, float x, float baseline
         pass(0, 0, col, Blend::Over, kModeText, 0, false);
         break;
     case TextFx::Engraved:
-        pass(0, onePx, {1, 1, 1, 0.55f * col.a}, Blend::Over, kModeText, 0, false);
+        pass(0, onePx, {1, 1, 1, 0.30f * col.a}, Blend::Over, kModeText, 0, false);
         pass(0, 0, col, Blend::Over, kModeText, 0, false);
         break;
     case TextFx::Shadowed:

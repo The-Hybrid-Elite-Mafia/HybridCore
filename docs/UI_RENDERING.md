@@ -55,3 +55,11 @@ display. No kerning: Poppins stores it in a GPOS layout stb_truetype cannot read
 ## Skins
 `%APPDATA%\HybridCore\skins\Main-Faceplate.png` (or .jpg) replaces the bundled art. It must keep
 the same layout and be 16:9 (4K or 8K); it is scaled to 3840 × 2160 in RAM and then to the window.
+
+## Look target
+`docs/reference/steven-hd-target-3460x2160.webp` is Steven's AI-enhanced version of a 0.6.0 screenshot: the target for contrast and
+crispness (black glass and caps, white labels, near-black engraving, tight glow rings, bright knob rings). It is a reference only — its
+controls and text are frozen pixels (and the enhancer invented some letters), so it is never drawn by the app.
+Tuning taken from it (0.6.1): sharper minification of the chassis and parts (0.6× texture footprint; 4K still samples 1:1), less bloom,
+darker strip glass, brighter bezel rims and labels, brighter knob skirts, visible unlit knob rings, blacker transport caps, no bloom on
+the lit cap rings, darker engraving with a fainter highlight.

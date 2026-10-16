@@ -13,10 +13,10 @@ constexpr float kKnobMin = -0.75f * kPi;   // -135°, 0 = straight up, clockwise
 constexpr float kKnobMax = 0.75f * kPi;
 
 // Colours (sRGB).
-constexpr Rgba kEngrave   = rgb8(0x24272C, 0.92f);
-constexpr Rgba kEngraveLo = rgb8(0x2C3036, 0.95f);
-constexpr Rgba kLightText = rgb8(0xE9EDF2);
-constexpr Rgba kDimText   = rgb8(0xA9B0B9);
+constexpr Rgba kEngrave   = rgb8(0x14161A, 1.0f);
+constexpr Rgba kEngraveLo = rgb8(0x1C1F24, 1.0f);
+constexpr Rgba kLightText = rgb8(0xF6F8FB);
+constexpr Rgba kDimText   = rgb8(0xC6CCD4);
 constexpr Rgba kNeon      = rgb8(0x56B6FF);
 constexpr Rgba kNeonAlert = rgb8(0xFF5A4A);
 constexpr Rgba kGreen     = rgb8(0x39E05A);
@@ -116,7 +116,9 @@ void MixerView::drawStrip(Renderer& r, const StripLayout& st) const {
     const float cs = 0.55f;   // glass corners at 55 % of the faceplate's pixel size
     r.nineSlice(Sprite::DropShadow, {st.bed.x - 22 + 6, st.bed.y - 22 + 10, st.bed.w + 44, st.bed.h + 44}, 0.55f, {1, 1, 1, 0.9f});
     r.nineSlice(Sprite::Glass, st.bed, cs);
+    r.fillRound(st.bed.inset(16), 20, {0, 0, 0, 0.50f}, Blend::Over);   // deeper black glass, more contrast for the controls
     drawGlassOverlay(r, st.bed.inset(14));
+    r.nineSlice(Sprite::GlassRim, st.bed.inset(9), 0.5f, {1, 1, 1, 0.8f}, Blend::Add);   // crisp bright edge on the bezel
 
     // Title + accent light.
     const float cx = st.bed.cx();
@@ -247,7 +249,7 @@ void MixerView::drawKnob(Renderer& r, const Widget& w, Rgba accent, bool hot) co
 
     // Value arc: unlit LED ring, then the lit part (emissive -> bloom) and a hot tip.
     const float ar = knob::kArcRadius * R, aw = knob::kArcWidth * R;
-    r.arc(cx, cy, ar, aw, kKnobMin, kKnobMax, accent.withAlpha(0.09f), false);
+    r.arc(cx, cy, ar, aw, kKnobMin, kKnobMax, accent.withAlpha(0.30f), false);
     if (!off && std::fabs(ang - a0) > 0.004f) {
         r.arc(cx, cy, ar, aw, std::min(a0, ang), std::max(a0, ang), accent, true);
         const float tx = cx + std::sin(ang) * ar, ty = cy - std::cos(ang) * ar;
@@ -346,7 +348,7 @@ void MixerView::drawTransport(Renderer& r, const Widget& w, const ViewState& v) 
     r.sprite(Sprite::CapDark, {cx - size / 2 + push, cy - size / 2 + push, size, size});
     if (active) {
         const float gs = 79.0f / 0.86f * 2.0f;
-        r.sprite(Sprite::RingGlow, {cx - gs / 2, cy - gs / 2, gs, gs}, lit.withAlpha(0.85f), Blend::Add, true);
+        r.sprite(Sprite::RingGlow, {cx - gs / 2, cy - gs / 2, gs, gs}, lit, Blend::Add, false);   // tight ring, no bloom haze over the cap
     }
     const Rgba ic = active ? lit : rgb8(0xD9DDE3);
     const float iy = cy - 12 + push, ix = cx + push;
@@ -363,13 +365,13 @@ void MixerView::drawTransport(Renderer& r, const Widget& w, const ViewState& v) 
     case UiAction::ClearSolo:
     case UiAction::ClearMute:
         r.text(TextStyle::Panel, w.action == UiAction::ClearSolo ? "S" : "M", ix, iy + r.capHeight(TextStyle::Panel) * 0.5f, ic, Align::Center,
-               active ? TextFx::Neon : TextFx::Plain);
+               TextFx::Plain);
         break;
     default: break;
     }
     const char* cap = w.caption.c_str();
     if (w.action == UiAction::CycleSource) cap = v.source == SourceView::Tones ? "TONES" : v.source == SourceView::Inputs ? "INPUTS" : "STEMS";
-    r.text(TextStyle::Caption, cap, ix, cy + 44 + push, active ? lit : rgb8(0x9DA3AB), Align::Center, active ? TextFx::Neon : TextFx::Plain);
+    r.text(TextStyle::Caption, cap, ix, cy + 44 + push, active ? lit : rgb8(0xE6EAEF), Align::Center, TextFx::Plain);
 }
 
 void MixerView::drawDisplay(Renderer& r, const ViewState& v) const {
