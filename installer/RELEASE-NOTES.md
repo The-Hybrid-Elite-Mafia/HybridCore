@@ -1,3 +1,9 @@
+## The Hybrid Core — 0.11.6: OPEN plays audio files
+
+OPEN (and Ctrl+O) now shows WAV, MP3 and FLAC files as well as sessions. Open an audio file (an export, a Suno song) and it goes on strip 1 so you can play it through the console; BEAT FORGE switches off for it (your beat is kept — press ON on the BEAT FORGE page to bring it back). Sessions open as before. Everything else is the same as 0.11.5.
+
+---
+
 ## The Hybrid Core — 0.11.5: choose mastered or clean on every export
 
 In the EXPORT window, **"Save as type"** now has two choices:

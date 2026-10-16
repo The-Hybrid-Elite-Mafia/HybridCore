@@ -29,6 +29,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cwctype>
 #include <filesystem>
 #include <iterator>
 #include <string>
@@ -169,9 +170,11 @@ std::filesystem::path askOpenSession(HWND owner, const std::filesystem::path& fo
     std::filesystem::path out;
     IFileOpenDialog* dlg = nullptr;
     if (FAILED(::CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&dlg)))) return out;
-    const COMDLG_FILTERSPEC filters[] = {{L"Hybrid Core session", L"*.hcs"}};
-    dlg->SetFileTypes(1, filters);
-    dlg->SetTitle(L"Open session");
+    const COMDLG_FILTERSPEC filters[] = {{L"Sessions and audio files (.hcs, .wav, .mp3, .flac)", L"*.hcs;*.wav;*.mp3;*.flac"},
+                                         {L"Hybrid Core session (.hcs)", L"*.hcs"},
+                                         {L"Audio file (.wav, .mp3, .flac)", L"*.wav;*.mp3;*.flac"}};
+    dlg->SetFileTypes(3, filters);
+    dlg->SetTitle(L"Open a session or an audio file");
     FILEOPENDIALOGOPTIONS o = 0;
     dlg->GetOptions(&o);
     dlg->SetOptions(o | FOS_FILEMUSTEXIST | FOS_FORCEFILESYSTEM);
@@ -291,6 +294,24 @@ struct App {
         }
         ::CoTaskMemFree(music);
         return out;
+    }
+    // OPEN: a session (.hcs), or an audio file to listen to (an export, a Suno song): it goes on
+    // strip 1 alone, Beat Forge goes off (its song is kept; ON on the BEAT FORGE page brings it back).
+    void openAny(const std::filesystem::path& file, ui::Console& console) {
+        std::wstring ext = file.extension().wstring();
+        std::transform(ext.begin(), ext.end(), ext.begin(), [](wchar_t c) { return static_cast<wchar_t>(::towlower(c)); });
+        if (ext == L".hcs") { openSession(file, console); return; }
+        audio.stop();
+        const bool beatWasOn = forgeOn();
+        if (params::Parameter* on = tree.find(forge::id::on)) on->setPlain(0.0f);
+        stems.replaceAll({file});
+        audio.setSource(Source::Stems);
+        pendingSeek = 0;
+        session.clear();
+        settings.set("app", "session", "");
+        std::string msg = "Opened " + app::toUtf8(file.filename().wstring()) + " on strip 1 - press PLAY";
+        if (beatWasOn) msg += "  \xC2\xB7  BEAT FORGE is off (ON on the BEAT FORGE page brings your beat back)";
+        say(msg);
     }
     void startExport(HWND owner) {
         if (exporter.busy()) { exporter.cancel(); return; }   // EXPORT while exporting = cancel
@@ -585,8 +606,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                 case ui::UiAction::ToggleLoop:   a.audio.setLoop(!a.audio.loop()); break;
                 case ui::UiAction::Seek:         break;   // collected below with takeSeek
                 case ui::UiAction::OpenSession: {
-                    const auto f = askOpenSession(hwnd, a.songFolder());
-                    if (!f.empty()) a.openSession(f, console);
+                    const auto f = askOpenSession(hwnd, a.songFolder().empty() ? a.exportFolder() : a.songFolder());
+                    if (!f.empty()) a.openAny(f, console);
                     console.interaction().mouseUp();
                     break;
                 }
@@ -605,8 +626,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                 if (e.ctrl) {   // Ctrl+O open, Ctrl+S save, Ctrl+Shift+S save as, Ctrl+E export
                     const bool shift = (::GetKeyState(VK_SHIFT) & 0x8000) != 0;
                     if (e.key == 'O') {
-                        const auto f = askOpenSession(hwnd, a.songFolder());
-                        if (!f.empty()) a.openSession(f, console);
+                        const auto f = askOpenSession(hwnd, a.songFolder().empty() ? a.exportFolder() : a.songFolder());
+                        if (!f.empty()) a.openAny(f, console);
                     } else if (e.key == 'S') {
                         std::filesystem::path f = shift ? std::filesystem::path() : a.session;
                         if (f.empty()) f = askSaveFile(hwnd, L"Save session", L"Hybrid Core session", L"*.hcs", L"hcs", a.songFolder() / (a.songName() + L".hcs"));
