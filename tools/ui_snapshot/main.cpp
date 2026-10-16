@@ -287,7 +287,7 @@ int wmain(int argc, wchar_t** argv) {
         const auto refH = static_cast<std::uint32_t>(std::lround(ui::plate::kHeight * cv.scale));
         const ui::Image ref = (refW == art->master.width) ? art->master : ui::resizeSrgb(art->master, refW, refH);
         auto S = [&](float v) { return static_cast<int>(std::lround(v * cv.scale)); };
-        const double plateDiff = meanAbsDiff(shot, ref, S(1150), S(60), S(2400), S(175));          // top bar, between title and badge
+        const double plateDiff = meanAbsDiff(shot, ref, S(3095), S(60), S(3285), S(175));          // top bar, between the status line and the badge
         const double frameDiff = meanAbsDiff(shot, ref, 0, S(250), S(56), S(880));               // left neon frame (above the band)
         const double meterLit  = static_cast<double>(litPixels(shot, S(700), S(1500), S(3800), S(1935 + cv.extraH)));
         const double display   = regionStdDev(shot, S(2660), S(265), S(3700), S(430));
