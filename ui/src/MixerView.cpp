@@ -537,9 +537,13 @@ void MixerView::drawDynamic(Renderer& r, const ViewState& v, const MeterState& m
             const Rgba tint = w.index == 3 ? rgb8(0xFF7A1A) : kTabBlue;   // BEAT FORGE glows orange
             if (sel) {
                 const Rect f = w.rect.inset(8, 9);
-                r.fillRound(f, plate::kTabFaceRadius - 6, tint.withAlpha(0.62f), Blend::Over);
-                r.glow(f, plate::kTabFaceRadius - 6, 9, tint.withAlpha(0.45f), true);
-                r.text(TextStyle::Tab, cap, w.rect.cx(), baseline, rgb8(0xFFFFFF), Align::Center, TextFx::Shadowed);
+                // Dark glass with a coloured rim and coloured letters. Nothing here goes to the bloom
+                // pass: on some GPUs an emissive face washed out to near-white with white text on it.
+                r.fillRound(f, plate::kTabFaceRadius - 6, rgb8(0x0B0B0E).withAlpha(0.88f), Blend::Over);
+                r.fillRound(f, plate::kTabFaceRadius - 6, tint.withAlpha(0.22f), Blend::Over);
+                r.glow(f, plate::kTabFaceRadius - 6, 6, tint.withAlpha(0.55f), false);
+                r.text(TextStyle::Tab, cap, w.rect.cx(), baseline, w.index == 3 ? rgb8(0xFFB070) : rgb8(0x9CC4FF), Align::Center,
+                       TextFx::Shadowed);
             } else {
                 r.text(TextStyle::Tab, cap, w.rect.cx(), baseline, kEngrave, Align::Center, TextFx::Engraved);
             }

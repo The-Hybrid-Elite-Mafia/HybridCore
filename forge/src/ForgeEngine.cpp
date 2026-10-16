@@ -437,7 +437,7 @@ void ForgeEngine::endBlock(std::uint32_t frames) noexcept {
         const TrackParams& q = tp_[static_cast<std::size_t>(t)];
         float* L = trackBuf_.data() + static_cast<std::size_t>(2 * t) * maxBlock_;
         float* R = L + maxBlock_;
-        const float vg = dbToGain(kVoiceGainDb[t]);
+        const float vg = dbToGain(kVoiceGainDb[t] + kHeadroomDb);
         for (std::uint32_t s = 0; s < frames; ++s) { L[s] *= vg; R[s] *= vg; }
         // Post-fader sends: follow the strip's fader, mute and solo.
         const bool audible = !(q.stripMute && q.stripMute->isOn()) && (!soloed || (q.stripSolo && q.stripSolo->isOn()));

@@ -1,7 +1,7 @@
 #pragma once
 // =============================================================================
 //  ForgeController — the message-thread brain of BEAT FORGE in the app:
-//  GENERATE (every unlocked track), DICE (one track, same chords), UNDO (one step),
+//  GEN (every unlocked track), re-roll (one track, same chords), BACK (one step undo),
 //  CLEAR, the song form, and saving / restoring the song with its composer seeds.
 //  Songs reach the audio thread only through ForgeEngine::setSong() (lock-free).
 // =============================================================================

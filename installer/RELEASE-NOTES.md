@@ -1,3 +1,22 @@
+## The Hybrid Core — 0.11.2: fixes from the first test on Steven's PC
+
+Private test build for Steven's rig (Windows 10/11 x64, Intel i7-14700HX). Fixes what showed up when 0.11.1 ran on the real PC (Realtek speakers, WASAPI exclusive, 144 frames = 3.0 ms, DSP load 2.5-3.8 %, 0 dropouts).
+
+- **"Default output" now works:** when Windows' default device cannot run 48 kHz exclusive, the app uses the first output that can and shows "Default → <device>". Error messages say what is wrong in plain words.
+- **Selected page tab is readable on every graphics card:** dark glass with a coloured rim and coloured letters (it washed out to near-white on the PC).
+- **Beat Forge is 6 dB quieter going into the console:** a trap beat measured +4.7 to +5.6 dBFS before the console, so the Main limiter was always working. Now it peaks around -1 dBFS and the limiter is only a safety net. Turn Main up if you want it louder.
+- **Verses are thinner, hooks lift:** verses drop LEAD and PAD (except cinematic); the hook brings them in.
+- Re-roll / CLEAR messages say BACK (the button's name), not UNDO.
+- **EXPORT names a beat after itself** ("Beat Forge - TRAP 140 BPM.wav") and saves to Music\The Hybrid Core, then remembers the last folder you used.
+
+**Checked, not a bug:** the sharp sample-to-sample jumps in the PC export are the snare's noise, the kick's click layer and the hats (all by design); no glitch was found when each track was rendered on its own.
+
+**No ASIO devices on this PC:** the build has ASIO, but no ASIO driver is installed (Realtek doesn't ship one). An audio interface's driver will show up in the DEVICE list.
+
+Not code-signed: Windows SmartScreen will warn. Click "More info" → "Run anyway".
+
+---
+
 ## The Hybrid Core — 0.11.1: BEAT FORGE (your instrumental maker) rebuilt inside The Hybrid Core
 
 Private test build for Steven's rig (Windows 10/11 x64, Intel i7-14700HX). 0.11.1 = 0.11.0 with the OPEN / SAVE / EXPORT labels back to full size.

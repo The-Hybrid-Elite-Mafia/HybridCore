@@ -21,6 +21,7 @@
 
 #include <windows.h>
 #include <shellapi.h>
+#include <shlobj.h>
 #include <shobjidl.h>
 
 #include <algorithm>
@@ -266,13 +267,42 @@ struct App {
         }
         say(msg);
     }
+    // Where exports go when there is no session or stem folder: the last export folder, else
+    // Music\The Hybrid Core (created on first use).
+    [[nodiscard]] std::filesystem::path exportFolder() {
+        std::error_code ec;
+        const std::filesystem::path last(app::fromUtf8(settings.get("app", "exportDir")));
+        if (!last.empty() && std::filesystem::is_directory(last, ec)) return last;
+        PWSTR music = nullptr;
+        std::filesystem::path out;
+        if (SUCCEEDED(::SHGetKnownFolderPath(FOLDERID_Music, 0, nullptr, &music))) {
+            out = std::filesystem::path(music) / L"The Hybrid Core";
+            std::filesystem::create_directories(out, ec);
+            if (ec) out.clear();
+        }
+        ::CoTaskMemFree(music);
+        return out;
+    }
     void startExport(HWND owner) {
         if (exporter.busy()) { exporter.cancel(); return; }   // EXPORT while exporting = cancel
         const bool beat = forge && audio.forgeActive() && !forge->song().pattern.isEmpty();
         if (stems.loadedCount() == 0 && !beat) { say("Load stems or make a beat in BEAT FORGE before exporting"); return; }
+        std::filesystem::path folder = songFolder();
+        std::wstring name = songName() + L" - Mix";
+        if (folder.empty()) {
+            folder = exportFolder();
+            if (beat && session.empty()) {   // a Beat Forge beat on its own: "Beat Forge - TRAP 140 BPM"
+                const auto* g = tree.find(forge::id::genre);
+                const auto* b = tree.find(forge::id::bpm);
+                name = L"Beat Forge";
+                if (g) name += L" - " + app::fromUtf8(g->format());
+                if (b) name += L" " + std::to_wstring(static_cast<int>(std::lround(b->plain()))) + L" BPM";
+            }
+        }
         const auto target = askSaveFile(owner, L"Export the mix (WAV, 48 kHz, 24-bit)", L"WAV audio", L"*.wav", L"wav",
-                                        songFolder() / (songName() + L" - Mix.wav"));
+                                        folder / (name + L".wav"));
         if (target.empty()) return;
+        settings.set("app", "exportDir", app::toUtf8(target.parent_path().wstring()));
         media::ExportRequest req;
         for (std::uint32_t s = 0; s < kStemCount; ++s)
             if (!stems.slot(s).name.empty()) req.stems[s] = stems.slot(s).file;
@@ -347,7 +377,7 @@ struct App {
     }
     void forgeReroll(int track) {
         forge->reroll(track);
-        say(std::string("BEAT FORGE  \xC2\xB7  new ") + forge::kTrackNames[track] + " part (UNDO takes it back)");
+        say(std::string("BEAT FORGE  \xC2\xB7  new ") + forge::kTrackNames[track] + " part (BACK undoes it)");
     }
     // Transport. Any transport command switches the source to the loaded stems.
     void playPause() {
@@ -508,7 +538,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                 }
                 case ui::UiAction::ForgeGenerate: a.forgeGenerate(); break;
                 case ui::UiAction::ForgeUndo:     a.forge->undo(); a.say(a.forge->canUndo() ? "" : "BEAT FORGE  \xC2\xB7  undone"); break;
-                case ui::UiAction::ForgeClear:    a.forge->clear(); a.say("BEAT FORGE  \xC2\xB7  pattern cleared (UNDO brings it back)"); break;
+                case ui::UiAction::ForgeClear:    a.forge->clear(); a.say("BEAT FORGE  \xC2\xB7  pattern cleared (BACK brings it back)"); break;
                 case ui::UiAction::CycleSource: {
                     const Source s = a.audio.source();
                     a.audio.setSource(s == Source::TestTones ? Source::Hardware : s == Source::Hardware ? Source::Stems : Source::TestTones);

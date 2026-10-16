@@ -766,8 +766,9 @@ std::uint8_t maskFor (int genre, Section kind)
             if (genre == cinematic) return bit (pad) | bit (keys);
             if (urban) return bit (keys) | bit (pad) | bit (lead);
             return bit (keys) | bit (perc);                                   // country / folk / gospel: the band counts in
-        case kVerse:
-            return static_cast<std::uint8_t> (kAll & ~bit (lead));            // leave room for the voice
+        case kVerse:   // leave room for the voice; the hook brings lead + pad in for the lift
+            if (genre == cinematic) return static_cast<std::uint8_t> (kAll & ~bit (lead));
+            return static_cast<std::uint8_t> (kAll & ~(bit (lead) | bit (pad)));
         case kHook:
             return kAll;
         case kBridge:
@@ -803,7 +804,7 @@ Arrangement Composer::arrange (int genre, const Pattern& pattern, uint32_t seed,
         {
             ++verseNo;
             if (verseNo == 1 && rng.chance (0.5 * variation + 0.2)) m &= static_cast<std::uint8_t> (~bit (perc));   // first verse a bit thinner
-            if (verseNo >= 2 && rng.chance (0.4 * variation)) m &= static_cast<std::uint8_t> (~bit (pad));
+            if (verseNo >= 2 && genre != cinematic && rng.chance (0.4 * variation)) m |= bit (pad);   // a later verse may keep the pad
         }
         if (sp.kind == kIntro && urban && rng.chance (0.5)) m |= bit (hats);
         if ((m & present) == 0) m = kAll;   // the section would be silent: play everything

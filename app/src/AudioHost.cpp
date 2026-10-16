@@ -79,13 +79,39 @@ bool AudioHost::open(const DeviceChoice& choice) {
     char buf[256];
 
     if (choice.kind == DeviceChoice::Kind::Wasapi) {
-        wasapi_ = std::make_unique<io::WasapiExclusiveOutput>();
-        io::WasapiExclusiveOutput::Options opt;
-        opt.deviceId = choice.id;
-        auto cfg = wasapi_->open(opt, engine_);
+        auto tryOpen = [&](const std::wstring& id) {
+            wasapi_ = std::make_unique<io::WasapiExclusiveOutput>();
+            io::WasapiExclusiveOutput::Options opt;
+            opt.deviceId = id;
+            return wasapi_->open(opt, engine_);
+        };
+        auto cfg = tryOpen(choice.id);
+        if (!cfg && choice.id.empty()) {
+            // Windows' default output can be a device that has no 48 kHz exclusive mode (HDMI, a
+            // monitor, Bluetooth). Fall back to the first output that does, and say which one.
+            if (auto eps = io::enumerateWasapi()) {
+                for (const auto& ep : *eps) {
+                    if (ep.flow != io::Flow::Render || ep.id.empty()) continue;
+                    if (!(ep.excl48kFloat32 || ep.excl48kInt24in32 || ep.excl48kInt16)) continue;
+                    wasapi_->close();
+                    auto again = tryOpen(ep.id);
+                    if (again) {
+                        cfg = std::move(again);
+                        status_.device = "Default â " + toUtf8(ep.name);
+                        status_.deviceName = toUtf8(ep.name);
+                        break;
+                    }
+                }
+            }
+        }
         if (!cfg) {
-            std::snprintf(buf, sizeof(buf), "WASAPI exclusive open failed at %s (0x%08lX) - is another app using the device?",
-                          cfg.error().stage, static_cast<unsigned long>(cfg.error().code));
+            const auto code = static_cast<unsigned long>(cfg.error().code);
+            if (code == 0x88890008ul)   // AUDCLNT_E_UNSUPPORTED_FORMAT
+                std::snprintf(buf, sizeof(buf), "This output cannot play 48 kHz in exclusive mode - pick another device with the DEVICE arrows");
+            else if (code == 0x8889000Aul)   // AUDCLNT_E_DEVICE_IN_USE
+                std::snprintf(buf, sizeof(buf), "Another app is using this output in exclusive mode - close it or pick another device");
+            else
+                std::snprintf(buf, sizeof(buf), "WASAPI exclusive open failed at %s (0x%08lX)", cfg.error().stage, code);
             problem_ = buf;
             wasapi_.reset();
             status_.alert = true;

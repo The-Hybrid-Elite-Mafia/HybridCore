@@ -59,6 +59,10 @@ inline constexpr double kDelaySteps[kDelayChoices] = {1, 2, 3, 4, 6, 8};   // in
 // Fixed per-track voice gain (dB) so the console's faders at 0 dB give a balanced beat
 // (Hybrid Studio's default track levels).
 inline constexpr float kVoiceGainDb[kTracks] = {-1.0f, -1.0f, -5.0f, -7.0f, -3.0f, -9.0f, -10.0f, -13.0f};
+// Headroom for the whole beat. Measured before this (TRAP, 6 songs, faders at 0 dB): peaks
+// +4.7 .. +5.6 dBFS before the console, so Main's limiter was always working. -6 dB leaves the
+// beat peaking around -1 dBFS and the limiter as a safety net only.
+inline constexpr float kHeadroomDb = -6.0f;
 inline constexpr float kRevSendDefault[kTracks] = {0, 12, 0, 15, 0, 25, 20, 35};   // %
 inline constexpr float kDlySendDefault[kTracks] = {0, 0, 0, 0, 0, 10, 15, 0};      // %
 
