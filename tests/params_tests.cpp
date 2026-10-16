@@ -26,9 +26,10 @@ void testParams() {
     std::printf("[parameters]\n");
     params::ParameterTree tree;
     params::addMixerParameters(tree);
-    const std::size_t expected = dsp::StemMatrix::kStems * 9 + dsp::StemMatrix::kBuses * 2;
+    // 0.7: 13 stems x 9 + 4 buses x 2; 0.8 appended 13 x 10 (EQ + compressor) + 2 (main limiter).
+    const std::size_t expected = dsp::StemMatrix::kStems * 9 + dsp::StemMatrix::kBuses * 2 + dsp::StemMatrix::kStems * 10 + 2;
     CHECK(tree.size() == expected);
-    std::printf("  mixer parameters: %zu (13 stems x 9 + 4 buses x 2)\n", tree.size());
+    std::printf("  mixer parameters: %zu (13 stems x 19 + 4 buses x 2 + limiter 2)\n", tree.size());
 
     params::Parameter* main1 = tree.find("stem01.main");
     params::Parameter* pan1  = tree.find("stem01.pan");
