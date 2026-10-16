@@ -32,6 +32,7 @@ SolidCompression=yes
 WizardStyle=modern
 UninstallDisplayName=The Hybrid Core
 CloseApplications=yes
+ChangesAssociations=yes
 
 ; Settings: the app keeps them in %APPDATA%\HybridCore (settings.ini, skins\, texcache\).
 ; This installer never creates, overwrites or deletes that folder, so settings survive
@@ -74,6 +75,14 @@ Name: "{group}\Diagnostics\4 - Engine Self-Test";      Filename: "{cmd}"; Parame
 Name: "{group}\Diagnostics\5 - Screen Snapshots";      Filename: "{cmd}"; Parameters: "/k """"{app}\bin\hc_ui_snapshot.exe"""""; WorkingDir: "{app}\bin"
 Name: "{group}\How to test";                   Filename: "{app}\HOW-TO-TEST.txt"
 Name: "{group}\Uninstall The Hybrid Core";     Filename: "{uninstallexe}"
+
+[Registry]
+; .hcs session files open in The Hybrid Core (double-click in Explorer).
+Root: HKA; Subkey: "Software\Classes\.hcs";                                  ValueType: string; ValueName: "";                   ValueData: "HybridCore.Session"; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\.hcs\OpenWithProgids";                 ValueType: string; ValueName: "HybridCore.Session"; ValueData: "";                   Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\HybridCore.Session";                     ValueType: string; ValueName: "";                   ValueData: "Hybrid Core Session"; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\HybridCore.Session\DefaultIcon";        ValueType: string; ValueName: "";                   ValueData: "{app}\HybridCore.exe,0"
+Root: HKA; Subkey: "Software\Classes\HybridCore.Session\shell\open\command"; ValueType: string; ValueName: "";                   ValueData: """{app}\HybridCore.exe"" ""%1"""
 
 [Run]
 Filename: "{app}\HOW-TO-TEST.txt"; Description: "Show how to test"; Flags: postinstall shellexec skipifsilent unchecked

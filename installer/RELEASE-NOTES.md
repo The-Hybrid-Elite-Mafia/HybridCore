@@ -1,3 +1,21 @@
+## The Hybrid Core — 0.10.0: Phase 10 — all ten roadmap phases built (1.0 after it is proven on the rig)
+
+Private test build for Steven's rig (Windows 10/11 x64, Intel i7-14700HX).
+
+**New in 0.10.0**
+- Double-click a **.hcs** session in Explorer to open it. If the console is already open, the song opens in that window (only one console runs at a time, so two never fight over the sound card).
+- Version in the title bar.
+
+**Everything since 0.6** (one place): transport + song overview (0.7) · EQ, compressor on every stem + main limiter (0.8) · sessions + WAV export (0.9).
+
+**Verified in CI** (GitHub Windows Server 2022 — no sound card, software GPU): build with 0 compiler warnings, all unit tests, VST3 validator, UI snapshots with real stems playing, the real app starting, installer install / upgrade / uninstall including the .hcs association.
+
+**Not tested yet:** everything that needs your hardware or your hands — sound on your speakers and ASIO driver, your graphics card, the open / save / export dialogs, double-clicking a session, the plug-in in a DAW.
+
+Not code-signed: Windows SmartScreen will warn. Click "More info" → "Run anyway".
+
+---
+
 ## The Hybrid Core — 0.9.0: Phase 9 sessions (save / open) + WAV export
 
 Private test build for Steven's rig (Windows 10/11 x64, Intel i7-14700HX).

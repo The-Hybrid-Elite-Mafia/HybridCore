@@ -16,7 +16,8 @@ Turn your speakers/headphones DOWN first. Close any app that is playing audio
        SAVE    keeps the song as a .hcs session file: which stems are loaded, every knob, fader
                and button, loop, and where the song was. Keep it in the song's folder: if you
                move or copy the whole folder, it still finds the stems.
-       OPEN    loads a session back (stems reload in the background).
+       OPEN    loads a session back (stems reload in the background). Double-clicking a .hcs
+               file in Explorer opens it too (if the console is already open, it opens there).
        EXPORT  renders the mix to a WAV file (48 kHz, 24-bit) exactly as long as the song,
                with everything you set: EQ, compressors, faders, mutes, limiter. It runs in the
                background (the button shows %); press EXPORT again to cancel. The music keeps

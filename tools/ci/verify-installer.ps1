@@ -29,6 +29,11 @@ foreach ($f in 'HybridCore.exe','bin\hc_device_probe.exe','bin\hc_engine_smoke.e
 Check (Test-Path (Join-Path $desktop 'The Hybrid Core.lnk')) 'desktop shortcut'
 $vstDll = Get-ChildItem $vst3 -Recurse -Filter '*.vst3' -File -ErrorAction SilentlyContinue | Select-Object -First 1
 Check ($null -ne $vstDll) "VST3 plug-in installed in $vst3"
+$assoc = 'Registry::HKEY_LOCAL_MACHINE\Software\Classes\HybridCore.Session\shell\open\command'
+$cmd = (Get-ItemProperty -Path $assoc -ErrorAction SilentlyContinue).'(default)'
+Check ($cmd -like '*HybridCore.exe*%1*') ".hcs sessions open with HybridCore.exe ($cmd)"
+$ext = (Get-ItemProperty -Path 'Registry::HKEY_LOCAL_MACHINE\Software\Classes\.hcs' -ErrorAction SilentlyContinue).'(default)'
+Check ($ext -eq 'HybridCore.Session') '.hcs extension registered'
 
 $out = & (Join-Path $app 'bin\hc_tests.exe') 2>&1 | Out-String
 Check ($LASTEXITCODE -eq 0 -and $out -match '0 failed -> PASS') 'installed hc_tests.exe passes'
@@ -45,6 +50,7 @@ Start-Sleep -Seconds 3
 Check ($p.ExitCode -eq 0) 'silent uninstall exit code 0'
 Check (-not (Test-Path (Join-Path $app 'HybridCore.exe'))) 'program files removed on uninstall'
 Check (-not (Test-Path $vst3)) 'VST3 plug-in removed on uninstall'
+Check (-not (Test-Path 'Registry::HKEY_LOCAL_MACHINE\Software\Classes\HybridCore.Session')) '.hcs association removed on uninstall'
 Check (Test-Path $marker) 'settings kept after uninstall'
 
 Write-Host ""

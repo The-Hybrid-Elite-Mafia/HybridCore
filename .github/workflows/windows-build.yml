@@ -87,6 +87,8 @@ jobs:
           GALLIUM_DRIVER: llvmpipe
         run: |
           tools\ci\run-and-report.ps1 -Title "app: smoke run" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\run-app-smoke.ps1','-Exe','build\rig-full\app\Release\HybridCore.exe','-Shot','shots\app_window.png'
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          tools\ci\run-and-report.ps1 -Title "app: open a session from the command line" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\run-app-smoke.ps1','-Exe','build\rig-full\app\Release\HybridCore.exe','-Shot','shots\app_session.png','-StemsDir','tests\data'
 
       - name: Publish screenshots to the ci-screenshots branch
         if: github.ref == 'refs/heads/main'

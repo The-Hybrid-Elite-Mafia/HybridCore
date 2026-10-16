@@ -355,9 +355,42 @@ std::string formatLine(const app::HostStatus& st, const std::string& source) {
 
 } // namespace
 
+// The visible console window of a HybridCore.exe that is already running (nullptr if none).
+HWND findRunningConsole() {
+    struct Find { HWND hit = nullptr; } f;
+    ::EnumWindows([](HWND h, LPARAM lp) -> BOOL {
+        wchar_t cls[64] = {};
+        ::GetClassNameW(h, cls, 64);
+        if (std::wstring(cls) == ui::GlWindow::className() && ::IsWindowVisible(h)) {
+            reinterpret_cast<Find*>(lp)->hit = h;
+            return FALSE;
+        }
+        return TRUE;
+    }, reinterpret_cast<LPARAM>(&f));
+    return f.hit;
+}
+
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     ::SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     const Options opts = parseOptions();
+
+    // One console at a time (two would fight over the sound card). A second start — e.g. a
+    // double-clicked .hcs — hands its session to the running one and brings it to the front.
+    // Test runs (--exit-after) are exempt.
+    HANDLE instance = ::CreateMutexW(nullptr, FALSE, L"Local\\HybridCore.Console");
+    if (instance && ::GetLastError() == ERROR_ALREADY_EXISTS && opts.exitAfter <= 0.0) {
+        if (HWND other = findRunningConsole()) {
+            if (!opts.session.empty()) {
+                const std::wstring p = std::filesystem::absolute(opts.session).wstring();
+                COPYDATASTRUCT cd{ui::GlWindow::kOpenFileTag, static_cast<DWORD>((p.size() + 1) * sizeof(wchar_t)), const_cast<wchar_t*>(p.c_str())};
+                DWORD_PTR result = 0;
+                ::SendMessageTimeoutW(other, WM_COPYDATA, 0, reinterpret_cast<LPARAM>(&cd), SMTO_ABORTIFHUNG, 5000, &result);
+            }
+            if (::IsIconic(other)) ::ShowWindow(other, SW_RESTORE);
+            ::SetForegroundWindow(other);
+        }
+        return 0;
+    }
     rt::configureProcessForAudio();
     io::ComApartment com(io::Apartment::SingleThreaded);   // ASIO drivers want an STA with a message pump
 
@@ -510,6 +543,9 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                     a.stems.clear(static_cast<std::uint32_t>(at));
                 break;
             }
+            case ui::InputEvent::Type::OpenFile:   // a .hcs double-clicked while the console was already open
+                if (!e.files.empty()) a.openSession(e.files.front(), console);
+                break;
             case ui::InputEvent::Type::Resize:
             case ui::InputEvent::Type::Close:     break;
             }
