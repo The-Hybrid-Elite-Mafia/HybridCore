@@ -293,7 +293,7 @@ void MixerView::drawButton(Renderer& r, const Widget& w, bool pressed) const {
     drawCap(r, w.rect, w.caption, prm.isOn(), pressed, lit);
 }
 
-void MixerView::drawCap(Renderer& r, Rect b, const std::string& caption, bool on, bool pressed, Rgba lit) const {
+void MixerView::drawCap(Renderer& r, Rect b, const std::string& caption, bool on, bool pressed, Rgba lit, bool bigText) const {
     const bool  in  = on || pressed;
     const float px  = r.pixelSize();
     // Pushed in: 1.5 px down-right, shadow shrinks.
@@ -305,7 +305,7 @@ void MixerView::drawCap(Renderer& r, Rect b, const std::string& caption, bool on
                    b.w * 128.0f / 116.0f, b.h * 96.0f / 84.0f};
     r.sprite(Sprite::ButtonCap, cap, in ? Rgba{0.86f, 0.86f, 0.86f, 1} : Rgba{1, 1, 1, 1});
     // Words (LOCK, GEN, UNDO...) use the smaller caption type so they fit the cap.
-    const TextStyle ts = caption.size() > 2 && caption != "\xC3\x98" ? TextStyle::Caption : TextStyle::Button;
+    const TextStyle ts = bigText || caption.size() <= 2 ? TextStyle::Button : TextStyle::Caption;
     const float bl = b.cy() + r.capHeight(ts) * 0.5f + push;
     if (on) {
         r.sprite(Sprite::ButtonLens, cap, lit.withAlpha(0.95f), Blend::Over, true);
@@ -526,7 +526,7 @@ void MixerView::drawDynamic(Renderer& r, const ViewState& v, const MeterState& m
         case WidgetKind::Command: {   // OPEN / SAVE / EXPORT in the top bar
             const bool exporting = w.action == UiAction::ExportMix && v.exportProgress >= 0.0f;
             const std::string cap = exporting ? fmt("%.0f%%", 100.0 * v.exportProgress) : w.caption;
-            drawCap(r, w.rect, cap, exporting, static_cast<int>(i) == v.pressed, kLitAmber);
+            drawCap(r, w.rect, cap, exporting, static_cast<int>(i) == v.pressed, kLitAmber, true);
             break;
         }
         case WidgetKind::Transport: drawTransport(r, w, v); break;

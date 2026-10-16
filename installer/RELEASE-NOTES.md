@@ -1,6 +1,6 @@
-## The Hybrid Core — 0.11.0: BEAT FORGE (your instrumental maker) rebuilt inside The Hybrid Core
+## The Hybrid Core — 0.11.1: BEAT FORGE (your instrumental maker) rebuilt inside The Hybrid Core
 
-Private test build for Steven's rig (Windows 10/11 x64, Intel i7-14700HX).
+Private test build for Steven's rig (Windows 10/11 x64, Intel i7-14700HX). 0.11.1 = 0.11.0 with the OPEN / SAVE / EXPORT labels back to full size.
 
 Beat Forge comes from Hybrid Studio 2.0.9 (that code is untouched in its own repo). It was rebuilt here without JUCE and improved:
 

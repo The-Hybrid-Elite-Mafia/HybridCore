@@ -102,7 +102,7 @@ private:
     void drawKnobStatic(Renderer& r, const Widget& w) const;
     void drawKnob(Renderer& r, const Widget& w, Rgba accent, bool hot) const;
     void drawButton(Renderer& r, const Widget& w, bool pressed) const;
-    void drawCap(Renderer& r, Rect b, const std::string& caption, bool on, bool pressed, Rgba lit) const;
+    void drawCap(Renderer& r, Rect b, const std::string& caption, bool on, bool pressed, Rgba lit, bool bigText = false) const;
     void drawFader(Renderer& r, const StripLayout& st, Rgba lineColour) const;
     void drawMeterColumn(Renderer& r, Rect col, float level, float hold, bool lit) const;
     void drawMeterRow(Renderer& r, Rect row, float level, float hold, bool lit) const;
