@@ -8,7 +8,8 @@ add_library(hc_media STATIC
     src/StemLoader.cpp
     src/DrLibsImpl.cpp
     src/Session.cpp
-    src/MixExporter.cpp)
+    src/MixExporter.cpp
+    src/Loudness.cpp)
 add_library(hc::media ALIAS hc_media)
 
 target_include_directories(hc_media PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")

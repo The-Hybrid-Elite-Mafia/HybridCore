@@ -1,3 +1,12 @@
+## The Hybrid Core — 0.11.4: exports at song loudness, hooks that hit harder
+
+- **EXPORT now makes the WAV as loud as a finished song** (-14 LUFS, the level Spotify / YouTube play at), with a limiter keeping peaks at -1 dB so nothing distorts or clips. A mix that is already that loud or louder is left exactly as it is. The message after export shows the loudness and how much it was raised. Playback in the app is not changed. (To turn it off: settings.ini, section [export], master=0.)
+- **Hooks hit harder:** in the verses, kick / snare / 808 play a little softer, hats softer still, and the percussion waits for the hook (trap, pop trap, drill, boom bap). Measured on 6 trap beats: hooks are about 2 dB louder than verses (was 0.2 dB).
+
+Measured on the beat exported on your PC in 0.11.3: -17.8 LUFS before; the new export step brings that same mix to -14.3 LUFS, peak -1.0 dB (limiter working up to about 6 dB on the loudest hits).
+
+---
+
 ## The Hybrid Core — 0.11.3: selected page tab, second try
 
 0.11.2's tab fix didn't work: the tab's glow also filled its inside, so it still showed bright blue on your PC. In 0.11.3 the selected tab is a dark face with a coloured rim and coloured letters (blue for MIX / EQ / DYNAMICS, orange for BEAT FORGE). Everything else is the same as 0.11.2.

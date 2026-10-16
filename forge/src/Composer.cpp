@@ -768,6 +768,7 @@ std::uint8_t maskFor (int genre, Section kind)
             return bit (keys) | bit (perc);                                   // country / folk / gospel: the band counts in
         case kVerse:   // leave room for the voice; the hook brings lead + pad in for the lift
             if (genre == cinematic) return static_cast<std::uint8_t> (kAll & ~bit (lead));
+            if (urban) return static_cast<std::uint8_t> (kAll & ~(bit (lead) | bit (pad) | bit (perc)));   // perc comes in with the hook
             return static_cast<std::uint8_t> (kAll & ~(bit (lead) | bit (pad)));
         case kHook:
             return kAll;

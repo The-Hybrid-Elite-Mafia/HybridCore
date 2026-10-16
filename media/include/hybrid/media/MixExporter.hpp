@@ -9,10 +9,12 @@
 //  Output: the Main bus, 48 kHz stereo, 24-bit PCM (rounded) or 32-bit float, exactly
 //  as long as the longest stem (or the Beat Forge song, plus 2 s for its reverb / delay tails),
 //  starting on its first sample (the limiter look-ahead is compensated; no fade-in).
+//  Optional last step: raise the mix to a loudness target (see Loudness.hpp).
 //  Rendering never touches the live audio thread.
 // =============================================================================
 #include "hybrid/core/Config.hpp"
 #include "hybrid/media/AudioFile.hpp"
+#include "hybrid/media/Loudness.hpp"
 
 #include <array>
 #include <atomic>
@@ -31,6 +33,10 @@ struct ExportRequest {
     std::string           forgeSong;                             // forge::songToText(); used when forge.on
     std::filesystem::path out;
     WavEncoding           encoding = WavEncoding::Pcm24;
+    // Loudness step after the render: raise a quiet mix to masterSettings.targetLufs with a
+    // limiter at the ceiling (never turns a loud mix down). Off = the file is the Main bus as-is.
+    bool                  master = false;
+    MasterSettings        masterSettings{};
 };
 
 struct ExportResult {
@@ -40,6 +46,7 @@ struct ExportResult {
     std::uint64_t clipped  = 0;      // samples over full scale (only possible with the limiter off; PCM clips them)
     double        seconds  = 0.0;    // wall time
     std::string   warning;           // e.g. stems that could not be read
+    MasterResult  master;            // loudness before / after (lufsBefore is measured even with master off)
 };
 
 // Synchronous render (used by the exporter thread and the tests). progress(0..1) may cancel.

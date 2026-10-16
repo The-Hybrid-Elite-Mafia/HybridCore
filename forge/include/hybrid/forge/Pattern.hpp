@@ -73,6 +73,15 @@ struct Pattern {
 enum Section : std::uint8_t { kIntro = 0, kVerse, kHook, kBridge, kDrop, kOutro, kSections };
 inline constexpr const char* kSectionNames[kSections] = {"INTRO", "VERSE", "HOOK", "BRIDGE", "DROP", "OUTRO"};
 
+// How hard each track plays in a section of the full song (scales the note velocity).
+// Verses sit back so the hook jumps out: drums and bass softer, hats softer still.
+[[nodiscard]] constexpr float sectionVelocity(int section, int track) noexcept {
+    if (section != kVerse) return 1.0f;
+    if (track == hats) return 0.75f;
+    if (track == kick || track == snare || track == bass) return 0.85f;
+    return 1.0f;
+}
+
 struct Arrangement {
     int bars = 0;
     std::array<std::uint8_t, kMaxSongBars> mask{};      // bit t set = track t plays in that bar

@@ -391,13 +391,16 @@ void ForgeEngine::render(std::uint32_t at, std::uint32_t n, std::uint64_t songPo
                     const bool odd = std::fabs(static_cast<double>(it->start) - r) < 0.2 && (static_cast<std::int64_t>(r) & 1) != 0;
                     const double eff = static_cast<double>(it->start) + (odd ? swing : 0.0);
                     if (eff < lo || eff >= hi) continue;
-                    if (full) {   // the arrangement decides which tracks play in this bar
+                    std::uint8_t vel = it->velocity;
+                    if (full) {   // the arrangement decides which tracks play in this bar, and how hard
                         const auto bar = static_cast<std::int64_t>((base + eff) / kStepsPerBar);
                         if (bar >= song.arrangement.bars || ((song.arrangement.mask[static_cast<std::size_t>(bar)] >> t) & 1u) == 0) continue;
+                        const float k = sectionVelocity(song.arrangement.section[static_cast<std::size_t>(bar)], t);
+                        vel = static_cast<std::uint8_t>(std::clamp(static_cast<int>(std::lround(static_cast<float>(vel) * k)), 1, 127));
                     }
                     const auto off = static_cast<std::int64_t>(std::floor((base + eff) * stepLen_ - static_cast<double>(songPos)));
                     events_[static_cast<std::size_t>(count++)] = {at + static_cast<std::uint32_t>(std::clamp<std::int64_t>(off, 0, n - 1)), t,
-                                                                  static_cast<int>(std::max(1.0, static_cast<double>(it->length) * stepLen_)), it->pitch, it->velocity};
+                                                                  static_cast<int>(std::max(1.0, static_cast<double>(it->length) * stepLen_)), it->pitch, vel};
                 }
             }
         }

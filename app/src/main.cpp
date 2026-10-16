@@ -310,6 +310,9 @@ struct App {
         if (beat) req.forgeSong = forge->songText();
         req.out      = target;
         req.encoding = media::WavEncoding::Pcm24;
+        // Song-level loudness on export (settings.ini [export] master=0 turns it off, target=-14 sets the level).
+        req.master = settings.get("export", "master", "1") != "0";
+        req.masterSettings.targetLufs = std::clamp(std::atof(settings.get("export", "target", "-14").c_str()), -30.0, -6.0);
         if (exporter.start(std::move(req))) say("Exporting " + app::toUtf8(target.filename().wstring()) + "...");
     }
     void pollExport() {
@@ -321,9 +324,13 @@ struct App {
         }
         const media::ExportResult& x = **r;
         char b[160];
-        std::snprintf(b, sizeof b, " (%s, peak %.1f dBFS, %.1f s)", fmtTime(static_cast<double>(x.frames) / kSampleRate).c_str(),
-                      x.peak > 0 ? 20.0 * std::log10(x.peak) : -144.0, x.seconds);
+        std::snprintf(b, sizeof b, " (%s, %.1f LUFS, peak %.1f dBFS)", fmtTime(static_cast<double>(x.frames) / kSampleRate).c_str(),
+                      x.master.lufsAfter, x.peak > 0 ? 20.0 * std::log10(x.peak) : -144.0);
         std::string msg = "Exported " + app::toUtf8(x.file.filename().wstring()) + b;
+        if (x.master.gainDb > 0.05) {
+            std::snprintf(b, sizeof b, "  \xC2\xB7  raised %.1f dB to song level", x.master.gainDb);
+            msg += b;
+        }
         if (x.clipped) msg += "  \xC2\xB7  " + std::to_string(x.clipped) + " samples clipped (turn LIM on)";
         if (!x.warning.empty()) msg += "  \xC2\xB7  " + x.warning;
         say(msg);

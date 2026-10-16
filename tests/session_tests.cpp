@@ -4,6 +4,7 @@
 
 #include "hybrid/core/Config.hpp"
 #include "hybrid/media/AudioFile.hpp"
+#include "hybrid/media/Loudness.hpp"
 #include "hybrid/media/MixExporter.hpp"
 #include "hybrid/media/Session.hpp"
 #include "hybrid/params/MixerParams.hpp"
@@ -15,6 +16,7 @@
 #include <fstream>
 #include <iterator>
 #include <numbers>
+#include <random>
 #include <thread>
 #include <vector>
 
@@ -188,6 +190,70 @@ void testExport() {
     std::error_code ec;
     CHECK(!fs::exists(dir / "bg.wav.part", ec));
     fs::remove_all(dir, ec);
+}
+
+
+// Loudness meter (BS.1770 / EBU R128 reference cases) and the export loudness step.
+void testLoudness() {
+    std::printf("[loudness: meter + export master]\n");
+    using namespace hc::media;
+    constexpr double fs = 48000.0;
+    const std::size_t n = static_cast<std::size_t>(fs * 10);
+
+    // EBU Tech 3341 case 1: stereo 997 Hz sine at -23 dBFS reads -23.0 LUFS (+-0.1).
+    const auto ref = sine(n, 997.0, static_cast<float>(std::pow(10.0, -23.0 / 20.0)));
+    const double l23 = integratedLufs(ref.data(), ref.data(), n, fs);
+    std::printf("  997 Hz at -23 dBFS (stereo): %.2f LUFS (expect -23.0)\n", l23);
+    CHECK(std::fabs(l23 + 23.0) <= 0.1);
+    // Silence after the tone sits under the -70 LUFS gate: still -23.0.
+    std::vector<float> gated(ref);
+    gated.resize(2 * n, 0.0f);
+    const double lg = integratedLufs(gated.data(), gated.data(), gated.size(), fs);
+    std::printf("  same tone + 10 s of silence: %.2f LUFS (gate keeps -23.0)\n", lg);
+    CHECK(std::fabs(lg + 23.0) <= 0.1);
+    const std::vector<float> zero(n, 0.0f);
+    CHECK(integratedLufs(zero.data(), zero.data(), n, fs) <= kSilentLufs);
+    CHECK(integratedLufs(ref.data(), ref.data(), 1000, fs) <= kSilentLufs);   // shorter than one block
+
+    // A quiet "beat": noise bursts + a low sine, peaks hit hard.
+    std::mt19937 rng(7);
+    std::normal_distribution<float> nd(0.0f, 1.0f);
+    std::vector<float> L(n), R(n);
+    for (std::size_t i = 0; i < n; ++i) {
+        const double t = static_cast<double>(i) / fs;
+        const double beat = std::fmod(t, 0.5);
+        const float hit = beat < 0.08 ? static_cast<float>(std::exp(-beat * 40.0)) : 0.0f;
+        const float body = 0.3f * static_cast<float>(std::sin(2.0 * std::numbers::pi * 55.0 * t));
+        L[i] = 0.35f * (body + 0.4f * hit * nd(rng));
+        R[i] = 0.35f * (body + 0.4f * hit * nd(rng));
+    }
+    std::vector<float> L0(L), R0(R);
+    const MasterResult m = masterToLoudness(L, R, fs, {});
+    float pk = 0.0f;
+    for (std::size_t i = 0; i < n; ++i) pk = std::max({pk, std::fabs(L[i]), std::fabs(R[i])});
+    std::printf("  quiet mix %.1f LUFS -> %.1f LUFS, gain +%.1f dB, limiter %.1f dB, peak %.2f dBFS\n", m.lufsBefore, m.lufsAfter, m.gainDb,
+                m.limitDb, 20.0 * std::log10(pk));
+    CHECK(m.gainDb > 0.0 && std::fabs(m.lufsAfter + 14.0) <= 0.5);
+    CHECK(pk <= std::pow(10.0f, -1.0f / 20.0f) + 1.0e-4f);
+    CHECK(std::fabs(integratedLufs(L.data(), R.data(), n, fs) - m.lufsAfter) < 1.0e-9);
+
+    // Already loud: left exactly as it was (never turned down).
+    for (auto& v : L0) v *= 6.0f;
+    for (auto& v : R0) v *= 6.0f;
+    const std::vector<float> keepL(L0), keepR(R0);
+    const MasterResult loud = masterToLoudness(L0, R0, fs, {});
+    CHECK(loud.gainDb == 0.0 && L0 == keepL && R0 == keepR);
+
+    // Very quiet: gain capped at +12 dB; the limiter stays idle, so the output is the input
+    // times the gain, sample for sample (look-ahead compensated, nothing shifted in time).
+    auto qL = sine(n, 440.0, 0.01f), qR = sine(n, 330.0, 0.01f);
+    const auto inL = qL, inR = qR;
+    const MasterResult q = masterToLoudness(qL, qR, fs, {});
+    const float g = static_cast<float>(std::pow(10.0, q.gainDb / 20.0));
+    float worst = 0.0f;
+    for (std::size_t i = 0; i < n; ++i) worst = std::max({worst, std::fabs(qL[i] - inL[i] * g), std::fabs(qR[i] - inR[i] * g)});
+    std::printf("  quiet sine: gain +%.1f dB (cap 12), largest sample error %.1e\n", q.gainDb, static_cast<double>(worst));
+    CHECK(std::fabs(q.gainDb - 12.0) < 1.0e-9 && worst < 1.0e-5f);
 }
 
 } // namespace hc::test

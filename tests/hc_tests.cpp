@@ -219,6 +219,7 @@ int main(int argc, char** argv) {
     testTransport();
     testSession();
     testExport();
+    testLoudness();
     testForgeComposer();
     testForgeEngine();
     testForgeInMixer();

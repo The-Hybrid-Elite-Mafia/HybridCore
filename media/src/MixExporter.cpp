@@ -95,6 +95,12 @@ std::expected<ExportResult, std::string> renderMix(const ExportRequest& req, con
         res.file    = req.out;
         res.frames  = song;
         res.warning = warning;
+        if (req.master) {
+            res.master = masterToLoudness(L, R, hc::kSampleRate, req.masterSettings);
+        } else {
+            res.master.lufsBefore = res.master.lufsAfter = integratedLufs(L.data(), R.data(), L.size(), hc::kSampleRate);
+        }
+        if (!report(0.97f)) return std::unexpected(std::string("cancelled"));
         for (std::size_t i = 0; i < L.size(); ++i) {
             const float a = std::max(std::fabs(L[i]), std::fabs(R[i]));
             res.peak = std::max(res.peak, a);
