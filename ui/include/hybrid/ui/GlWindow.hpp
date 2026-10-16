@@ -13,7 +13,7 @@
 namespace hc::ui {
 
 struct InputEvent {
-    enum class Type : std::uint8_t { MouseDown, MouseUp, MouseMove, Wheel, Resize, Close, RightDown, Drop, Key };
+    enum class Type : std::uint8_t { MouseDown, MouseUp, MouseMove, Wheel, Resize, Close, RightDown, Drop, Key, OpenFile };
     Type  type        = Type::MouseMove;
     float x           = 0.0f;   // client pixels
     float y           = 0.0f;
@@ -22,7 +22,7 @@ struct InputEvent {
     bool  fine        = false;  // Shift or Ctrl held
     bool  ctrl        = false;  // Ctrl held (Key)
     std::uint32_t key = 0;      // Key: Windows virtual-key code
-    std::vector<std::filesystem::path> files;   // Drop: files dragged in from Explorer
+    std::vector<std::filesystem::path> files;   // Drop: files dragged in from Explorer; OpenFile: path sent by a second instance
 };
 
 class GlWindow {
@@ -44,13 +44,16 @@ public:
     void swap() noexcept;
     void setVsync(bool on) noexcept;
     void setTitle(const std::wstring& title) noexcept;
+    // Window class of every GlWindow (used to find a running instance).
+    [[nodiscard]] static const wchar_t* className() noexcept;
+    // WM_COPYDATA tag: the payload is a UTF-16 file path to open (InputEvent::Type::OpenFile).
+    static constexpr unsigned long kOpenFileTag = 0x48435331;   // 'HCS1'
 
     [[nodiscard]] int   pixelWidth() const noexcept;
     [[nodiscard]] int   pixelHeight() const noexcept;
     [[nodiscard]] float dpiScale() const noexcept;    // 1.0 = 96 DPI
     [[nodiscard]] bool  minimized() const noexcept;
     [[nodiscard]] void* nativeHandle() const noexcept;   // HWND
-    void setTitle(const std::wstring& title) noexcept;
 
     struct Impl;
 

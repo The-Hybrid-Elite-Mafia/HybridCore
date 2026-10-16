@@ -95,6 +95,14 @@ struct GlWindow::Impl {
             e.y = static_cast<float>(GET_Y_LPARAM(lp));
             events.push_back(e);
             return 0;
+        case WM_COPYDATA: {   // a second HybridCore.exe hands over a session to open
+            const auto* cd = reinterpret_cast<const COPYDATASTRUCT*>(lp);
+            if (!cd || cd->dwData != GlWindow::kOpenFileTag || !cd->lpData || cd->cbData < sizeof(wchar_t) || cd->cbData > 65536) return FALSE;
+            e.type = InputEvent::Type::OpenFile;
+            e.files.emplace_back(std::wstring(static_cast<const wchar_t*>(cd->lpData), cd->cbData / sizeof(wchar_t)).c_str());
+            events.push_back(std::move(e));
+            return TRUE;
+        }
         case WM_DROPFILES: {
             auto* drop = reinterpret_cast<HDROP>(wp);
             POINT pt{};
@@ -238,6 +246,7 @@ std::vector<InputEvent> GlWindow::takeEvents() {
 
 void GlWindow::swap() noexcept { if (impl_->hdc) ::SwapBuffers(impl_->hdc); }
 void GlWindow::setVsync(bool on) noexcept { if (impl_->swapInterval) impl_->swapInterval(on ? 1 : 0); }
+const wchar_t* GlWindow::className() noexcept { return kClassName; }
 void GlWindow::setTitle(const std::wstring& t) noexcept { if (impl_->hwnd) ::SetWindowTextW(impl_->hwnd, t.c_str()); }
 
 int GlWindow::pixelWidth() const noexcept {
@@ -255,6 +264,5 @@ float GlWindow::dpiScale() const noexcept {
 }
 bool  GlWindow::minimized() const noexcept { return impl_->hwnd && ::IsIconic(impl_->hwnd); }
 void* GlWindow::nativeHandle() const noexcept { return impl_->hwnd; }
-void GlWindow::setTitle(const std::wstring& title) noexcept { if (impl_->hwnd) ::SetWindowTextW(impl_->hwnd, title.c_str()); }
 
 } // namespace hc::ui
