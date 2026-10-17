@@ -1,3 +1,11 @@
+## The Hybrid Core — 0.12.3: every ANALYZER check fits
+
+On a shorter window a long check (e.g. the peak warning, two lines) pushed the last check (stereo) out of the CHECKS box. Now the checks switch to smaller text when they would not fit, so all of them always show. Everything else is the same as 0.12.2.
+
+Tested on Steven's PC with 0.12.2: a new trap beat now reads stereo +0.94 (was +0.99), and "Almost mono" is gone.
+
+---
+
 ## The Hybrid Core — 0.12.2: a wider Beat Forge
 
 The ANALYZER showed Beat Forge beats were almost mono (stereo +0.99: left and right nearly the same). Now hats, keys, pad, lead, percussion (and a touch of snare) spread out to the sides; kick and 808 stay dead centre.

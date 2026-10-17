@@ -389,21 +389,30 @@ void drawScope(Renderer& r, Rect a, const ViewState& v) {
         const Rect c{cx0, y, cw, a.bottom() - 24 - y};
         card(r, c);
         r.text(TextStyle::DisplayCap, "CHECKS - WHOLE PLAY SO FAR", c.x + 26, c.y + 44, kCyan, Align::Left, TextFx::Neon);
-        float ly2 = c.y + 92;
-        const float lineH = 40.0f;
         std::vector<Analyzer::Check> checks;
         if (an) checks = an->checks();
         else checks.push_back({Analyzer::Mark::Note, "No audio stream: pick a device with the DEVICE panel."});
+        // Every check must fit: normal text when there is room, smaller text when the window is short.
+        TextStyle st = TextStyle::Label;
+        float lineH = 40.0f, gap = 8.0f, dotY = 22.0f;
+        const auto heightFor = [&](TextStyle s, float lh, float g) {
+            float h = 0.0f;
+            for (const auto& ck : checks) h += lh * static_cast<float>(wrap(r, s, ck.text, c.w - 100).size()) + g;
+            return h;
+        };
+        const float room = c.bottom() - 8 - (c.y + 92) + lineH;
+        if (heightFor(st, lineH, gap) > room) { st = TextStyle::Caption; lineH = 32.0f; gap = 5.0f; dotY = 19.0f; }
+        float ly2 = c.y + 92;
         for (const auto& ck : checks) {
             const Rgba dot = ck.mark == Analyzer::Mark::Good ? kGood : ck.mark == Analyzer::Mark::Warn ? kWarn : ck.mark == Analyzer::Mark::Bad ? kBad : kNote;
-            const auto lines = wrap(r, TextStyle::Label, ck.text, c.w - 100);
-            if (ly2 + lineH * static_cast<float>(lines.size()) > c.bottom() - 8) break;
-            r.fillRound({c.x + 30, ly2 - 22, 18, 18}, 9, dot, Blend::Over, true);
+            const auto lines = wrap(r, st, ck.text, c.w - 100);
+            if (ly2 + lineH * static_cast<float>(lines.size() - 1) > c.bottom() - 8) break;
+            r.fillRound({c.x + 30, ly2 - dotY, 18, 18}, 9, dot, Blend::Over, true);
             for (const auto& l : lines) {
-                r.text(TextStyle::Label, l, c.x + 66, ly2, kText, Align::Left, TextFx::Shadowed);
+                r.text(st, l, c.x + 66, ly2, kText, Align::Left, TextFx::Shadowed);
                 ly2 += lineH;
             }
-            ly2 += 8;
+            ly2 += gap;
         }
     }
 }
