@@ -16,7 +16,16 @@
 #include <string>
 #include <vector>
 
+namespace hc::analysis { class Analyzer; }
+
 namespace hc::ui {
+
+// How the ANALYZER's 3D view is turned (radians). Drag in the view to turn it.
+struct ScopeCamera {
+    static constexpr float kYaw = -0.38f, kPitch = 0.52f;
+    float yaw   = kYaw;     // turn left / right, -0.9 .. 0.9
+    float pitch = kPitch;   // look down, 0.15 .. 1.1
+};
 
 // Linear peak levels from the engine plus UI-side ballistics (decay + peak hold).
 struct MeterState {
@@ -80,6 +89,11 @@ struct ViewState {
     const std::vector<std::uint8_t>* sections = nullptr;  // Beat Forge song form: forge::Section per bar (null = none)
     double        barSeconds = 0.0;                       // length of one bar at the Beat Forge tempo
     EngineReadout engine;
+    // ANALYZER (over the stem strips while `scope` is on).
+    bool                      scope    = false;
+    const analysis::Analyzer* analyzer = nullptr;
+    ScopeCamera               camera;
+    std::string               scopeSource;   // what is playing: a file name, or "" for the console's Main out
     int           hover   = -1;    // widget indices from Interaction
     int           active  = -1;
     int           pressed = -1;
@@ -98,7 +112,7 @@ public:
 private:
     void drawChassis(Renderer& r, const Canvas& canvas) const;
     void drawStrip(Renderer& r, const StripLayout& st) const;
-    void drawEmissiveStatic(Renderer& r) const;
+    void drawEmissiveStatic(Renderer& r, bool scope) const;
     void drawKnobStatic(Renderer& r, const Widget& w) const;
     void drawKnob(Renderer& r, const Widget& w, Rgba accent, bool hot) const;
     void drawButton(Renderer& r, const Widget& w, bool pressed) const;

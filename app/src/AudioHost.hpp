@@ -53,6 +53,8 @@ public:
     [[nodiscard]] dsp::BusLimiter& limiter() noexcept { return mixer_->limiter(); }
     [[nodiscard]] forge::ForgeEngine& forge() noexcept { return mixer_->forge(); }
     [[nodiscard]] bool forgeActive() const noexcept { return mixer_->forgeActive(); }
+    // ANALYZER feed (null until a device has been opened once).
+    [[nodiscard]] analysis::ScopeTap* scopeTap() noexcept { return mixer_->scopeTap(); }
     [[nodiscard]] engine::MixerProcessor::Source source() const noexcept { return mixer_->source(); }
     void setSource(engine::MixerProcessor::Source s) noexcept { mixer_->setSource(s); }
 

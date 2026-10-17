@@ -1,3 +1,21 @@
+## The Hybrid Core — 0.12.0: the ANALYZER (3D)
+
+New **SCOPE** button in the top bar (next to EXPORT). It covers the stem strips with the ANALYZER; press it again to get the strips back.
+
+- **3D spectrum landscape**, rebuilt from Hybrid Studio's waterfall and drawn on the graphics card: the newest sound in front, about 2.7 seconds going back; bass on the left, highs on the right; height and colour show how loud each part is. Drag it to turn it, double-click to put it back.
+- **Loudness** (LUFS, the number streaming services use): last 3 seconds, and the whole play so far, with "finished songs: about -14" marked.
+- **Peak** with hold, highest peak and clipped samples.
+- **Tone** (bass / mids / highs) and **stereo** (how wide, and whether it holds up on one speaker).
+- **Checks in plain words**, e.g. "Song level: -14.2 LUFS", "Peaks safe", "Clipping: 3 samples (last at 1:32)".
+- **OPEN** now also opens WAV / MP3 / FLAC: the file goes on strip 1 and the ANALYZER comes up; press PLAY. You can also drag a file onto the ANALYZER.
+- It measures what comes out of MAIN, so it works for Beat Forge, your stems and opened files alike. Measuring stops while it is hidden.
+
+Measured in the tests: an EBU reference tone reads -23.0 LUFS (as the standard requires); the analyzer and the export meter agree within 0.15 LU; a full-scale sine reads 0 dB at its frequency in the 3D view; the audio-thread feed never allocates and never loses order.
+
+Not tested yet on your PC: how smooth the 3D view runs on your graphics card.
+
+---
+
 ## The Hybrid Core — 0.11.6: OPEN plays audio files
 
 OPEN (and Ctrl+O) now shows WAV, MP3 and FLAC files as well as sessions. Open an audio file (an export, a Suno song) and it goes on strip 1 so you can play it through the console; BEAT FORGE switches off for it (your beat is kept — press ON on the BEAT FORGE page to bring it back). Sessions open as before. Everything else is the same as 0.11.5.

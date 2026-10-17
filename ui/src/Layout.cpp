@@ -137,10 +137,10 @@ Layout::Layout(const params::ParameterTree& tree, float extraH) : extraH_(std::m
     overview_ = {130, by + 26, 2270, 90};
     limit_    = {2448, by + 47, 112, 48};
     widgets_.push_back({WidgetKind::Button, limit_, paramIndex(tree, params::busParamId(0, "limit")), 0, UiAction::None, "LIM"});
-    status_   = {1320, plate::kTopBar.y, 1760, plate::kTopBar.h};   // engraved in the top bar
-    static const UiAction kCmd[3] = {UiAction::OpenSession, UiAction::SaveSession, UiAction::ExportMix};
-    static const char* const kCmdCap[3] = {"OPEN", "SAVE", "EXPORT"};
-    for (std::uint32_t i = 0; i < 3; ++i)
+    status_   = {1500, plate::kTopBar.y, 1580, plate::kTopBar.h};   // engraved in the top bar
+    static const UiAction kCmd[4] = {UiAction::OpenSession, UiAction::SaveSession, UiAction::ExportMix, UiAction::ToggleScope};
+    static const char* const kCmdCap[4] = {"OPEN", "SAVE", "EXPORT", "SCOPE"};
+    for (std::uint32_t i = 0; i < 4; ++i)
         widgets_.push_back({WidgetKind::Command, {770.0f + 178.0f * static_cast<float>(i), plate::kTopBar.cy() - 32.0f, 160.0f, 64.0f}, -1, i, kCmd[i],
                             kCmdCap[i]});
     widgets_.push_back({WidgetKind::MasterMeter, master_, -1, 0, UiAction::None, ""});
@@ -224,6 +224,7 @@ int Layout::hitTest(float x, float y) const noexcept {
         if (w.kind == WidgetKind::StemMeter || w.kind == WidgetKind::BusMeter || w.kind == WidgetKind::MasterMeter) continue;
         if (isEmptySlot(w)) continue;
         if (!w.rect.contains(x, y)) continue;
+        if (underScope(w.rect)) continue;
         if (w.kind == WidgetKind::Knob || w.kind == WidgetKind::SendKnob || w.kind == WidgetKind::Transport) {
             const float dx = x - w.rect.cx(), dy = y - w.rect.cy(), r = w.rect.w * 0.5f;
             if (dx * dx + dy * dy > r * r) continue;
@@ -234,6 +235,7 @@ int Layout::hitTest(float x, float y) const noexcept {
 }
 
 int Layout::stemStripAt(float x, float y) const noexcept {
+    if (scope_) return -1;
     for (const StripLayout& st : strips_)
         if (!st.isBus && st.bed.contains(x, y)) return static_cast<int>(st.index);
     return -1;

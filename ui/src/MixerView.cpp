@@ -1,4 +1,5 @@
 #include "hybrid/ui/MixerView.hpp"
+#include "hybrid/ui/ScopeView.hpp"
 #include "hybrid/forge/Pattern.hpp"
 
 #include <algorithm>
@@ -200,8 +201,9 @@ void MixerView::drawStatic(Renderer& r, const Canvas& canvas) const {
 }
 
 // Emissive parts of the static layer, re-submitted each frame for bloom only.
-void MixerView::drawEmissiveStatic(Renderer& r) const {
+void MixerView::drawEmissiveStatic(Renderer& r, bool scope) const {
     for (const StripLayout& st : layout_.strips()) {
+        if (scope && !st.isBus) continue;   // under the ANALYZER
         const float cx = st.bed.cx();
         r.fillRound({cx - st.bed.w * 0.28f, st.bed.y + 22, st.bed.w * 0.56f, 7}, 3.5f, st.accent, Blend::Over, true);
     }
@@ -482,7 +484,7 @@ void MixerView::drawOverview(Renderer& r, const ViewState& v) const {
 
 void MixerView::drawDynamic(Renderer& r, const ViewState& v, const MeterState& m) const {
     r.setBloomOnly(true);
-    drawEmissiveStatic(r);
+    drawEmissiveStatic(r, v.scope);
     r.setBloomOnly(false);
 
     // Status lamp in the logo socket.
@@ -508,6 +510,7 @@ void MixerView::drawDynamic(Renderer& r, const ViewState& v, const MeterState& m
     const std::uint32_t bank = layout_.faderBank();
     for (std::size_t i = 0; i < layout_.widgets().size(); ++i) {
         const Widget& w = layout_.widgets()[i];
+        if (v.scope && layout_.underScope(w.rect)) continue;
         const bool hot = static_cast<int>(i) == v.hover || static_cast<int>(i) == v.active;
         switch (w.kind) {
         case WidgetKind::Knob:
@@ -526,7 +529,8 @@ void MixerView::drawDynamic(Renderer& r, const ViewState& v, const MeterState& m
         case WidgetKind::Command: {   // OPEN / SAVE / EXPORT in the top bar
             const bool exporting = w.action == UiAction::ExportMix && v.exportProgress >= 0.0f;
             const std::string cap = exporting ? fmt("%.0f%%", 100.0 * v.exportProgress) : w.caption;
-            drawCap(r, w.rect, cap, exporting, static_cast<int>(i) == v.pressed, kLitAmber, true);
+            const bool lit = exporting || (w.action == UiAction::ToggleScope && v.scope);
+            drawCap(r, w.rect, cap, lit, static_cast<int>(i) == v.pressed, w.action == UiAction::ToggleScope ? kLitCyan : kLitAmber, true);
             break;
         }
         case WidgetKind::Transport: drawTransport(r, w, v); break;
@@ -557,6 +561,7 @@ void MixerView::drawDynamic(Renderer& r, const ViewState& v, const MeterState& m
     }
 
     for (const StripLayout& st : layout_.strips()) {
+        if (v.scope && !st.isBus) continue;   // under the ANALYZER
         // Title area: stem name (or "STEM n"), and its load state.
         const float cx = st.bed.cx(), tw = st.bed.w - 24;
         if (st.isBus) {
@@ -602,6 +607,8 @@ void MixerView::drawDynamic(Renderer& r, const ViewState& v, const MeterState& m
         drawGlassOverlay(r, st.meter.inset(5));
         drawGlassOverlay(r, st.valueBox.inset(5));
     }
+
+    if (v.scope) drawScope(r, layout_.scopeRect(), v);
 
     // Main bus meter + status line.
     const Rect mm = layout_.masterMeter();

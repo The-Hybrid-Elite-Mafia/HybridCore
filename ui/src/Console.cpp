@@ -44,6 +44,7 @@ bool Console::resize(int w, int h, std::string* error) {
         layout_ = std::make_unique<Layout>(tree_, c.extraH);
         layout_->setFaderBank(bank_);
         layout_->setPage(page_);
+        layout_->setScope(scope_);
         view_ = std::make_unique<MixerView>(*layout_, tree_);
         if (interaction_) interaction_->rebind(*layout_);
         else interaction_ = std::make_unique<Interaction>(*layout_, tree_);
@@ -58,6 +59,12 @@ void Console::setFaderBank(std::uint32_t bank) {
     bank_ = std::min(bank, kFaderBanks - 1);
     if (layout_) layout_->setFaderBank(bank_);
     staticDirty_ = true;
+}
+
+void Console::setScope(bool on) {
+    scope_ = on;
+    if (layout_) layout_->setScope(on);
+    if (interaction_) interaction_->mouseUp();
 }
 
 void Console::setPage(Page page) {

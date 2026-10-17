@@ -220,6 +220,7 @@ int main(int argc, char** argv) {
     testSession();
     testExport();
     testLoudness();
+    testAnalyzer();
     testForgeComposer();
     testForgeEngine();
     testForgeInMixer();

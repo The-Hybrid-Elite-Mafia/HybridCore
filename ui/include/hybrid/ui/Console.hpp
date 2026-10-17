@@ -44,6 +44,8 @@ public:
     void setFaderBank(std::uint32_t bank);
     [[nodiscard]] std::uint32_t faderBank() const noexcept { return bank_; }
     void setPage(Page page);
+    void setScope(bool on);
+    [[nodiscard]] bool scope() const noexcept { return scope_; }
     [[nodiscard]] Page page() const noexcept { return page_; }
 
     // Draws one frame into `targetFbo` (0 = window) or into the capture buffer.
@@ -78,6 +80,7 @@ private:
     float                         fontScale_    = 0.0f;
     std::uint32_t                 bank_         = 0;
     Page                          page_         = Page::Mix;
+    bool                          scope_        = false;
     std::string                   faceplateInfo_;
     ConsoleTimings                timings_;
 };

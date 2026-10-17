@@ -84,6 +84,11 @@ public:
     void glow(Rect core, float radius, float spread, Rgba c, bool emissive = true);
     // Soft-edged rounded rectangle of light or tint.
     void fillRound(Rect r, float radius, Rgba c, Blend blend, bool emissive = false);
+    // Any four-cornered shape (corners in order around it, e.g. TL TR BR BL) with its own colour
+    // at each corner, blended across: flat shading, no texture. For 3D meshes projected by the caller.
+    void colorQuad(const float xs[4], const float ys[4], const Rgba cols[4], Blend blend = Blend::Over, bool emissive = false);
+    // Connected line through n points, `width` design units wide, one colour.
+    void polyline(const float* xs, const float* ys, int n, float width, Rgba c, Blend blend = Blend::Over, bool emissive = false);
     void text(TextStyle style, std::string_view utf8, float x, float baseline, Rgba c, Align align = Align::Left,
               TextFx fx = TextFx::Plain);
     [[nodiscard]] float textWidth(TextStyle style, std::string_view utf8) const;

@@ -278,8 +278,8 @@ void testUiLayout() {
     }
     CHECK(in.mouseDown(ui::plate::kNamePanel.cx(), ui::plate::kNamePanel.cy(), false, false) == ui::UiAction::NextDevice);
     in.mouseUp();
-    {   // OPEN / SAVE / EXPORT sit in the top bar, between the title and the status line, without overlapping.
-        const ui::UiAction want[3] = {ui::UiAction::OpenSession, ui::UiAction::SaveSession, ui::UiAction::ExportMix};
+    {   // OPEN / SAVE / EXPORT / SCOPE sit in the top bar, between the title and the status line, without overlapping.
+        const ui::UiAction want[4] = {ui::UiAction::OpenSession, ui::UiAction::SaveSession, ui::UiAction::ExportMix, ui::UiAction::ToggleScope};
         int ok = 0;
         float lastRight = 740.0f;   // end of the engraved title
         for (const auto& w : L.widgets()) {
@@ -290,7 +290,24 @@ void testUiLayout() {
             in.mouseUp();
             lastRight = w.rect.right();
         }
-        CHECK(ok == 3);
+        CHECK(ok == 4);
+    }
+    {   // ANALYZER on: nothing under it takes clicks (stem strips), the bus strips and top bar still do; off: back.
+        int stemKnob = -1, busFader = -1;
+        for (std::size_t i = 0; i < L.widgets().size(); ++i) {
+            const auto& w = L.widgets()[i];
+            if (stemKnob < 0 && w.kind == ui::WidgetKind::Knob && !ui::Layout::isEmptySlot(w)) stemKnob = static_cast<int>(i);
+        }
+        for (const auto& st : L.strips())
+            if (st.isBus && busFader < 0) busFader = st.faderWidget;
+        CHECK(stemKnob >= 0 && busFader >= 0);
+        const ui::Rect k = L.widgets()[static_cast<std::size_t>(stemKnob)].rect, f = L.widgets()[static_cast<std::size_t>(busFader)].rect;
+        CHECK(L.hitTest(k.cx(), k.cy()) == stemKnob && L.stemStripAt(k.cx(), k.cy()) >= 0);
+        L.setScope(true);
+        CHECK(L.hitTest(k.cx(), k.cy()) == -1 && L.stemStripAt(k.cx(), k.cy()) == -1 && L.hitTest(f.cx(), f.cy()) == busFader);
+        CHECK(L.underScope(k) && !L.underScope(f) && L.scopeRect().w > 2000.0f);
+        L.setScope(false);
+        CHECK(L.hitTest(k.cx(), k.cy()) == stemKnob);
     }
     {   // Song overview: click = seek to that fraction, drag keeps seeking, release stops.
         const ui::Rect o = L.overview();

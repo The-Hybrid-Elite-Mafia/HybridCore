@@ -133,6 +133,7 @@ double MixerProcessor::testToneHz(std::uint32_t stem) noexcept {
 
 void MixerProcessor::prepare(const io::StreamConfig& config) {
     maxFrames_ = config.blockFrames;
+    if (!tap_) tap_ = std::make_unique<analysis::ScopeTap>();
     matrix_.prepare(maxFrames_, static_cast<double>(config.sampleRate));
     forge_.prepare(static_cast<double>(config.sampleRate), maxFrames_);
     mainMix_.allocate(static_cast<std::size_t>(2) * maxFrames_);
@@ -227,6 +228,7 @@ void MixerProcessor::process(const ProcessContext& ctx) noexcept {
             const std::uint32_t out = 2 * b + c;
             if (out < ctx.numOutputs) dsp::copy(ctx.outputs[out], limiter_.channel(b, c), ctx.frames);
         }
+    if (tap_) tap_->push(limiter_.channel(0, 0), limiter_.channel(0, 1), ctx.frames);
 }
 
 } // namespace hc::engine

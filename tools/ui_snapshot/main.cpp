@@ -15,6 +15,7 @@
 // Checks (exit 3 on failure): GL errors, chassis pixels equal Main-Faceplate.png where nothing is
 // drawn on top, meters lit by the engine, glass display populated.
 #include "AudioHost.hpp"
+#include "hybrid/analysis/Analyzer.hpp"
 #include "StemDeck.hpp"
 #include "ForgeController.hpp"
 #include "hybrid/forge/Forge.hpp"
@@ -152,6 +153,7 @@ int wmain(int argc, wchar_t** argv) {
     std::filesystem::path stemsDir;
     ui::Page page = ui::Page::Mix;
     int forgeGenre = -1;   // --forge <0..7>: make a Beat Forge song in that genre and play it
+    bool scope = false;    // --scope: the ANALYZER over the stem strips, fed live from the engine
     std::string           prefix = "HybridCore";
     for (int i = 1; i < argc; ++i) {
         const std::wstring k = argv[i];
@@ -164,6 +166,7 @@ int wmain(int argc, wchar_t** argv) {
             page = p == L"eq" ? ui::Page::Eq : p == L"dyn" ? ui::Page::Dynamics : p == L"forge" ? ui::Page::Forge : ui::Page::Mix;
         }
         else if (k == L"--forge" && i + 1 < argc) forgeGenre = static_cast<int>(std::wcstol(argv[++i], nullptr, 10));
+        else if (k == L"--scope") scope = true;
         else if (k == L"--name" && i + 1 < argc) { prefix.clear(); for (const wchar_t* c = argv[++i]; *c; ++c) prefix.push_back(*c < 128 ? static_cast<char>(*c) : '_'); }
         else if (k == L"--sizes" && i + 1 < argc) {
             sizes.clear();
@@ -180,7 +183,7 @@ int wmain(int argc, wchar_t** argv) {
                 pos = comma + 1;
             }
         } else {
-            std::wprintf(L"usage: hc_ui_snapshot [--out <folder>] [--sizes 3840x2160,1389x868] [--seconds 2] [--device offline|default] [--stems <folder>] [--name <prefix>] [--page mix|eq|dyn|forge] [--forge <genre 0-7>]\n");
+            std::wprintf(L"usage: hc_ui_snapshot [--out <folder>] [--sizes 3840x2160,1389x868] [--seconds 2] [--device offline|default] [--stems <folder>] [--name <prefix>] [--page mix|eq|dyn|forge] [--forge <genre 0-7>] [--scope]\n");
             return 1;
         }
     }
@@ -203,6 +206,9 @@ int wmain(int argc, wchar_t** argv) {
     const auto devices = app::AudioHost::listDevices();
     host.open(offline ? devices.back() : devices.front());
     app::StemDeck deck(host);
+    analysis::Analyzer analyzer(static_cast<double>(hc::kSampleRate));
+    std::vector<analysis::StereoFrame> tapBuf(8192);
+    if (scope && host.scopeTap()) host.scopeTap()->setEnabled(true);
     if (!stemsDir.empty()) {
         const auto t0 = std::chrono::steady_clock::now();
         const std::size_t n = deck.load(0, {stemsDir});
@@ -244,6 +250,9 @@ int wmain(int argc, wchar_t** argv) {
             tree.dispatchChanges();
             host.poll();
             deck.pump();
+            if (scope && host.scopeTap())
+                for (std::size_t n; (n = host.scopeTap()->pop(tapBuf.data(), tapBuf.size())) > 0;)
+                    analyzer.add(tapBuf.data(), n, static_cast<double>(host.stemPlayhead()) / hc::kSampleRate);
             const auto now = std::chrono::steady_clock::now();
             float sp[kStemCount], bl[kBusCount], br[kBusCount];
             for (std::uint32_t s = 0; s < kStemCount; ++s) sp[s] = host.matrix().stemPeak(s);
@@ -265,6 +274,7 @@ int wmain(int argc, wchar_t** argv) {
     if (!std::filesystem::is_directory(assets, ec)) assets = exeDir().parent_path() / "assets";
     if (!console.init(assets, {}, 8, &err)) { std::wprintf(L"console init failed: %hs\n", err.c_str()); return 2; }
     console.setPage(page);
+    console.setScope(scope);
     std::wprintf(L"OpenGL  : %hs\nRenderer: %hs\nMSAA    : %d samples (requested 8, GPU maximum %d)\nFaceplate: %hs\n",
                  console.renderer().glVersion().c_str(), console.renderer().glRenderer().c_str(), console.renderer().samples(),
                  console.renderer().maxSamples(), console.faceplateInfo().c_str());
@@ -322,6 +332,8 @@ int wmain(int argc, wchar_t** argv) {
             vs.overview           = deck.songOverview().empty() ? nullptr : &deck.songOverview();
             for (std::uint32_t s2 = 0; s2 < kStemCount; ++s2) vs.gainReduction[s2] = host.matrix().strip(s2).gainReductionDb();
             vs.limiterGr          = host.limiter().gainReductionDb();
+            vs.scope              = scope;
+            vs.analyzer           = scope ? &analyzer : nullptr;
             const auto t0 = std::chrono::steady_clock::now();
             console.renderToCapture(vs, meters);
             const auto t1 = std::chrono::steady_clock::now();
@@ -362,6 +374,14 @@ int wmain(int argc, wchar_t** argv) {
                      console.timings().staticMs, rs.drawCalls, rs.quads, rs.bloomQuads, console.renderer().textureBytes() / 1048576.0,
                      console.renderer().targetBytes() / 1048576.0, plateDiff, frameDiff, tol, meterLit, display, ok ? L"PASS" : L"FAIL",
                      base.c_str(), base.c_str());
+    }
+    if (scope) {
+        std::wprintf(L"\nANALYZER: %.1f s heard, short-term %.1f LUFS, whole %.1f LUFS, highest peak %.1f dB, %llu clipped, correlation %.2f, %llu waterfall rows, tap dropped %llu\n",
+                     analyzer.heardSeconds(), analyzer.shortTermLufs(), analyzer.integratedLufs(), static_cast<double>(analyzer.maxPeakDb()),
+                     static_cast<unsigned long long>(analyzer.clippedSamples()), static_cast<double>(analyzer.correlation()),
+                     static_cast<unsigned long long>(analyzer.rowsMade()), static_cast<unsigned long long>(host.scopeTap() ? host.scopeTap()->dropped() : 0));
+        for (const auto& c : analyzer.checks()) std::wprintf(L"  check: %hs\n", c.text.c_str());
+        if (analyzer.rowsMade() < 10) { std::wprintf(L"  ANALYZER got no audio -> FAIL\n"); ++failures; }
     }
     const app::HostStatus& st = host.status();
     std::wprintf(L"\nEngine after the shots: %hs\n  %hs\n", st.line1.c_str(), st.line2.c_str());

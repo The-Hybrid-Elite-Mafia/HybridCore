@@ -29,6 +29,7 @@
 #include "hybrid/dsp/StemMatrix.hpp"
 #include "hybrid/dsp/BusLimiter.hpp"
 #include "hybrid/forge/ForgeEngine.hpp"
+#include "hybrid/analysis/ScopeTap.hpp"
 
 #include <array>
 #include <atomic>
@@ -54,6 +55,9 @@ public:
     [[nodiscard]] std::uint32_t latencyFrames() const noexcept { return limiter_.latency(); }
     [[nodiscard]] forge::ForgeEngine&       forge() noexcept { return forge_; }
     [[nodiscard]] const forge::ForgeEngine& forge() const noexcept { return forge_; }
+    // ANALYZER feed: the Main output after the limiter. Created by the first prepare() (null before);
+    // off until the UI enables it.
+    [[nodiscard]] analysis::ScopeTap* scopeTap() noexcept { return tap_.get(); }
     // Published by the audio thread: Beat Forge is playing into strips 1–8.
     [[nodiscard]] bool forgeActive() const noexcept { return forgePub_.load(std::memory_order_relaxed); }
 
@@ -101,6 +105,7 @@ private:
     dsp::StemMatrix                                   matrix_;
     dsp::BusLimiter                                   limiter_;
     forge::ForgeEngine                                forge_;
+    std::unique_ptr<analysis::ScopeTap>               tap_;        // allocated once (message thread), never replaced
     core::AlignedBuffer<float>                        mainMix_;    // 2 × maxFrames: Main + Beat Forge FX return
     bool                                              forgeActive_ = false, forgeWasOn_ = false, forgeRendered_ = false;
     std::atomic<bool>                                 forgePub_{false};

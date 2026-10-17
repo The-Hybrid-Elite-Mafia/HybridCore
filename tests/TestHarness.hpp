@@ -44,6 +44,7 @@ void testForgeEngine();
 void testForgeInMixer();
 void testExport();
 void testLoudness();
+void testAnalyzer();
 void testLimiter();
 void testStripInMatrix();
 void testStripParams();

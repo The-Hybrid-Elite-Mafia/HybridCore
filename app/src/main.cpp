@@ -8,6 +8,7 @@
 #include "StemDeck.hpp"
 #include "ForgeController.hpp"
 
+#include "hybrid/analysis/Analyzer.hpp"
 #include "hybrid/core/RealtimeThread.hpp"
 #include "hybrid/io/DeviceProbe.hpp"
 #include "hybrid/forge/Forge.hpp"
@@ -18,6 +19,7 @@
 #include "hybrid/params/Settings.hpp"
 #include "hybrid/ui/Console.hpp"
 #include "hybrid/ui/GlWindow.hpp"
+#include "hybrid/ui/ScopeView.hpp"
 
 #include <windows.h>
 #include <shellapi.h>
@@ -217,6 +219,35 @@ struct App {
     std::string           notice;
     bool                  lastExportMastered = true;
     std::chrono::steady_clock::time_point noticeUntil{};
+    // ANALYZER
+    analysis::Analyzer    analyzer{static_cast<double>(kSampleRate)};
+    std::vector<analysis::StereoFrame> tapBuf = std::vector<analysis::StereoFrame>(8192);
+    bool                  tapOn = false, wasPlaying = false;
+    std::string           scopeSource;      // file opened with OPEN ("" = the console's Main out)
+    ui::ScopeCamera       camera;
+    bool                  orbiting = false;
+    float                 orbitX = 0, orbitY = 0;
+
+    // Feeds the analyzer with what the audio thread sent (every UI frame).
+    void pumpScope(bool show) {
+        analysis::ScopeTap* tap = audio.scopeTap();
+        if (!tap) return;
+        const bool want = show && audio.status().running;
+        if (want != tapOn) {
+            tap->setEnabled(want);
+            if (want) {   // throw away whatever was left from the last time, start fresh
+                while (tap->pop(tapBuf.data(), tapBuf.size()) > 0) {}
+                analyzer.reset();
+            }
+            tapOn = want;
+        }
+        const bool playing = audio.wantsPlay();
+        const double pos = static_cast<double>(audio.stemPlayhead()) / kSampleRate;
+        if (playing && !wasPlaying && pos < 0.25) analyzer.reset();   // playing from the start: measure the song afresh
+        wasPlaying = playing;
+        if (!want) return;
+        for (std::size_t n; (n = tap->pop(tapBuf.data(), tapBuf.size())) > 0;) analyzer.add(tapBuf.data(), n, pos);
+    }
 
     void say(std::string text) {
         notice      = std::move(text);
@@ -255,6 +286,7 @@ struct App {
         return true;
     }
     void openSession(const std::filesystem::path& file, ui::Console& console) {
+        scopeSource.clear();
         auto l = media::loadSession(file);
         if (!l) { say("Open failed: " + l.error()); return; }
         audio.stop();
@@ -309,7 +341,10 @@ struct App {
         pendingSeek = 0;
         session.clear();
         settings.set("app", "session", "");
-        std::string msg = "Opened " + app::toUtf8(file.filename().wstring()) + " on strip 1 - press PLAY";
+        scopeSource = app::toUtf8(file.filename().wstring());
+        console.setScope(true);
+        analyzer.reset();
+        std::string msg = "Opened " + app::toUtf8(file.filename().wstring()) + " on strip 1 - press PLAY (SCOPE shows the ANALYZER)";
         if (beatWasOn) msg += "  \xC2\xB7  BEAT FORGE is off (ON on the BEAT FORGE page brings your beat back)";
         say(msg);
     }
@@ -376,7 +411,8 @@ struct App {
 
     // uiState = fader bank + 4 × knob page.
     void saveSettings(std::uint32_t uiState) {
-        const std::uint32_t bank = uiState % 4, page = uiState / 4;
+        const std::uint32_t bank = uiState % 4, page = (uiState / 4) % 16;
+        settings.set("app", "scope", uiState >= 64 ? "1" : "0");
         settings.setSectionText("params", tree.serialize());
         const auto& d = audio.current();
         settings.set("app", "device.kind", kindName(d.kind));
@@ -413,6 +449,7 @@ struct App {
     bool forgeOn() const { const params::Parameter* p = tree.find(forge::id::on); return p && p->isOn(); }
     // BEAT FORGE buttons.
     void forgeGenerate() {
+        scopeSource.clear();
         forge->generate();
         if (audio.source() != Source::Stems) audio.setSource(Source::Stems);
         const auto* g = tree.find(forge::id::genre);
@@ -536,7 +573,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     }
     console.setFaderBank(static_cast<std::uint32_t>(std::clamp(std::atoi(a.settings.get("app", "faderBank", "0").c_str()), 0, 3)));
     console.setPage(static_cast<ui::Page>(std::clamp(std::atoi(a.settings.get("app", "page", "0").c_str()), 0, 2)));
-    auto uiState = [&console] { return console.faderBank() + 4u * static_cast<std::uint32_t>(console.page()); };
+    console.setScope(a.settings.get("app", "scope", "0") == "1");
+    auto uiState = [&console] { return console.faderBank() + 4u * static_cast<std::uint32_t>(console.page()) + (console.scope() ? 64u : 0u); };
     if (!opts.session.empty()) a.openSession(opts.session, console);
     std::filesystem::path shownSession = L"?";
     const HWND hwnd = static_cast<HWND>(window.nativeHandle());
@@ -563,6 +601,13 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             const float x = cv.toDesignX(e.x), y = cv.toDesignY(e.y);
             switch (e.type) {
             case ui::InputEvent::Type::MouseDown: {
+                if (console.scope() && ui::scopeViewArea(console.layout().scopeRect()).contains(x, y)) {   // turn the 3D view
+                    if (e.doubleClick) a.camera = {};
+                    a.orbiting = !e.doubleClick;
+                    a.orbitX = x;
+                    a.orbitY = y;
+                    break;
+                }
                 std::uint32_t idx = 0;
                 switch (console.interaction().mouseDown(x, y, e.doubleClick, e.fine, &idx)) {
                 case ui::UiAction::PrevDevice:   a.selectDevice(-1); break;
@@ -570,6 +615,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                 case ui::UiAction::LoadStems: {
                     const auto files = askForStems(static_cast<HWND>(window.nativeHandle()));
                     if (!files.empty()) {
+                        a.scopeSource.clear();
                         if (a.forgeOn()) {   // Beat Forge owns strips 1-8: your stems (vocals) go to 9-13
                             for (std::uint32_t s = forge::kTracks; s < kStemCount; ++s) a.stems.clear(s);
                             a.stems.load(forge::kTracks, files);
@@ -600,7 +646,12 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                     break;
                 }
                 case ui::UiAction::SelectPage:   console.setPage(static_cast<ui::Page>(idx)); break;
-                case ui::UiAction::ToStart:      a.audio.seek(0); break;
+                case ui::UiAction::ToStart:      a.audio.seek(0); a.analyzer.reset(); break;
+                case ui::UiAction::ToggleScope:
+                    console.setScope(!console.scope());
+                    if (console.scope()) a.say("ANALYZER: press PLAY, or OPEN a WAV / MP3 to measure it. Drag the 3D view to turn it.");
+                    console.interaction().mouseUp();
+                    break;
                 case ui::UiAction::PlayPause:    a.playPause(); break;
                 case ui::UiAction::Stop:         a.audio.stop(); break;
                 case ui::UiAction::ToggleLoop:   a.audio.setLoop(!a.audio.loop()); break;
@@ -648,10 +699,20 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                 default:        break;
                 }
                 break;
-            case ui::InputEvent::Type::MouseMove: console.interaction().mouseMove(x, y, e.fine); break;
-            case ui::InputEvent::Type::MouseUp:   console.interaction().mouseUp(); break;
+            case ui::InputEvent::Type::MouseMove:
+                if (a.orbiting) {
+                    a.camera.yaw   = std::clamp(a.camera.yaw + (x - a.orbitX) * 0.0022f, -0.9f, 0.9f);
+                    a.camera.pitch = std::clamp(a.camera.pitch + (y - a.orbitY) * 0.0018f, 0.15f, 1.1f);
+                    a.orbitX = x;
+                    a.orbitY = y;
+                } else {
+                    console.interaction().mouseMove(x, y, e.fine);
+                }
+                break;
+            case ui::InputEvent::Type::MouseUp:   a.orbiting = false; console.interaction().mouseUp(); break;
             case ui::InputEvent::Type::Wheel:     console.interaction().wheel(x, y, e.wheel, e.fine); break;
             case ui::InputEvent::Type::Drop: {   // onto a stem strip: from that slot; elsewhere: first empty slot
+                if (console.scope() && e.files.size() == 1) { a.openAny(e.files.front(), console); break; }   // onto the ANALYZER: listen to it
                 const int at = console.layout().stemStripAt(x, y);
                 const int first = at >= 0 ? at : std::max(0, a.stems.firstEmptySlot());
                 a.stems.load(static_cast<std::uint32_t>(first), e.files);
@@ -670,7 +731,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                 break;
             }
             case ui::InputEvent::Type::OpenFile:   // a .hcs double-clicked while the console was already open
-                if (!e.files.empty()) a.openSession(e.files.front(), console);
+                if (!e.files.empty()) a.openAny(e.files.front(), console);
                 break;
             case ui::InputEvent::Type::Resize:
             case ui::InputEvent::Type::Close:     break;
@@ -694,6 +755,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         a.tree.dispatchChanges();
         a.audio.poll();
         a.stems.pump();
+        a.pumpScope(console.scope());
 
         const auto  now = std::chrono::steady_clock::now();
         const float dt  = std::chrono::duration<float>(now - lastFrame).count();
@@ -788,6 +850,10 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         for (std::uint32_t s = 0; s < kStemCount; ++s) vs.gainReduction[s] = st.running ? a.audio.matrix().strip(s).gainReductionDb() : 0.0f;
         vs.limiterGr           = st.running ? a.audio.limiter().gainReductionDb() : 0.0f;
         vs.exportProgress      = a.exporter.progress();
+        vs.scope       = console.scope();
+        vs.analyzer    = st.running ? &a.analyzer : nullptr;
+        vs.camera      = a.camera;
+        vs.scopeSource = a.scopeSource;
         vs.hover   = console.interaction().hoverWidget();
         vs.active  = console.interaction().activeWidget();
         vs.pressed = console.interaction().pressedWidget();

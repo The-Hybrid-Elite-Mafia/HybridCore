@@ -34,7 +34,7 @@ enum class WidgetKind : std::uint8_t { Knob, SendKnob, Fader, Button, StemMeter,
                                        Command, BusTitle };
 enum class UiAction : std::uint8_t { None, PrevDevice, NextDevice, LoadStems, CycleSource, ClearSolo, ClearMute, FaderBank,
                                      ToStart, PlayPause, Stop, ToggleLoop, Seek, SelectPage,
-                                     OpenSession, SaveSession, ExportMix, ForgeGenerate, ForgeUndo, ForgeClear };
+                                     OpenSession, SaveSession, ExportMix, ForgeGenerate, ForgeUndo, ForgeClear, ToggleScope };
 
 // What the 5 knobs of every stem strip control.
 enum class Page : std::uint8_t { Mix, Eq, Dynamics, Forge };
@@ -103,6 +103,17 @@ public:
     [[nodiscard]] Page page() const noexcept { return page_; }
     [[nodiscard]] int faderParam(std::uint32_t stem, std::uint32_t bank) const noexcept { return stemFader_[stem][bank]; }
 
+    // ANALYZER: shown over the stem strips (the bus strips stay). While it is on, nothing under it
+    // takes clicks.
+    void setScope(bool on) noexcept { scope_ = on; }
+    [[nodiscard]] bool scope() const noexcept { return scope_; }
+    [[nodiscard]] Rect mainPanel() const noexcept { return {plate::kMainPanel.x, plate::kMainPanel.y, plate::kMainPanel.w, plate::kMainPanel.h + extraH_}; }
+    [[nodiscard]] Rect scopeRect() const noexcept { return mainPanel().inset(14); }
+    [[nodiscard]] bool underScope(const Rect& r) const noexcept {
+        const Rect m = mainPanel();
+        return scope_ && r.x >= m.x && r.right() <= m.right() && r.y >= m.y && r.bottom() <= m.bottom();
+    }
+
     [[nodiscard]] Rect masterMeter() const noexcept { return master_; }
     [[nodiscard]] Rect statusArea() const noexcept { return status_; }
     [[nodiscard]] Rect overview() const noexcept { return overview_; }
@@ -122,6 +133,7 @@ private:
     std::array<std::array<std::array<Slot, 3>, kPages>, hc::kStemCount>           buttonSlot_{};
     Rect          limit_;
     float         extraH_ = 0;
+    bool          scope_  = false;
     Rect          master_, status_, overview_;
 };
 

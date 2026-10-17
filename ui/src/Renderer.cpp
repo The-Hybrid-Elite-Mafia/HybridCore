@@ -11,7 +11,7 @@ using namespace hc::gl;
 
 namespace {
 
-constexpr float kModeTexture = 0, kModeText = 1, kModeTextBlur = 2, kModeArc = 3, kModeGlow = 4, kModeFill = 5;
+constexpr float kModeTexture = 0, kModeText = 1, kModeTextBlur = 2, kModeArc = 3, kModeGlow = 4, kModeFill = 5, kModeFlat = 6;
 constexpr float kTexChassis = 0, kTexParts = 1, kTexStatic = 2;
 constexpr float kBloomStrength = 0.32f;
 
@@ -611,6 +611,35 @@ void Renderer::fillRound(Rect r, float radius, Rgba col, Blend blend, bool emiss
     const float s = canvas_.scale, hw = r.w * s * 0.5f + 1, hh = r.h * s * 0.5f + 1;
     const float p[2] = {1.0f, 0}, q[4] = {r.w * s * 0.5f, r.h * s * 0.5f, std::min(radius * s, std::min(r.w, r.h) * s * 0.5f), 0};
     rectQuad({px(r.cx()) - hw, py(r.cy()) - hh, hw * 2, hh * 2}, 0, 0, 0, 0, c, kModeFill, kTexParts, p, q, emissive, hw, hh);
+}
+
+void Renderer::colorQuad(const float xs[4], const float ys[4], const Rgba cols[4], Blend blend, bool emissive) {
+    Vertex v[4];
+    for (int i = 0; i < 4; ++i) {
+        float c[4];
+        premul(cols[i], blend, c);
+        v[i] = Vertex{px(xs[i]), py(ys[i]), 0, 0, 0, 0, c[0], c[1], c[2], c[3], kModeFlat, kTexParts, 0, 0, 0, 0, 0, 0};
+    }
+    if (!bloomOnly_) {
+        for (int i : {0, 1, 2, 0, 2, 3}) verts_.push_back(v[i]);
+        ++stats_.quads;
+    }
+    if (emissive) for (int i : {0, 1, 2, 0, 2, 3}) bloomVerts_.push_back(v[i]);
+}
+
+void Renderer::polyline(const float* xs, const float* ys, int n, float width, Rgba col, Blend blend, bool emissive) {
+    const float h = 0.5f * width;
+    const Rgba cs[4] = {col, col, col, col};
+    for (int i = 0; i + 1 < n; ++i) {
+        const float dx = xs[i + 1] - xs[i], dy = ys[i + 1] - ys[i];
+        const float len = std::sqrt(dx * dx + dy * dy);
+        if (len < 1.0e-4f) continue;
+        const float nx = -dy / len * h, ny = dx / len * h;
+        const float ex = dx / len * h * 0.5f, ey = dy / len * h * 0.5f;   // a little overlap closes the joints
+        const float qx[4] = {xs[i] + nx - ex, xs[i + 1] + nx + ex, xs[i + 1] - nx + ex, xs[i] - nx - ex};
+        const float qy[4] = {ys[i] + ny - ey, ys[i + 1] + ny + ey, ys[i + 1] - ny + ey, ys[i] - ny - ey};
+        colorQuad(qx, qy, cs, blend, emissive);
+    }
 }
 
 float Renderer::textWidth(TextStyle style, std::string_view s) const { return font_ ? font_->measure(style, s) : 0.0f; }
