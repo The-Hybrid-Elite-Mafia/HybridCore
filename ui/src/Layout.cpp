@@ -86,6 +86,7 @@ Layout::Layout(const params::ParameterTree& tree, float extraH) : extraH_(std::m
         for (std::uint32_t b = 0; b < 3; ++b) {
             const float bx = cx + (static_cast<float>(b) - 1.0f) * kButtonPitch;
             buttonWidget_[s][b] = static_cast<int>(widgets_.size());
+            buttonRect_[s][b] = {bx - kButtonW / 2, y0 + 580, kButtonW, kButtonH};
             const Slot& sl = buttonSlot_[s][0][b];
             widgets_.push_back({WidgetKind::Button, {bx - kButtonW / 2, y0 + 580, kButtonW, kButtonH}, sl.param, s, sl.action, sl.caption});
         }
@@ -215,6 +216,10 @@ void Layout::setPage(Page page) noexcept {
             Widget& w = widgets_[static_cast<std::size_t>(buttonWidget_[s][b])];
             const Slot& sl = buttonSlot_[s][pg][b];
             w.param = sl.param; w.action = sl.action; w.caption = sl.caption;
+            w.rect = buttonRect_[s][b];
+            // A word too long for one cap (REMAKE) gets the whole row: its two neighbours are empty.
+            if (b == 0 && sl.action == UiAction::ForgeRemake)
+                w.rect = {buttonRect_[s][0].x, buttonRect_[s][0].y, buttonRect_[s][2].x + buttonRect_[s][2].w - buttonRect_[s][0].x, buttonRect_[s][0].h};
         }
     }
 }

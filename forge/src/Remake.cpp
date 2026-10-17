@@ -503,7 +503,12 @@ RemakeResult remake(const RemakeInput& in, const std::function<bool(float)>& pro
 
     // ---- which parts play in each bar ----------------------------------------------------------
     std::vector<std::array<bool, kTracks>> active(static_cast<std::size_t>(songBars));
-    const double midRef = percentile(std::vector<float>(barMid.begin(), barMid.end()), 0.8), bassRef = percentile(std::vector<float>(barBass.begin(), barBass.end()), 0.8);
+    auto asFloat = [](const auto& v) {
+        std::vector<float> f(v.size());
+        for (std::size_t i = 0; i < v.size(); ++i) f[i] = static_cast<float>(v[i]);
+        return f;
+    };
+    const double midRef = percentile(asFloat(barMid), 0.8), bassRef = percentile(asFloat(barBass), 0.8);
     std::vector<int> bassStep(steps, -1);   // MIDI note sounding (start) at each step, -1 none
     const float bassThr = static_cast<float>(bassRef / kStepsPerBar * 0.08);
     for (std::size_t j = 0; j < steps; ++j) {

@@ -1,4 +1,6 @@
-## The Hybrid Core — 0.13.0: REMAKE, the HEM effects, the HEM WAVE synth
+## The Hybrid Core — 0.13.1: REMAKE, the HEM effects, the HEM WAVE synth
+
+(0.13.1: the REMAKE button is one wide button so the word fits.)
 
 ### REMAKE (BEAT FORGE page, SPACE strip)
 Press **REMAKE** and pick one of your beats — one mixed file (WAV / MP3 / FLAC), or its stems (files with drum / kick / snare / hat / perc, bass / 808 / sub in the name are used for those parts; vocal / vox / acapella files are skipped; anything else counts as music). It listens to it on this PC (nothing is uploaded) and turns it back into a Beat Forge song: tempo, key, chords per bar, the drum groove, the 808 / bass line, a rough lead, and the song form (intro / verse / hook / outro). Press PLAY to hear the remake; GEN / re-roll redo parts, **BACK** puts your previous beat back. REMAKE while it is working cancels.

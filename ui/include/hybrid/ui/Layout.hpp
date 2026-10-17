@@ -129,6 +129,7 @@ private:
     struct Slot { int param = -1; UiAction action = UiAction::None; std::string caption; };   // what a knob / button does on a page
     std::array<std::array<int, kStripKnobs>, hc::kStemCount> knobWidget_{};
     std::array<std::array<int, 3>, hc::kStemCount>           buttonWidget_{};
+    std::array<std::array<Rect, 3>, hc::kStemCount>          buttonRect_{};    // each button's own place (a wide button may span all 3)
     std::array<std::array<std::array<Slot, kStripKnobs>, kPages>, hc::kStemCount> knobSlot_{};
     std::array<std::array<std::array<Slot, 3>, kPages>, hc::kStemCount>           buttonSlot_{};
     Rect          limit_;
