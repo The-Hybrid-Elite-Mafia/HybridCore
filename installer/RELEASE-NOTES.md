@@ -1,3 +1,9 @@
+## The Hybrid Core — 0.12.5: knob values in the bottom box
+
+Turning or pointing at a knob now shows its value in that strip's bottom box too (in the strip's colour, with a light behind it), not only the fader's. Let go and move away and the box shows the fader again. The knob's name still swaps to its value above the knob while you hold it. Everything else is the same as 0.12.4.
+
+---
+
 ## The Hybrid Core — 0.12.4: RESET button
 
 New **RESET** button in the top bar (after SCOPE):

@@ -318,7 +318,7 @@ void MixerView::drawCap(Renderer& r, Rect b, const std::string& caption, bool on
     }
 }
 
-void MixerView::drawFader(Renderer& r, const StripLayout& st, Rgba lineColour) const {
+void MixerView::drawFader(Renderer& r, const StripLayout& st, Rgba lineColour, const Widget* focusKnob) const {
     const Widget& w = layout_.widgets()[static_cast<std::size_t>(st.faderWidget)];
     const params::Parameter& prm = tree_.at(static_cast<std::size_t>(w.param));
     const float travel = st.faderTrack.h - st.capH;
@@ -329,11 +329,15 @@ void MixerView::drawFader(Renderer& r, const StripLayout& st, Rgba lineColour) c
     r.sprite(Sprite::FaderCap, {cx - cw / 2, cy - ch / 2, cw, ch});
     r.sprite(Sprite::FaderLine, {cx - st.capW * 0.43f, cy - st.capH * 0.085f, st.capW * 0.86f, st.capH * 0.17f}, lineColour, Blend::Over, true);
 
-    // Value readout.
-    std::string v = prm.format();
+    // Value readout: the fader, or the knob of this strip under the mouse / being turned
+    // (its name flashes above it, its value shows here, in the knob's colour).
+    const bool knob = focusKnob && focusKnob->param >= 0;
+    const params::Parameter& shown = knob ? tree_.at(static_cast<std::size_t>(focusKnob->param)) : prm;
+    std::string v = shown.format();
     if (r.textWidth(TextStyle::Value, v) > st.valueBox.w - 16 && v.size() > 3 && v.ends_with(" dB")) v.resize(v.size() - 3);
+    if (knob) r.fillRound(st.valueBox.inset(6), 8, st.accent.withAlpha(0.18f), Blend::Over);
     r.text(TextStyle::Value, fit(r, TextStyle::Value, v, st.valueBox.w - 16), st.valueBox.cx(),
-           st.valueBox.cy() + r.capHeight(TextStyle::Value) * 0.5f, lineColour, Align::Center, TextFx::Neon);
+           st.valueBox.cy() + r.capHeight(TextStyle::Value) * 0.5f, knob ? st.accent : lineColour, Align::Center, TextFx::Neon);
 }
 
 void MixerView::drawTransport(Renderer& r, const Widget& w, const ViewState& v) const {
@@ -594,7 +598,14 @@ void MixerView::drawDynamic(Renderer& r, const ViewState& v, const MeterState& m
             }
         }
         const Rgba line = (!st.isBus && bank > 0) ? busAccent(bank) : st.accent;
-        drawFader(r, st, line);
+        const Widget* focus = nullptr;   // a knob of this strip under the mouse or being turned
+        for (int wi : {v.active, v.hover}) {
+            if (wi < 0 || static_cast<std::size_t>(wi) >= layout_.widgets().size()) continue;
+            const Widget& fw = layout_.widgets()[static_cast<std::size_t>(wi)];
+            if ((fw.kind == WidgetKind::Knob || fw.kind == WidgetKind::SendKnob) && fw.param >= 0 && fw.index == st.index && !st.isBus &&
+                st.bed.contains(fw.rect.cx(), fw.rect.cy())) { focus = &fw; break; }
+        }
+        drawFader(r, st, line, focus);
         if (st.isBus) {
             const Rect in = st.meter.inset(8, 12);
             const float cw = (in.w - 4) * 0.5f;
