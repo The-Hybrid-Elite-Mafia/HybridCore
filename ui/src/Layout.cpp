@@ -199,7 +199,7 @@ void Layout::buildSlots(const params::ParameterTree& tree, std::uint32_t s) {
     } else {
         bs = {};
     }
-    if (s >= static_cast<std::uint32_t>(forge::kTracks) && s != 8 && s != 9) { bs[0] = {}; bs[1] = {}; }
+    if (s >= static_cast<std::uint32_t>(forge::kTracks) && s != 8 && s != 9 && s != 10) { bs[0] = {}; bs[1] = {}; }
 }
 
 void Layout::setPage(Page page) noexcept {

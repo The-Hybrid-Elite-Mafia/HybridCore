@@ -1,3 +1,30 @@
+## The Hybrid Core — 0.13.0: REMAKE, the HEM effects, the HEM WAVE synth
+
+### REMAKE (BEAT FORGE page, SPACE strip)
+Press **REMAKE** and pick one of your beats — one mixed file (WAV / MP3 / FLAC), or its stems (files with drum / kick / snare / hat / perc, bass / 808 / sub in the name are used for those parts; vocal / vox / acapella files are skipped; anything else counts as music). It listens to it on this PC (nothing is uploaded) and turns it back into a Beat Forge song: tempo, key, chords per bar, the drum groove, the 808 / bass line, a rough lead, and the song form (intro / verse / hook / outro). Press PLAY to hear the remake; GEN / re-roll redo parts, **BACK** puts your previous beat back. REMAKE while it is working cancels.
+
+Measured on beats Beat Forge rendered (the notes are known exactly): tempo right on 20 of 21, key right on 14 of 21 (2 more found the relative key), kick 0.65, snare 0.51, hats 0.73, bass 0.54 average match (1.0 = every hit). It works best on beats with clear drums; busy full songs with vocals come out rougher — give it the stems for better results.
+
+### HEM effects (VST3, for your DAW) — our own code, names and sound
+Installed into Common Files\VST3\HEM Suite.vst3 (ten plug-ins):
+- **HEM VOX ONE** — one knob for vocals: low cut, leveling, de-ess, presence and air (SING / RAP / BACKING)
+- **HEM EQ-6** — six-band EQ: low cut, low shelf, two bells, high shelf, high cut
+- **HEM BUS PRESS** — glue compressor for the mix or drum bus (mix knob, side-chain low cut, auto release)
+- **HEM SUBSTACK** — deeper sub and harmonics so 808s read on phones; mono below
+- **HEM STRIP** — channel strip: low cut, gate, compressor, 3-band EQ
+- **HEM CALM** — finds harsh ringing frequencies as they happen and turns only those down (Delta = hear what it removes)
+- **HEM CLIP** — clipper, 4x oversampled
+- **HEM CEILING** — mastering limiter with a true-peak ceiling (measured -0.99 dBTP at a -1.00 setting)
+- **HEM HEAT** — saturation: tape, tube or transistor, with tone and auto gain
+- **HEM BLOOM** — reverb that ducks only where it clashes with the dry sound
+
+### HEM WAVE (VST3 instrument) — our own wavetable synth
+Installed into Common Files\VST3\HEM WAVE.vst3: 8 wavetables (64 frames each) with morphing position and warp, unison up to 7, sub, filter (LP / BP / HP), two envelopes, LFO, mono / legato with glide, 10 presets (Glass Keys, Vocal Pad, 808 Wave Bass, Neon Lead, Pluck, Dark Choir, Bell Tower, Hollow Keys, Air Texture, Init).
+
+For now the plug-ins use your DAW's plain controls (no custom faceplates yet). Every one passed Steinberg's VST3 validator and its own sound tests; they have not been tried inside a DAW on your PC yet.
+
+---
+
 ## The Hybrid Core — 0.12.5: knob values in the bottom box
 
 Turning or pointing at a knob now shows its value in that strip's bottom box too (in the strip's colour, with a light behind it), not only the fader's. Let go and move away and the box shows the fader again. The knob's name still swaps to its value above the knob while you hold it. Everything else is the same as 0.12.4.

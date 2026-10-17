@@ -1,5 +1,6 @@
 # =============================================================================
-#  Optional VST3 build of the 13-stem matrix (HC_BUILD_VST3=ON).
+#  Optional VST3 builds (HC_BUILD_VST3=ON): the 13-stem matrix, the HEM Suite effects,
+#  and the HEM WAVE synth.
 #  Steinberg VST3 SDK v3.8.1 (MIT licence) is fetched at configure time — never
 #  committed. VSTGUI and the SDK examples are not fetched/built. Steinberg's
 #  validator is built and run automatically after the plug-in links.
@@ -29,5 +30,19 @@ set_target_properties(HybridCoreVST3 PROPERTIES CXX_STANDARD 23 CXX_STANDARD_REQ
 target_include_directories(HybridCoreVST3 SYSTEM PRIVATE "${vst3sdk_SOURCE_DIR}")
 target_compile_definitions(HybridCoreVST3 PRIVATE HC_VERSION_STR="${PROJECT_VERSION}")
 target_link_libraries(HybridCoreVST3 PRIVATE sdk hc::params hc::dsp)
+
+# HEM Suite: every HEM effect (hc::fx) in one bundle, one plug-in per effect.
+smtg_add_vst3plugin(HemSuite PACKAGE_NAME "HEM Suite" SOURCES_LIST src/HemSuiteVst3.cpp)
+set_target_properties(HemSuite PROPERTIES CXX_STANDARD 23 CXX_STANDARD_REQUIRED ON)
+target_include_directories(HemSuite SYSTEM PRIVATE "${vst3sdk_SOURCE_DIR}")
+target_compile_definitions(HemSuite PRIVATE HC_VERSION_STR="${PROJECT_VERSION}")
+target_link_libraries(HemSuite PRIVATE sdk hc::fx)
+
+# HEM WAVE: the wavetable synth (hc::synth) as a VST3 instrument.
+smtg_add_vst3plugin(HemWave PACKAGE_NAME "HEM WAVE" SOURCES_LIST src/HemWaveVst3.cpp)
+set_target_properties(HemWave PROPERTIES CXX_STANDARD 23 CXX_STANDARD_REQUIRED ON)
+target_include_directories(HemWave SYSTEM PRIVATE "${vst3sdk_SOURCE_DIR}")
+target_compile_definitions(HemWave PRIVATE HC_VERSION_STR="${PROJECT_VERSION}")
+target_link_libraries(HemWave PRIVATE sdk hc::synth)
 
 message(STATUS "[HybridCore] VST3 plug-in enabled (SDK ${vst3sdk_SOURCE_DIR})")

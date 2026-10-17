@@ -40,7 +40,7 @@ ChangesAssociations=yes
 
 [Tasks]
 #ifdef Vst3Bundle
-Name: "vst3"; Description: "Install the VST3 plug-in (for your DAW) into Common Files\VST3"
+Name: "vst3"; Description: "Install the VST3 plug-ins (The Hybrid Core, the HEM effects, the HEM WAVE synth) into Common Files\VST3"
 #endif
 
 [Files]
@@ -62,6 +62,12 @@ Source: "{#AsioLicense}"; DestDir: "{app}\licenses"; DestName: "Steinberg-ASIO-S
 #ifdef Vst3Bundle
 Source: "{#Vst3Bundle}\*"; DestDir: "{commoncf64}\VST3\The Hybrid Core.vst3"; Flags: ignoreversion recursesubdirs createallsubdirs; Tasks: vst3
 Source: "{#Vst3License}";  DestDir: "{app}\licenses"; DestName: "Steinberg-VST3-SDK-LICENSE.txt"; Flags: ignoreversion
+#endif
+#ifdef HemSuiteBundle
+Source: "{#HemSuiteBundle}\*"; DestDir: "{commoncf64}\VST3\HEM Suite.vst3"; Flags: ignoreversion recursesubdirs createallsubdirs; Tasks: vst3
+#endif
+#ifdef HemWaveBundle
+Source: "{#HemWaveBundle}\*"; DestDir: "{commoncf64}\VST3\HEM WAVE.vst3"; Flags: ignoreversion recursesubdirs createallsubdirs; Tasks: vst3
 #endif
 
 [Icons]

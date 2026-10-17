@@ -30,6 +30,11 @@ if ($bundle -and $vstLic) {
     $defs += "/DVst3Bundle=$($bundle.FullName)"
     $defs += "/DVst3License=$($vstLic.FullName)"
     Write-Host "VST3 bundle: $($bundle.FullName)"
+    foreach ($pair in @(@('HEM Suite.vst3', 'HemSuiteBundle'), @('HEM WAVE.vst3', 'HemWaveBundle'))) {
+        $b = Get-ChildItem $bin -Recurse -Directory -Filter $pair[0] -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match '\\Release\\' } | Select-Object -First 1
+        if ($b) { $defs += "/D$($pair[1])=$($b.FullName)"; Write-Host "VST3 bundle: $($b.FullName)" }
+        else { throw "$($pair[0]) not found in the build" }
+    }
 } else { Write-Host 'NOTE: no VST3 bundle found; installer will not contain the plug-in.' }
 
 & $iscc @defs (Join-Path $root 'installer\HybridCore.iss') | Out-Host

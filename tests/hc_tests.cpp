@@ -225,6 +225,13 @@ int main(int argc, char** argv) {
     testForgeEngine();
     testForgeInMixer();
     testRemake();
+    testFxCommon();
+    testFxClip();
+    testFxCeiling();
+    testFxHeat();
+    testFxDynamics();
+    testFxTone();
+    testSynth();
     testUiImage();
     testUiLayout();
     testUiFaceplate();
