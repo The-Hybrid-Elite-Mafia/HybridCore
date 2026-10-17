@@ -7,6 +7,7 @@
 #include "AudioHost.hpp"
 #include "StemDeck.hpp"
 #include "ForgeController.hpp"
+#include "RemakeJob.hpp"
 
 #include "hybrid/analysis/Analyzer.hpp"
 #include "hybrid/core/RealtimeThread.hpp"
@@ -94,13 +95,13 @@ Source sourceFromName(const std::string& n) { return n == "inputs" ? Source::Har
 std::string slotKey(std::uint32_t s) { char b[16]; std::snprintf(b, sizeof b, "slot%02u", s + 1); return b; }
 
 // Windows file dialog, multi-select, WAV/MP3/FLAC. Empty when cancelled.
-std::vector<std::filesystem::path> askForStems(HWND owner) {
+std::vector<std::filesystem::path> askForStems(HWND owner, const wchar_t* title = L"Load stems (up to 13, in name order)") {
     std::vector<std::filesystem::path> out;
     IFileOpenDialog* dlg = nullptr;
     if (FAILED(::CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&dlg)))) return out;
     const COMDLG_FILTERSPEC filters[] = {{L"Audio (WAV, MP3, FLAC)", L"*.wav;*.wave;*.mp3;*.flac"}, {L"All files", L"*.*"}};
     dlg->SetFileTypes(2, filters);
-    dlg->SetTitle(L"Load stems (up to 13, in name order)");
+    dlg->SetTitle(title);
     FILEOPENDIALOGOPTIONS o = 0;
     dlg->GetOptions(&o);
     dlg->SetOptions(o | FOS_ALLOWMULTISELECT | FOS_FILEMUSTEXIST | FOS_FORCEFILESYSTEM);
@@ -213,6 +214,8 @@ struct App {
     std::vector<app::DeviceChoice> devices;
     int                   deviceIndex = 0;
     std::unique_ptr<app::ForgeController> forge;   // Beat Forge (created once the tree is bound)
+    app::RemakeJob        remakeJob;        // REMAKE: one of your beats back into Beat Forge
+    int                   remakeShown = -1; // last progress % shown
     std::filesystem::path session;          // current .hcs ("" = not saved yet)
     std::uint64_t         pendingSeek = UINT64_MAX;   // applied once the stems of an opened session are loaded
     media::MixExporter    exporter;
@@ -486,6 +489,29 @@ struct App {
         say("BEAT FORGE  \xC2\xB7  " + (g ? g->format() : std::string()) + "  \xC2\xB7  " + forge->chords() + "  \xC2\xB7  " +
             (b ? b->format() : std::string()) + "  \xC2\xB7  " + forge->form());
     }
+    // REMAKE: pick your beat (one mixed file) or its stems (named drums / bass / 808 / keys...;
+    // vocals are skipped). It is measured here, on this PC, and comes back as a Beat Forge song.
+    void startRemake(HWND owner) {
+        if (remakeJob.busy()) { remakeJob.cancel(); say("REMAKE: cancelling..."); return; }
+        const auto files = askForStems(owner, L"REMAKE: pick your beat (one file) or its stems (drums, bass / 808, keys...)");
+        if (files.empty()) return;
+        if (remakeJob.start(files, kSampleRate)) { remakeShown = -1; say("REMAKE: listening to " + remakeJob.what() + "..."); }
+    }
+    void pollRemake() {
+        if (remakeJob.busy()) {
+            const int pc = static_cast<int>(remakeJob.progress() * 100.0f);
+            if (pc / 5 != remakeShown / 5) { remakeShown = pc; say("REMAKE: listening to " + remakeJob.what() + "  " + std::to_string(pc) + " %  (REMAKE again cancels)"); }
+            return;
+        }
+        auto r = remakeJob.poll();
+        if (!r) return;
+        if (!r->ok) { say(r->error == "cancelled" ? std::string("REMAKE cancelled") : "REMAKE failed: " + r->error); return; }
+        scopeSource.clear();
+        forge->applyRemake(*r);
+        if (audio.source() != Source::Stems) audio.setSource(Source::Stems);
+        for (std::uint32_t s = 0; s < static_cast<std::uint32_t>(forge::kTracks); ++s) stems.clear(s);   // strips 1-8 play the remake
+        say(r->summary + "  \xC2\xB7  press PLAY  \xC2\xB7  GEN / re-roll to redo parts, BACK undoes");
+    }
     void forgeReroll(int track) {
         forge->reroll(track);
         say(std::string("BEAT FORGE  \xC2\xB7  new ") + forge::kTrackNames[track] + " part (BACK undoes it)");
@@ -667,6 +693,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                 }
                 case ui::UiAction::ForgeGenerate: a.forgeGenerate(); break;
                 case ui::UiAction::ForgeUndo:     a.forge->undo(); a.say(a.forge->canUndo() ? "" : "BEAT FORGE  \xC2\xB7  undone"); break;
+                case ui::UiAction::ForgeRemake:   a.startRemake(static_cast<HWND>(window.nativeHandle())); console.interaction().mouseUp(); break;
                 case ui::UiAction::ForgeClear:    a.forge->clear(); a.say("BEAT FORGE  \xC2\xB7  pattern cleared (BACK brings it back)"); break;
                 case ui::UiAction::CycleSource: {
                     const Source s = a.audio.source();
@@ -783,6 +810,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             a.audio.seek(static_cast<std::uint64_t>(f * static_cast<double>(songLen - 1)));
         }
         a.pollExport();
+        a.pollRemake();
         if (a.pendingSeek != UINT64_MAX && !a.stems.loading()) {
             if (a.pendingSeek < songLen) a.audio.seek(a.pendingSeek);
             a.pendingSeek = UINT64_MAX;

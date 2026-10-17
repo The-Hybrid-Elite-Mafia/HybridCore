@@ -224,6 +224,7 @@ int main(int argc, char** argv) {
     testForgeComposer();
     testForgeEngine();
     testForgeInMixer();
+    testRemake();
     testUiImage();
     testUiLayout();
     testUiFaceplate();

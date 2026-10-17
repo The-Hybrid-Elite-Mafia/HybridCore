@@ -83,6 +83,22 @@ void ForgeController::reroll(int track) {
     compose(s, false, false);
 }
 
+void ForgeController::applyRemake(const RemakeResult& r) {
+    if (!r.ok) return;
+    remember();
+    song_   = r.song;
+    chords_ = r.chords;
+    auto set = [&](const std::string& id, float v) { if (params::Parameter* p = tree_.find(id)) p->setPlain(v); };
+    set(id::bpm, static_cast<float>(r.bpm));
+    set(id::key, static_cast<float>(r.key));
+    set(id::scale, static_cast<float>(r.scale));
+    set(id::arrange, r.song.arrangement.active() ? 1.0f : 0.0f);
+    const int b = r.song.pattern.bars;
+    set(id::bars, b >= 8 ? 3.0f : b >= 4 ? 2.0f : b >= 2 ? 1.0f : 0.0f);
+    set(id::on, 1.0f);
+    publish();
+}
+
 void ForgeController::undo() {
     if (!undo_) return;
     song_    = undo_->song;

@@ -7,6 +7,7 @@
 // =============================================================================
 #include "hybrid/forge/Composer.hpp"
 #include "hybrid/forge/ForgeEngine.hpp"
+#include "hybrid/forge/Remake.hpp"
 #include "hybrid/params/ParameterTree.hpp"
 
 #include <array>
@@ -28,6 +29,9 @@ public:
     void undo();
     [[nodiscard]] bool canUndo() const noexcept { return undo_.has_value(); }
     void clear();                 // empty pattern (Beat Forge stays on, silent)
+    // REMAKE: the remade beat becomes the song (BACK undoes it); sets BPM, key, scale,
+    // FULL song form on, Beat Forge on. Sounds and knobs are left as they are.
+    void applyRemake(const forge::RemakeResult& r);
 
     [[nodiscard]] const forge::Song& song() const noexcept { return song_; }
     [[nodiscard]] const std::string& chords() const noexcept { return chords_; }

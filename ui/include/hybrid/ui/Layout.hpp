@@ -34,7 +34,7 @@ enum class WidgetKind : std::uint8_t { Knob, SendKnob, Fader, Button, StemMeter,
                                        Command, BusTitle };
 enum class UiAction : std::uint8_t { None, PrevDevice, NextDevice, LoadStems, CycleSource, ClearSolo, ClearMute, FaderBank,
                                      ToStart, PlayPause, Stop, ToggleLoop, Seek, SelectPage,
-                                     OpenSession, SaveSession, ExportMix, ForgeGenerate, ForgeUndo, ForgeClear, ToggleScope, ResetAll };
+                                     OpenSession, SaveSession, ExportMix, ForgeGenerate, ForgeUndo, ForgeClear, ToggleScope, ResetAll, ForgeRemake };
 
 // What the 5 knobs of every stem strip control.
 enum class Page : std::uint8_t { Mix, Eq, Dynamics, Forge };

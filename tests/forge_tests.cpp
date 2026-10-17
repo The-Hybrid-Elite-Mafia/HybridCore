@@ -9,6 +9,7 @@
 #include "hybrid/forge/Composer.hpp"
 #include "hybrid/forge/Forge.hpp"
 #include "hybrid/forge/ForgeEngine.hpp"
+#include "hybrid/forge/Remake.hpp"
 #include "hybrid/media/AudioFile.hpp"
 #include "hybrid/media/MixExporter.hpp"
 #include "hybrid/params/MixerParams.hpp"
@@ -496,6 +497,100 @@ void testForgeInMixer() {
         CHECK(again && first == second);
     }
     fs::remove_all(dir, ec);
+}
+
+// REMAKE: Beat Forge renders songs whose notes are known exactly; REMAKE must hear the tempo,
+// key and the groove back out of the mixed audio (nothing else is given to it).
+namespace {
+std::set<int> remakeStarts(const forge::Song& s, int track, int shift, int songSteps) {
+    std::set<int> out;
+    const auto& P = s.pattern;
+    for (int base = 0; base < songSteps; base += P.lengthSteps())
+        for (int i = 0; i < P.tracks[static_cast<std::size_t>(track)].count; ++i) {
+            const forge::Note& n = P.tracks[static_cast<std::size_t>(track)].notes[static_cast<std::size_t>(i)];
+            if (std::fabs(n.start - std::round(n.start)) > 0.2) continue;   // 16th grid only
+            const int j = static_cast<int>(std::lround(base + n.start)) + shift;
+            if (j < 0 || j >= songSteps) continue;
+            const int bar = j / forge::kStepsPerBar;
+            if (s.arrangement.active() && (bar >= s.arrangement.bars || !((s.arrangement.mask[static_cast<std::size_t>(bar)] >> track) & 1))) continue;
+            out.insert(j);
+        }
+    return out;
+}
+} // namespace
+
+void testRemake() {
+    std::printf("[remake] tempo, key and groove heard back from rendered Beat Forge songs\n");
+    using namespace forge;
+    struct Case { int genre; unsigned seed; };
+    const Case cases[] = {{0, 2}, {2, 2}, {4, 2}};   // TRAP 133, DRILL 138, OUTLAW COUNTRY 93 (seeds measured offline)
+    for (const Case& c : cases) {
+        params::ParameterTree tree;
+        params::addMixerParameters(tree);
+        addForgeParameters(tree);
+        ComposeSettings cs;
+        cs.genre = c.genre; cs.harmonySeed = c.seed * 977; cs.key = static_cast<int>((c.seed * 5) % 12); cs.scale = static_cast<int>(c.seed % 2);
+        for (int t = 0; t < kTracks; ++t) cs.trackSeed[static_cast<std::size_t>(t)] = c.seed * 31 + static_cast<unsigned>(t);
+        ComposeResult cr;
+        Composer::compose(cs, Pattern{}, cr);
+        Song song;
+        song.pattern = cr.pattern;
+        song.arrangement = Composer::arrange(c.genre, song.pattern, cs.harmonySeed, cs.variation);
+        for (int t = bass; t < kTracks; ++t) tree.find(id::type(t))->setPlain(static_cast<float>(cr.soundType[static_cast<std::size_t>(t)]));
+        tree.find(id::on)->setPlain(1); tree.find(id::bpm)->setPlain(static_cast<float>(cr.bpm)); tree.find(id::arrange)->setPlain(1);
+        tree.find(id::swing)->setPlain(static_cast<float>(Composer::genreSwing(c.genre)));
+        ForgeEngine e;
+        e.bind(tree);
+        e.prepare(48000, 512);
+        e.setSong(song);
+        const std::uint64_t len = std::min<std::uint64_t>(ForgeEngine::songLength(song, 48000, cr.bpm, true), 48000ull * 75);
+        std::vector<float> L, R;
+        L.reserve(len + 512); R.reserve(len + 512);
+        for (std::uint64_t pos = 0; pos < len; pos += 512) {
+            e.beginBlock(512);
+            e.render(0, 512, pos, true);
+            e.endBlock(512);
+            for (int i = 0; i < 512; ++i) {
+                float l = e.fxReturn(0)[i], r = e.fxReturn(1)[i];
+                for (int t = 0; t < kTracks; ++t) { l += e.track(t, 0)[i]; r += e.track(t, 1)[i]; }
+                L.push_back(l); R.push_back(r);
+            }
+        }
+        RemakeInput in;
+        in.mixL = L.data(); in.mixR = R.data(); in.mixFrames = L.size();
+        const RemakeResult res = remake(in);
+        CHECK(res.ok);
+        CHECK(std::fabs(res.bpm - cr.bpm) < 0.6);
+        CHECK(res.key == cs.key && res.scale == cs.scale);
+        const double stepSec = 60.0 / cr.bpm / 4;
+        const int songSteps = static_cast<int>(static_cast<double>(L.size()) / 48000.0 / stepSec);
+        const int shift = static_cast<int>(std::lround(res.firstDownbeat / stepSec));
+        auto f1 = [&](int t) {
+            const auto truth = remakeStarts(song, t, 0, songSteps), got = remakeStarts(res.song, t, shift, songSteps);
+            int tp = 0;
+            for (int x : got) tp += static_cast<int>(truth.count(x));
+            const double p = got.empty() ? 0 : static_cast<double>(tp) / static_cast<double>(got.size());
+            const double r = truth.empty() ? 1 : static_cast<double>(tp) / static_cast<double>(truth.size());
+            return p + r > 0 ? 2 * p * r / (p + r) : 0.0;
+        };
+        const double fk = f1(kick), fs = f1(snare), fh = f1(hats), fb = f1(bass);
+        std::printf("  %-15s %5.1f -> %5.1f BPM  key %s%s -> %s%s  F1 kick %.2f snare %.2f hats %.2f bass %.2f  (%s)\n", kGenreNames[c.genre], cr.bpm, res.bpm,
+                    kKeyNames[cs.key], cs.scale ? "m" : "", kKeyNames[res.key], res.scale ? "m" : "", fk, fs, fh, fb, res.chords.c_str());
+        CHECK(fk >= 0.5);
+        CHECK(fs >= 0.5);
+        CHECK(fh >= 0.5);
+        CHECK(fb >= 0.4);
+        CHECK(res.song.arrangement.active() && !res.song.pattern.isEmpty());
+        // The remade song round-trips through the session text like any Beat Forge song.
+        Song back;
+        CHECK(songFromText(songToText(res.song), back) && back.pattern.tracks[kick].count == res.song.pattern.tracks[kick].count);
+    }
+    // Silence and empty input fail cleanly.
+    std::vector<float> quiet(48000 * 10, 0.0f);
+    RemakeInput q;
+    q.mixL = quiet.data(); q.mixR = quiet.data(); q.mixFrames = quiet.size();
+    CHECK(!remake(q).ok);
+    CHECK(!remake(RemakeInput{}).ok);
 }
 
 } // namespace hc::test

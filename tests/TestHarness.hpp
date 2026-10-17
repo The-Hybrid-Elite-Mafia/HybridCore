@@ -42,6 +42,7 @@ void testSession();
 void testForgeComposer();
 void testForgeEngine();
 void testForgeInMixer();
+void testRemake();
 void testExport();
 void testLoudness();
 void testAnalyzer();

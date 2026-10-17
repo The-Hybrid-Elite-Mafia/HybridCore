@@ -2,9 +2,9 @@
 #  HybridCore.exe — standalone 13-stem console (GUI subsystem)
 #  hc_apphost   — the audio host (engine + device streams) and the stem deck, shared with hc_ui_snapshot
 # =============================================================================
-add_library(hc_apphost STATIC src/AudioHost.cpp src/StemDeck.cpp src/ForgeController.cpp)
+add_library(hc_apphost STATIC src/AudioHost.cpp src/StemDeck.cpp src/ForgeController.cpp src/RemakeJob.cpp)
 target_include_directories(hc_apphost PUBLIC src)
-target_link_libraries(hc_apphost PUBLIC hc::build_flags hc::engine hc::io hc::media)
+target_link_libraries(hc_apphost PUBLIC hc::build_flags hc::engine hc::io hc::media hc::forge)
 
 configure_file(resources/HybridCore.rc.in "${CMAKE_CURRENT_BINARY_DIR}/HybridCore.rc" @ONLY)
 add_executable(HybridCore WIN32

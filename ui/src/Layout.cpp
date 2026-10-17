@@ -191,6 +191,7 @@ void Layout::buildSlots(const params::ParameterTree& tree, std::uint32_t s) {
         knob(0, forge::id::revSize, "REVERB"); knob(1, forge::id::revTone, "TONE");
         knob(2, forge::id::dlyTime, "DLY"); knob(3, forge::id::dlyFb, "FDBK");
         bs = {};
+        bs[0] = {-1, UiAction::ForgeRemake, "REMAKE"};
     } else if (s == 11) {        // SOUNDS
         knob(0, forge::id::type(forge::bass), "BASS"); knob(1, forge::id::type(forge::keys), "KEYS");
         knob(2, forge::id::type(forge::lead), "LEAD"); knob(3, forge::id::type(forge::pad), "PAD");

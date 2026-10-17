@@ -363,7 +363,9 @@ void testUiLayout() {
         int soundOk = 0, empty13 = 0, lockOk = 0;
         const ui::Widget* gen = nullptr;
         const ui::Widget* genre = nullptr;
+        const ui::Widget* remakeBtn = nullptr;
         for (const auto& w : L.widgets()) {
+            if (w.kind == ui::WidgetKind::Button && w.index == 10 && w.action == ui::UiAction::ForgeRemake) remakeBtn = &w;
             if ((w.kind == ui::WidgetKind::Knob || w.kind == ui::WidgetKind::SendKnob) && w.index < 8 && w.param >= 0) {
                 const std::string& pid = tree.at(static_cast<std::size_t>(w.param)).spec().id;
                 if (pid.rfind(std::string("forge.") + forge::kTrackKeys[w.index] + ".", 0) == 0) ++soundOk;
@@ -377,6 +379,11 @@ void testUiLayout() {
         CHECK(soundOk == 8 * 5 && lockOk == 8 && empty13 == 8 && gen && genre);   // strip 13: 5 knobs + 3 buttons empty
         if (gen) {
             CHECK(in.mouseDown(gen->rect.cx(), gen->rect.cy(), false, false) == ui::UiAction::ForgeGenerate);
+            in.mouseUp();
+        }
+        CHECK(remakeBtn != nullptr);   // REMAKE sits on the SPACE strip of the BEAT FORGE page
+        if (remakeBtn) {
+            CHECK(in.mouseDown(remakeBtn->rect.cx(), remakeBtn->rect.cy(), false, false) == ui::UiAction::ForgeRemake);
             in.mouseUp();
         }
         for (const auto& w : L.widgets())
