@@ -225,6 +225,35 @@ struct App {
     bool                  tapOn = false, wasPlaying = false;
     std::string           scopeSource;      // file opened with OPEN ("" = the console's Main out)
     ui::ScopeCamera       camera;
+    // RESET: press once = "SURE?", again within 4 s = every knob and fader back to its start
+    // position (stems, the beat and its tempo / genre / key stay); then UNDO for 15 s.
+    int                   resetStage = 0;
+    std::chrono::steady_clock::time_point resetUntil{};
+    std::string           resetBackup;
+    void resetPressed() {
+        const auto now = std::chrono::steady_clock::now();
+        if (resetStage != 0 && now > resetUntil) resetStage = 0;
+        if (resetStage == 0) {
+            resetStage = 1;
+            resetUntil = now + std::chrono::seconds(4);
+            say("Press RESET again to put every knob and fader back (stems and beat stay)");
+        } else if (resetStage == 1) {
+            resetBackup = tree.serialize();
+            const std::size_t n = tree.resetToDefaults([](const std::string& id) { return forge::keepOnReset(id); });
+            resetStage = 2;
+            resetUntil = now + std::chrono::seconds(15);
+            say("RESET: " + std::to_string(n) + " controls back to start  \xC2\xB7  UNDO within 15 s puts them back");
+        } else {
+            tree.deserialize(resetBackup);
+            resetBackup.clear();
+            resetStage = 0;
+            say("RESET undone: every control is back how you had it");
+        }
+    }
+    [[nodiscard]] int resetStageNow() {
+        if (resetStage != 0 && std::chrono::steady_clock::now() > resetUntil) { resetStage = 0; resetBackup.clear(); }
+        return resetStage;
+    }
     bool                  orbiting = false;
     float                 orbitX = 0, orbitY = 0;
 
@@ -548,6 +577,15 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     a.audio.forge().bind(a.tree);
     a.forge = std::make_unique<app::ForgeController>(a.tree, a.audio.forge());
     a.forge->restore(a.settings.sectionText("forge"), a.settings.get("forge.meta", "seeds"));
+    {   // Say so when knobs and faders come back the way they were left last time.
+        std::size_t moved = 0;
+        for (std::size_t i = 0; i < a.tree.size(); ++i) {
+            const params::Parameter& p = a.tree.at(i);
+            if (!forge::keepOnReset(p.spec().id) && p.plain() != p.spec().def) ++moved;
+        }
+        if (moved > 0)
+            a.say("Welcome back: " + std::to_string(moved) + " controls are where you left them  \xC2\xB7  RESET puts them back");
+    }
 
     if (opts.session.empty()) a.restoreStems();   // background loads; the saved source below wins over the "switch to stems" a load does
     a.session = app::fromUtf8(a.settings.get("app", "session"));
@@ -647,6 +685,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                 }
                 case ui::UiAction::SelectPage:   console.setPage(static_cast<ui::Page>(idx)); break;
                 case ui::UiAction::ToStart:      a.audio.seek(0); a.analyzer.reset(); break;
+                case ui::UiAction::ResetAll: a.resetPressed(); console.interaction().mouseUp(); break;
                 case ui::UiAction::ToggleScope:
                     console.setScope(!console.scope());
                     if (console.scope()) a.say("ANALYZER: press PLAY, or OPEN a WAV / MP3 to measure it. Drag the 3D view to turn it.");
@@ -854,6 +893,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         vs.analyzer    = st.running ? &a.analyzer : nullptr;
         vs.camera      = a.camera;
         vs.scopeSource = a.scopeSource;
+        vs.resetStage  = a.resetStageNow();
         vs.hover   = console.interaction().hoverWidget();
         vs.active  = console.interaction().activeWidget();
         vs.pressed = console.interaction().pressedWidget();

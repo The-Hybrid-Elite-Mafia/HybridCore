@@ -211,4 +211,17 @@ bool songFromText(std::string_view text, Song& out) {
     return any;
 }
 
+bool keepOnReset(const std::string& pid) noexcept {
+    static const char* const kKeep[] = {id::on, id::bpm, id::swing, id::genre, id::key, id::scale, id::bars,
+                                        id::density, id::variation, id::humanize, id::setTempo, id::arrange};
+    for (const char* k : kKeep)
+        if (pid == k) return true;
+    if (pid.rfind("forge.", 0) != 0) return false;
+    const auto ends = [&](const char* tail) {
+        const std::size_t n = std::char_traits<char>::length(tail);
+        return pid.size() > n && pid.compare(pid.size() - n, n, tail) == 0;
+    };
+    return ends(".type") || ends(".lock");
+}
+
 } // namespace hc::forge

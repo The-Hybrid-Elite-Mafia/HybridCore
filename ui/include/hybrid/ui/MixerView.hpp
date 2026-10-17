@@ -94,6 +94,7 @@ struct ViewState {
     const analysis::Analyzer* analyzer = nullptr;
     ScopeCamera               camera;
     std::string               scopeSource;   // what is playing: a file name, or "" for the console's Main out
+    int                       resetStage = 0;   // RESET button: 0 = ready, 1 = "SURE?" (press again), 2 = "UNDO" offered
     int           hover   = -1;    // widget indices from Interaction
     int           active  = -1;
     int           pressed = -1;

@@ -182,4 +182,16 @@ std::size_t ParameterTree::deserialize(std::string_view text) {
     return applied;
 }
 
+std::size_t ParameterTree::resetToDefaults(const std::function<bool(const std::string& id)>& keep) {
+    std::size_t changed = 0;
+    for (auto& p : params_) {
+        if (keep && keep(p->spec().id)) continue;
+        if (p->plain() != p->spec().def) {
+            p->resetToDefault();
+            ++changed;
+        }
+    }
+    return changed;
+}
+
 } // namespace hc::params

@@ -109,6 +109,10 @@ public:
     // Message thread: run listeners for every parameter changed since the last call.
     std::size_t dispatchChanges();
 
+    // Puts every parameter back to its default except those `keep` says to leave alone.
+    // Returns how many values actually changed. Message thread.
+    std::size_t resetToDefaults(const std::function<bool(const std::string& id)>& keep = {});
+
     // "id=value" lines. Unknown ids and malformed lines are skipped on load.
     [[nodiscard]] std::string serialize() const;
     std::size_t               deserialize(std::string_view text);

@@ -103,4 +103,9 @@ inline constexpr const char* fxLevel  = "forge.fx";
 // parameter numbers never change.
 void addForgeParameters(params::ParameterTree& tree);
 
+// RESET (put every knob and fader back) leaves the beat itself alone: Beat Forge on / off, tempo,
+// swing, genre, key, scale, bars, density / variation / humanize, song form, the sound picked for
+// each melodic track, and the track locks. Everything else (mixer, Beat Forge sound knobs and sends) resets.
+[[nodiscard]] bool keepOnReset(const std::string& parameterId) noexcept;
+
 } // namespace hc::forge

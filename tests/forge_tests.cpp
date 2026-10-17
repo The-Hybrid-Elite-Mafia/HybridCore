@@ -375,6 +375,37 @@ void testForgeEngine() {
         CHECK(cHats < 0.85 && cKeys < 0.85 && cPad < 0.85);
         CHECK(cMix < 0.97 && dropMix > -1.0);
     }
+    {   // RESET: mixer and Beat Forge sound knobs go back to their defaults; the beat (on, tempo,
+        // genre, key, form, sound types, locks) stays; the saved text puts everything back (UNDO).
+        params::ParameterTree tree;
+        params::addMixerParameters(tree);
+        addForgeParameters(tree);
+        auto* trim = tree.find(params::stemParamId(0, "trim"));
+        auto* mainFader = tree.find(params::stemParamId(0, "main"));
+        auto* kickDecay = tree.find(id::knob(kick, 1));
+        auto* keysRev = tree.find(id::rev(keys));
+        trim->setPlain(6.0f);
+        mainFader->setPlain(1.5f);
+        kickDecay->setPlain(1200.0f);
+        keysRev->setPlain(80.0f);
+        tree.find(id::on)->setPlain(1.0f);
+        tree.find(id::bpm)->setPlain(150.0f);
+        tree.find(id::genre)->setPlain(3.0f);
+        tree.find(id::type(bass))->setPlain(2.0f);
+        tree.find(id::lock(snare))->setPlain(1.0f);
+        const std::string before = tree.serialize();
+        const std::size_t n = tree.resetToDefaults([](const std::string& pid) { return keepOnReset(pid); });
+        std::printf("  RESET: %zu controls back to default; beat settings kept\n", n);
+        CHECK(n == 4);
+        CHECK(trim->plain() == trim->spec().def && mainFader->plain() == mainFader->spec().def && kickDecay->plain() == kickDecay->spec().def &&
+              keysRev->plain() == keysRev->spec().def);
+        CHECK(tree.find(id::on)->isOn() && tree.find(id::bpm)->plain() == 150.0f && tree.find(id::genre)->plain() == 3.0f &&
+              tree.find(id::type(bass))->plain() == 2.0f && tree.find(id::lock(snare))->isOn());
+        tree.deserialize(before);
+        CHECK(trim->plain() == 6.0f && mainFader->plain() == 1.5f && kickDecay->plain() == 1200.0f && keysRev->plain() == 80.0f);
+        CHECK(!keepOnReset("stem01.trim") && !keepOnReset("forge.kick.decay") && keepOnReset("forge.pad.type") && keepOnReset("forge.genre"));
+        CHECK(tree.resetToDefaults() > 0 && !tree.find(id::on)->isOn());   // no keep rule: everything
+    }
 }
 
 void testForgeInMixer() {

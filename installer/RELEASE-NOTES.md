@@ -1,3 +1,18 @@
+## The Hybrid Core — 0.12.4: RESET button
+
+New **RESET** button in the top bar (after SCOPE):
+1. Press it once: it turns red and asks **SURE?**
+2. Press it again within 4 seconds: every knob and fader goes back to its start position — faders, trims, pans, EQ, compressors, sends, mutes / solos, bus levels, and Beat Forge's sound knobs and effects.
+3. Changed your mind? For 15 seconds the button says **UNDO**: press it and everything comes back the way you had it.
+
+RESET never touches your loaded stems or files, or the beat itself (Beat Forge on / off, tempo, genre, key, song form, the sounds it picked, locks).
+
+When the app opens with controls still set from last time, the status line now says so ("Welcome back: 12 controls are where you left them · RESET puts them back").
+
+Also in this version: every ANALYZER check always fits on screen (0.12.3).
+
+---
+
 ## The Hybrid Core — 0.12.3: every ANALYZER check fits
 
 On a shorter window a long check (e.g. the peak warning, two lines) pushed the last check (stereo) out of the CHECKS box. Now the checks switch to smaller text when they would not fit, so all of them always show. Everything else is the same as 0.12.2.
