@@ -63,6 +63,12 @@ inline constexpr float kVoiceGainDb[kTracks] = {-1.0f, -1.0f, -5.0f, -7.0f, -3.0
 // +4.7 .. +5.6 dBFS before the console, so Main's limiter was always working. -6 dB leaves the
 // beat peaking around -1 dBFS and the limiter as a safety net only.
 inline constexpr float kHeadroomDb = -6.0f;
+// Stereo spread per track (0 = centred). The side signal is a delayed, high-passed copy of the
+// track's centre, added to L and taken from R: wider on speakers and headphones, and the mono sum
+// (phone speaker, club mono) is exactly what it was. Kick and 808 stay centred.
+inline constexpr float kSpread[kTracks]    = {0.0f, 0.15f, 0.55f, 0.6f, 0.0f, 0.6f, 0.4f, 0.65f};
+inline constexpr float kSpreadMs[kTracks]  = {0.0f, 9.7f, 13.1f, 11.3f, 0.0f, 15.7f, 17.9f, 19.3f};
+inline constexpr float kSpreadLowHz        = 250.0f;   // below this the side signal is removed (bass stays centred)
 inline constexpr float kRevSendDefault[kTracks] = {0, 12, 0, 15, 0, 25, 20, 35};   // %
 inline constexpr float kDlySendDefault[kTracks] = {0, 0, 0, 0, 0, 10, 15, 0};      // %
 

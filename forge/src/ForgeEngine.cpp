@@ -231,6 +231,12 @@ void ForgeEngine::prepare(double sampleRate, std::uint32_t maxBlock) {
     revIn_.assign(static_cast<std::size_t>(2) * maxBlock_, 0.0f);
     dlyIn_.assign(static_cast<std::size_t>(2) * maxBlock_, 0.0f);
     fxOut_.assign(static_cast<std::size_t>(2) * maxBlock_, 0.0f);
+    spreadBuf_.assign(static_cast<std::size_t>(kTracks) * kSpreadRing, 0.0f);
+    spreadPos_.fill(0);
+    spreadLp_.fill(0.0f);
+    for (int t = 0; t < kTracks; ++t)
+        spreadDelay_[static_cast<std::size_t>(t)] = std::min(kSpreadRing - 1, static_cast<std::uint32_t>(std::lround(kSpreadMs[t] * 0.001 * sr_)));
+    spreadA_ = static_cast<float>(1.0 - std::exp(-2.0 * 3.14159265358979 * kSpreadLowHz / sr_));
     voices_->forEach([this](auto& v) { v.prepare(sr_); v.on = false; v.gate = 0; v.resetChoke(); });
     fx_->prepare(sr_);
     sendRev_.fill(0.0f);
@@ -273,6 +279,8 @@ std::uint64_t ForgeEngine::songFrames() const noexcept {
 void ForgeEngine::prepareVoicesForStart() noexcept {
     voices_->forEach([](auto& v) { v.on = false; v.gate = 0; v.resetChoke(); });
     fx_->reset();
+    std::fill(spreadBuf_.begin(), spreadBuf_.end(), 0.0f);
+    spreadLp_.fill(0.0f);
     sendRev_.fill(0.0f);
     sendDly_.fill(0.0f);
     fxGain_ = 0.0f;
@@ -442,6 +450,23 @@ void ForgeEngine::endBlock(std::uint32_t frames) noexcept {
         float* R = L + maxBlock_;
         const float vg = dbToGain(kVoiceGainDb[t] + kHeadroomDb);
         for (std::uint32_t s = 0; s < frames; ++s) { L[s] *= vg; R[s] *= vg; }
+        if (const float amt = kSpread[t]; amt > 0.0f && !spreadBuf_.empty()) {   // stereo spread, mono-safe
+            float* ring = spreadBuf_.data() + static_cast<std::size_t>(t) * kSpreadRing;
+            std::uint32_t pos = spreadPos_[static_cast<std::size_t>(t)];
+            const std::uint32_t d = spreadDelay_[static_cast<std::size_t>(t)];
+            float lp = spreadLp_[static_cast<std::size_t>(t)];
+            for (std::uint32_t s = 0; s < frames; ++s) {
+                ring[pos] = 0.5f * (L[s] + R[s]);
+                const float late = ring[(pos + kSpreadRing - d) & (kSpreadRing - 1)];
+                pos = (pos + 1) & (kSpreadRing - 1);
+                lp += spreadA_ * (late - lp);
+                const float side = (late - lp) * amt;
+                L[s] += side;
+                R[s] -= side;
+            }
+            spreadPos_[static_cast<std::size_t>(t)] = pos;
+            spreadLp_[static_cast<std::size_t>(t)] = lp;
+        }
         // Post-fader sends: follow the strip's fader, mute and solo.
         const bool audible = !(q.stripMute && q.stripMute->isOn()) && (!soloed || (q.stripSolo && q.stripSolo->isOn()));
         const float fader = audible ? (q.stripMain ? dbToGain(q.stripMain->effectiveDb()) : 1.0f) : 0.0f;

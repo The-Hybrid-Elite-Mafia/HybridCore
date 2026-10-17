@@ -121,6 +121,11 @@ private:
     std::vector<float> revIn_, dlyIn_, fxOut_;   // 2 x maxBlock each
     std::array<float, kTracks> sendRev_{}, sendDly_{};   // last block's send gains (ramped)
     float fxGain_ = 0.0f;
+    static constexpr std::uint32_t kSpreadRing = 2048;   // > 20 ms at 96 kHz
+    std::vector<float> spreadBuf_;                       // kTracks x kSpreadRing (centre history)
+    std::array<std::uint32_t, kTracks> spreadPos_{}, spreadDelay_{};
+    std::array<float, kTracks> spreadLp_{};
+    float spreadA_ = 0.0f;
     core::SpscRing<Event, 64> audition_;
 };
 

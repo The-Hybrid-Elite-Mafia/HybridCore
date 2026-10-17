@@ -343,6 +343,38 @@ void testForgeEngine() {
         a.render(12000, l, r, false);
         CHECK(rms(l) > 0.003);
     }
+    {   // Stereo spread: kick and 808 stay centred, hats / keys / pad go wide, and the whole beat
+        // keeps its level in mono (the side signal cancels in L+R instead of eating the centre).
+        ComposeSettings cs = settingsFor(trap, 1, 4, 21);
+        ComposeResult res;
+        Composer::compose(cs, Pattern{}, res);
+        Song song;
+        song.pattern = res.pattern;
+        auto corrOf = [&](int only, double& monoDropDb) {
+            Rig rig;
+            rig.only = only;
+            for (int t = bass; t < kTracks; ++t) rig.set(id::type(t), static_cast<float>(res.soundType[static_cast<std::size_t>(t)]));
+            rig.engine->setSong(song);
+            std::vector<float> l, r;
+            rig.render(static_cast<std::size_t>(kRate * 8), l, r);
+            double lr = 0, ll = 0, rr = 0, mono = 0;
+            for (std::size_t i = 0; i < l.size(); ++i) {
+                lr += static_cast<double>(l[i]) * r[i]; ll += static_cast<double>(l[i]) * l[i]; rr += static_cast<double>(r[i]) * r[i];
+                const double m = 0.5 * (static_cast<double>(l[i]) + r[i]);
+                mono += m * m;
+            }
+            monoDropDb = 10.0 * std::log10(std::max(1e-30, mono) / std::max(1e-30, 0.5 * (ll + rr)));
+            return ll > 0 && rr > 0 ? lr / std::sqrt(ll * rr) : 1.0;
+        };
+        double drop = 0, dropMix = 0;
+        const double cKick = corrOf(kick, drop), cBass = corrOf(bass, drop), cHats = corrOf(hats, drop), cKeys = corrOf(keys, drop),
+                     cPad = corrOf(pad, drop), cMix = corrOf(-1, dropMix);
+        std::printf("  stereo (1 = mono): kick %.3f, 808 %.3f, hats %.2f, keys %.2f, pad %.2f, whole beat %.2f; whole beat in mono %.2f dB\n", cKick, cBass,
+                    cHats, cKeys, cPad, cMix, dropMix);
+        CHECK(cKick > 0.999 && cBass > 0.999);
+        CHECK(cHats < 0.85 && cKeys < 0.85 && cPad < 0.85);
+        CHECK(cMix < 0.97 && dropMix > -1.0);
+    }
 }
 
 void testForgeInMixer() {

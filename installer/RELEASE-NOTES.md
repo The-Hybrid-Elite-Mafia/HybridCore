@@ -1,3 +1,13 @@
+## The Hybrid Core — 0.12.2: a wider Beat Forge
+
+The ANALYZER showed Beat Forge beats were almost mono (stereo +0.99: left and right nearly the same). Now hats, keys, pad, lead, percussion (and a touch of snare) spread out to the sides; kick and 808 stay dead centre.
+
+The width is made so it can't hurt in mono: the extra side sound cancels out when left and right are added together, so on a phone speaker or in a club the beat is exactly as before.
+
+Measured on a trap beat (1 = mono): kick 1.000, 808 1.000, hats 0.54, keys 0.53, pad 0.26, whole beat 0.96 (was 0.985); the whole beat in mono loses only 0.1 dB. Everything else is the same as 0.12.1.
+
+---
+
 ## The Hybrid Core — 0.12.1: the ANALYZER (3D)
 
 0.12.1 = 0.12.0 with cleaner labels in the ANALYZER (no "?" marks, BASS / HIGHS labels moved clear of the numbers).
