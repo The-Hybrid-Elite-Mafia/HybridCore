@@ -1,4 +1,6 @@
-## The Hybrid Core — 0.12.0: the ANALYZER (3D)
+## The Hybrid Core — 0.12.1: the ANALYZER (3D)
+
+0.12.1 = 0.12.0 with cleaner labels in the ANALYZER (no "?" marks, BASS / HIGHS labels moved clear of the numbers).
 
 New **SCOPE** button in the top bar (next to EXPORT). It covers the stem strips with the ANALYZER; press it again to get the strips back.
 

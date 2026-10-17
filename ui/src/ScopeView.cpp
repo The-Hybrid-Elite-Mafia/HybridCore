@@ -88,7 +88,7 @@ struct Projector {
         float x0 = 1e9f, x1 = -1e9f, y0 = 1e9f, y1 = -1e9f;
         for (float x : {-kXW - 0.25f, kXW + 0.25f})
             for (float y : {0.0f, kH})
-                for (float z : {-0.25f, kZD}) {
+                for (float z : {-0.6f, kZD}) {
                     float u, v, d;
                     raw(x, y, z, u, v, d);
                     x0 = std::min(x0, u); x1 = std::max(x1, u); y0 = std::min(y0, v); y1 = std::max(y1, v);
@@ -301,16 +301,16 @@ void drawScope(Renderer& r, Rect a, const ViewState& v) {
             r.text(TextStyle::Caption, name, sx, sy + 22, kDim, Align::Center, TextFx::Shadowed);
         }
         float sx, sy;
-        P(-kXW, 0, -0.32f, sx, sy);
-        r.text(TextStyle::Caption, "BASS", sx, sy + 26, kCyan.withAlpha(0.8f), Align::Left, TextFx::Shadowed);
-        P(kXW, 0, -0.32f, sx, sy);
-        r.text(TextStyle::Caption, "HIGHS  (Hz)", sx, sy + 26, kCyan.withAlpha(0.8f), Align::Right, TextFx::Shadowed);
+        P(-kXW, 0, -0.55f, sx, sy);
+        r.text(TextStyle::Caption, "< BASS", sx, sy + 26, kCyan.withAlpha(0.8f), Align::Left, TextFx::Shadowed);
+        P(kXW, 0, -0.55f, sx, sy);
+        r.text(TextStyle::Caption, "HIGHS >   (Hz)", sx, sy + 26, kCyan.withAlpha(0.8f), Align::Right, TextFx::Shadowed);
         P(kXW + 0.08f, 0, 0, sx, sy);
         r.text(TextStyle::Caption, "NOW", sx, sy + 8, rgb8(0xFFE2A8), Align::Left, TextFx::Shadowed);
         P(kXW + 0.08f, 0, kZD, sx, sy);
         r.text(TextStyle::Caption, fmtNum("%.1f s ago", static_cast<double>(kRows) * 2.0 * Analyzer::kHop / 48000.0), sx, sy + 8, kDim, Align::Left,
                TextFx::Shadowed);
-        r.text(TextStyle::Caption, "drag to turn  \xC2\xB7  double-click to reset", view.x + 10, view.bottom() - 8, kDim.withAlpha(0.7f), Align::Left,
+        r.text(TextStyle::Caption, "DRAG TO TURN  /  DOUBLE-CLICK TO RESET", view.x + 10, view.bottom() - 8, kDim.withAlpha(0.7f), Align::Left,
                TextFx::Shadowed);
     }
 
@@ -322,7 +322,7 @@ void drawScope(Renderer& r, Rect a, const ViewState& v) {
     {   // LOUDNESS
         const Rect c{cx0, y, cw, 250};
         card(r, c);
-        r.text(TextStyle::DisplayCap, "LOUDNESS  \xC2\xB7  LAST 3 S", c.x + 26, c.y + 44, kCyan, Align::Left, TextFx::Neon);
+        r.text(TextStyle::DisplayCap, "LOUDNESS - LAST 3 S", c.x + 26, c.y + 44, kCyan, Align::Left, TextFx::Neon);
         const double st = an ? an->shortTermLufs() : Analyzer::kSilentLufs;
         const std::string big = lufsText(st);
         r.text(TextStyle::Display, big, c.x + 26, c.y + 140, kText, Align::Left, TextFx::Neon);
@@ -388,7 +388,7 @@ void drawScope(Renderer& r, Rect a, const ViewState& v) {
     {   // CHECKS
         const Rect c{cx0, y, cw, a.bottom() - 24 - y};
         card(r, c);
-        r.text(TextStyle::DisplayCap, "CHECKS", c.x + 26, c.y + 44, kCyan, Align::Left, TextFx::Neon);
+        r.text(TextStyle::DisplayCap, "CHECKS - WHOLE PLAY SO FAR", c.x + 26, c.y + 44, kCyan, Align::Left, TextFx::Neon);
         float ly2 = c.y + 92;
         const float lineH = 40.0f;
         std::vector<Analyzer::Check> checks;
