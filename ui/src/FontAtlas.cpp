@@ -173,18 +173,26 @@ void FontAtlas::layout(TextStyle style, std::string_view s, float x, float basel
     float pen = x * scale_;
     const float base = baselineY * scale_;
     for (std::size_t i = 0; i < s.size();) {
-        const Packed& p = *glyph(st, nextCodepoint(s, i));
-        if (p.x1 > p.x0 && p.y1 > p.y0) {
+        const std::uint32_t cp = nextCodepoint(s, i);
+        const Packed& p = *glyph(st, cp);
+        // Spaces draw nothing: a padded quad around their empty cell would pick up the blurred
+        // edge of the next glyph in the atlas (thin bars between words in neon text).
+        if (cp != 0x20 && cp != 0xA0 && p.x1 > p.x0 && p.y1 > p.y0) {
             // Pixel-snap the pen so small text stays sharp.
             const float px0 = std::round(pen + p.xoff), py0 = std::round(base + p.yoff);
             const float w = p.xoff2 - p.xoff, h = p.yoff2 - p.yoff;
+            // The blur reaches kBlurRadius TEXELS around each glyph; with horizontal oversampling a
+            // texel is narrower than a screen pixel, so the padding is limited in texels (beyond it
+            // the quad would sample the neighbouring glyph: thin bars beside neon text).
+            const float rx = static_cast<float>(p.x1 - p.x0) / std::max(w, 1e-3f), ry = static_cast<float>(p.y1 - p.y0) / std::max(h, 1e-3f);
+            const float tp = std::min(padPx * rx, static_cast<float>(kBlurRadius));
+            const float tq = std::min(padPx * ry, static_cast<float>(kBlurRadius));
+            const float qpx = rx > 0 ? tp / rx : 0.0f, qpy = ry > 0 ? tq / ry : 0.0f;
             GlyphQuad q;
-            q.x0 = (px0 - padPx) / scale_;
-            q.y0 = (py0 - padPx) / scale_;
-            q.x1 = (px0 + w + padPx) / scale_;
-            q.y1 = (py0 + h + padPx) / scale_;
-            const float tp = padPx * (static_cast<float>(p.x1 - p.x0) / std::max(w, 1e-3f));   // pad in atlas texels (x)
-            const float tq = padPx * (static_cast<float>(p.y1 - p.y0) / std::max(h, 1e-3f));
+            q.x0 = (px0 - qpx) / scale_;
+            q.y0 = (py0 - qpy) / scale_;
+            q.x1 = (px0 + w + qpx) / scale_;
+            q.y1 = (py0 + h + qpy) / scale_;
             q.s0 = (p.x0 - tp) * inv; q.t0 = (p.y0 - tq) * inv;
             q.s1 = (p.x1 + tp) * inv; q.t1 = (p.y1 + tq) * inv;
             emit(q);

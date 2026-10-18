@@ -54,6 +54,7 @@ struct PanelSpec {
     std::vector<PanelParam> params;
     std::vector<PanelMeter> meters;
     std::vector<PanelGroup> groups;
+    bool                    hasBypass = true;   // instruments have none
 };
 
 struct FxPalette {
@@ -106,6 +107,7 @@ struct PanelLayout {
     float width = 0, height = 0;
     Rect  header, titleArea, footer, bypass, logo;
     std::string name, blurb;
+    bool hasBypass = true;
     std::vector<PanelPocket>    pockets;
     std::vector<PanelGroove>    grooves;
     std::vector<PanelSection>   sections;

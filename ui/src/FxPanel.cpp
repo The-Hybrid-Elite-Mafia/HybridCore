@@ -15,7 +15,7 @@ namespace {
 
 constexpr float kMargin = 44.0f, kHeaderH = 190.0f, kFooterH = 112.0f, kBayPad = 22.0f, kGap = 26.0f;
 constexpr float kBayDepth = 5.0f, kWellDepth = 14.0f, kWindowDepth = 7.0f, kButtonDepth = 8.0f, kMeterDepth = 10.0f;
-constexpr float kSectionCaptionH = 46.0f;
+constexpr float kSectionCaptionH = 60.0f;
 
 int balancedCols(int cells, int maxCols) {
     if (cells <= 0) return 1;
@@ -141,7 +141,8 @@ PanelLayout layoutFxPanel(const PanelSpec& spec) {
     L.bypass    = {L.footer.right() - 230, L.footer.y + 18, 210, L.footer.h - 36};
     addRectPocket(L, L.header, 22, kBayDepth);
     L.pockets.push_back({L.logo, 66, kBayDepth + 10, true, true});
-    addRectPocket(L, L.bypass.inset(-6), 16, kButtonDepth);
+    L.hasBypass = spec.hasBypass;
+    if (spec.hasBypass) addRectPocket(L, L.bypass.inset(-6), 16, kButtonDepth);
     // neon channels: under the header, above the footer, both full width
     L.grooves.push_back({kMargin + 30, L.header.bottom() + 15, L.width - kMargin - 30, L.header.bottom() + 15, false});
     L.grooves.push_back({kMargin + 30, L.footer.y - 13, L.width - kMargin - 30, L.footer.y - 13, false});
@@ -155,7 +156,7 @@ PanelLayout layoutFxPanel(const PanelSpec& spec) {
         const float capH = g.name.empty() ? 0.0f : kSectionCaptionH;
         s.captionArea = {pl.bay.x + kBayPad, pl.bay.y + 10, pl.bay.w - 2 * kBayPad, capH};
         addRectPocket(L, pl.bay, 26, kBayDepth);
-        if (capH > 0) L.grooves.push_back({pl.bay.x + 24, pl.bay.y + capH + 6, pl.bay.right() - 24, pl.bay.y + capH + 6, true});
+        if (capH > 0) L.grooves.push_back({pl.bay.x + 24, pl.bay.y + capH + 2, pl.bay.right() - 24, pl.bay.y + capH + 2, true});
         L.sections.push_back(s);
         for (int i = 0; i < g.count; ++i) {
             const int col = i % pl.cols, row = i / pl.cols;

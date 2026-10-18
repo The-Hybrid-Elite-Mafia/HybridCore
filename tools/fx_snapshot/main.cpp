@@ -87,6 +87,7 @@ ui::PanelSpec waveSpec() {
     ui::PanelSpec s;
     s.name = "HEM WAVE";
     s.blurb = "Morphing wavetable synth: 8 tables, unison, sub, filter, two envelopes, LFO";
+    s.hasBypass = false;
     for (const synth::ParamInfo& p : synth::WaveSynth::params()) {
         ui::PanelParam pp;
         pp.name = p.name;

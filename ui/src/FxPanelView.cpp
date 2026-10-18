@@ -70,8 +70,8 @@ void FxPanelView::drawKnob(Renderer& r, const PanelKnob& k, const PanelHost& hos
 
 void FxPanelView::drawButton(Renderer& r, Rect b, const std::string& text, bool lit, bool hot, Rgba colour) const {
     if (lit) {
-        r.glow(b.inset(4), 10, 16.0f, colour.withAlpha(0.55f), true);
-        r.fillRound(b.inset(2), 10, colour.withAlpha(0.85f), Blend::Over, true);
+        r.glow(b.inset(4), 10, 12.0f, colour.withAlpha(0.40f), true);
+        r.fillRound(b.inset(2), 10, colour.withAlpha(0.92f), Blend::Over, false);
         r.fillRound({b.x + 8, b.y + 5, b.w - 16, b.h * 0.35f}, 8, {1, 1, 1, 0.16f}, Blend::Add);
         r.text(TextStyle::Caption, text, b.cx(), b.cy() + r.capHeight(TextStyle::Caption) * 0.5f, rgb8(0x0A0812), Align::Center, TextFx::Plain);
     } else {
@@ -134,19 +134,43 @@ void FxPanelView::draw(Renderer& r, const PanelHost& host, PanelHit hover, Panel
     const Rect ta = at(L.titleArea, ox, oy);
     const TextStyle ts = r.textWidth(TextStyle::Display, L.name) <= ta.w ? TextStyle::Display : TextStyle::Heading;
     r.text(ts, L.name, ta.x, ta.y + 92, pal_.lime, Align::Left, TextFx::Neon);
-    r.text(TextStyle::Sub, L.blurb, ta.x + 4, ta.y + 136, kText, Align::Left, TextFx::Shadowed);
+    {   // the one-line description: smaller, then shortened, so it never runs off the plate
+        TextStyle bs = TextStyle::Sub;
+        std::string blurb = L.blurb;
+        const float room = L.header.right() + ox - 30 - (ta.x + 4);
+        if (r.textWidth(bs, blurb) > room) bs = TextStyle::Caption;
+        while (blurb.size() > 8 && r.textWidth(bs, blurb) > room) blurb = blurb.substr(0, blurb.size() - 4) + "...";
+        r.text(bs, blurb, ta.x + 4, ta.y + 136, kText, Align::Left, TextFx::Shadowed);
+    }
     // section captions
     for (const PanelSection& s : L.sections)
         if (!s.caption.empty()) {
             const Rect c = at(s.captionArea, ox, oy);
-            r.text(TextStyle::Label, s.caption, c.x + 8, c.y + 32, pal_.violet, Align::Left, TextFx::Neon);
+            r.text(TextStyle::Label, s.caption, c.x + 8, c.y + 30, pal_.violet, Align::Left, TextFx::Neon);
         }
     // control captions
     for (const PanelCaption& c : L.captions) {
         const Rect a = at(c.r, ox, oy);
         std::string name = spec_.params[static_cast<std::size_t>(c.param)].name;
         for (char& ch : name) ch = static_cast<char>(std::toupper(static_cast<unsigned char>(ch)));
-        r.text(TextStyle::Label, name, a.cx(), a.y + 32, kText, Align::Center, TextFx::Shadowed);
+        // Fit the cell: full size, then smaller, then two lines (split at the middle space).
+        if (r.textWidth(TextStyle::Label, name) <= a.w) {
+            r.text(TextStyle::Label, name, a.cx(), a.y + 32, kText, Align::Center, TextFx::Shadowed);
+        } else if (r.textWidth(TextStyle::Caption, name) <= a.w) {
+            r.text(TextStyle::Caption, name, a.cx(), a.y + 30, kText, Align::Center, TextFx::Shadowed);
+        } else {
+            std::size_t cut = std::string::npos, best = std::string::npos;
+            for (std::size_t p = name.find(' '); p != std::string::npos; p = name.find(' ', p + 1)) {
+                const std::size_t d = p > name.size() / 2 ? p - name.size() / 2 : name.size() / 2 - p;
+                if (best == std::string::npos || d < best) { best = d; cut = p; }
+            }
+            if (cut == std::string::npos) {
+                r.text(TextStyle::Caption, name, a.cx(), a.y + 30, kText, Align::Center, TextFx::Shadowed);
+            } else {
+                r.text(TextStyle::Caption, name.substr(0, cut), a.cx(), a.y + 14, kText, Align::Center, TextFx::Shadowed);
+                r.text(TextStyle::Caption, name.substr(cut + 1), a.cx(), a.y + 40, kText, Align::Center, TextFx::Shadowed);
+            }
+        }
     }
     // knobs
     for (std::size_t i = 0; i < L.knobs.size(); ++i) {
@@ -189,7 +213,7 @@ void FxPanelView::draw(Renderer& r, const PanelHost& host, PanelHit hover, Panel
     // footer
     const Rect ft = at(L.footer, ox, oy);
     r.text(TextStyle::Status, "HYBRID ELITE MAFIA  -  STUDIO PLUG-INS", ft.x + 24, ft.cy() + 10, pal_.violet, Align::Left, TextFx::Neon);
-    if (host.hasBypass()) {
+    if (host.hasBypass() && L.hasBypass) {
         const bool byp = host.bypassed();
         drawButton(r, at(L.bypass, ox, oy), byp ? "BYPASSED" : "BYPASS", byp, hover.kind == PanelHit::Kind::Bypass, pal_.violet);
     }

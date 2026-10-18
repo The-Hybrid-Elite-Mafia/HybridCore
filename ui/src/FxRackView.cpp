@@ -14,8 +14,8 @@ const Rgba kGlass = rgb8(0x050507, 0.92f);
 
 void button(Renderer& r, Rect b, const std::string& text, bool lit, bool hot, Rgba colour, TextStyle ts = TextStyle::Label) {
     if (lit) {
-        r.glow(b.inset(4), 12, 18.0f, colour.withAlpha(0.5f), true);
-        r.fillRound(b, 12, colour.withAlpha(0.88f), Blend::Over, true);
+        r.glow(b.inset(4), 12, 10.0f, colour.withAlpha(0.35f), true);
+        r.fillRound(b, 12, colour.withAlpha(0.92f), Blend::Over, false);
         r.fillRound({b.x + 8, b.y + 5, b.w - 16, b.h * 0.33f}, 9, {1, 1, 1, 0.15f}, Blend::Add);
         r.text(ts, text, b.cx(), b.cy() + r.capHeight(ts) * 0.5f, rgb8(0x0A0812), Align::Center, TextFx::Plain);
     } else {
@@ -167,9 +167,9 @@ bool FxRackView::wheel(float x, float y, float notches, bool fine) {
 void FxRackView::draw(Renderer& r, float canvasScale, FxRackModel& model) {
     syncPanel(model, &r, canvasScale);
     // the rack's own glass, over the stem strips
-    r.fillRound(area_, 28, rgb8(0x060509, 0.97f), Blend::Over);
-    r.glow(area_.inset(6), 28, 22.0f, kViolet.withAlpha(0.35f), true);
+    r.fillRound(area_, 28, rgb8(0x060509, 1.0f), Blend::Over);
     r.fillRound({area_.x + 30, area_.y + 6, area_.w - 60, 4}, 2, kViolet, Blend::Over, true);
+    r.fillRound({area_.x + 30, area_.bottom() - 10, area_.w - 60, 4}, 2, kViolet, Blend::Over, true);
 
     // ---- left: strips and inserts
     r.text(TextStyle::Heading, "FX RACK", left_.x, left_.y + 56, kLime, Align::Left, TextFx::Neon);
