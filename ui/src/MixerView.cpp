@@ -488,7 +488,7 @@ void MixerView::drawOverview(Renderer& r, const ViewState& v) const {
 
 void MixerView::drawDynamic(Renderer& r, const ViewState& v, const MeterState& m) const {
     r.setBloomOnly(true);
-    drawEmissiveStatic(r, v.scope);
+    drawEmissiveStatic(r, v.scope || v.fxRack);
     r.setBloomOnly(false);
 
     // Status lamp in the logo socket.
@@ -515,6 +515,10 @@ void MixerView::drawDynamic(Renderer& r, const ViewState& v, const MeterState& m
     for (std::size_t i = 0; i < layout_.widgets().size(); ++i) {
         const Widget& w = layout_.widgets()[i];
         if (v.scope && layout_.underScope(w.rect)) continue;
+        if (v.fxRack) {   // under the FX RACK: nothing of the stem strips (their light would shine through)
+            const Rect mp = layout_.mainPanel();
+            if (w.rect.x >= mp.x && w.rect.right() <= mp.right() && w.rect.y >= mp.y && w.rect.bottom() <= mp.bottom()) continue;
+        }
         const bool hot = static_cast<int>(i) == v.hover || static_cast<int>(i) == v.active;
         switch (w.kind) {
         case WidgetKind::Knob:
@@ -571,7 +575,7 @@ void MixerView::drawDynamic(Renderer& r, const ViewState& v, const MeterState& m
     }
 
     for (const StripLayout& st : layout_.strips()) {
-        if (v.scope && !st.isBus) continue;   // under the ANALYZER
+        if ((v.scope || v.fxRack) && !st.isBus) continue;   // under the ANALYZER / FX RACK
         // Title area: stem name (or "STEM n"), and its load state.
         const float cx = st.bed.cx(), tw = st.bed.w - 24;
         if (st.isBus) {

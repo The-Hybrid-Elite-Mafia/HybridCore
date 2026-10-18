@@ -57,6 +57,10 @@ Turn your speakers/headphones DOWN first. Close any app that is playing audio
        6. Vocals: with Beat Forge on, LOAD puts your stems on strips 9-13.
        7. EXPORT renders the beat (and your stems 9-13) to a WAV, with the reverb tails.
        Your beat is saved with the session (SAVE) and comes back when you reopen the app.
+   - FX (top bar) opens the FX RACK: every stem strip takes 3 HEM effects (22 to choose from).
+       Pick a strip on the left, click a slot (1, 2, 3), pick an effect - its faceplate opens on
+       the right: drag the knobs, click the buttons. ON / OFF bypasses that slot, X removes it.
+       FX again (or SCOPE) closes the rack. Effects are saved with the session and in EXPORT.
    - LIM (bottom bar, blue = on) is a safety limiter on the main output: nothing goes over
      -0.3 dB. GR next to it shows how much it is turning down. It adds 1 ms of delay.
    - Knobs: drag up/down. Hold Shift for fine moves. Double-click = reset. Mouse wheel works too.
@@ -88,6 +92,8 @@ Turn your speakers/headphones DOWN first. Close any app that is playing audio
 6) VST3 (optional): in your DAW, rescan plug-ins and look for "The Hybrid Core"
    (vendor Hybrid Elite Mafia). It has 13 stereo inputs (Stem 1 + 12 side-chain inputs)
    and 4 stereo outputs. It uses the DAW's own generic controls (no custom screen yet).
+   "HEM Suite" holds the 22 HEM effects and "HEM WAVE" the synth: each opens its own obsidian
+   faceplate in the DAW.
 
 If something says "open failed": another app is using the device, or the device does
 not allow exclusive mode. Screenshot that message too.

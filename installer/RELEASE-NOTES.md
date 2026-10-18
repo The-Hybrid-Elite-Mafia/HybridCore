@@ -1,3 +1,31 @@
+## The Hybrid Core — 0.14.0: 12 new HEM effects, obsidian faceplates, the FX RACK
+
+### FX RACK (new FX button in the top bar)
+Every stem strip now takes **3 HEM effects** (inserts after its EQ / compressor). Press **FX**: pick a strip on the left, click a slot, pick an effect from the list — its faceplate opens on the right, live. **ON / OFF** bypasses a slot (no click), **X** removes it. Effects that need look-ahead (HUSH, SWIRL KILLER, CALM, TUNE) delay the other strips by the same amount, so everything stays in time. The effects are saved in sessions, kept when you reopen the app, and included in EXPORT.
+
+### 12 new effects (22 in total), rebuilt from the Rework Playground and improved
+- **HEM PUNCH** — transient shaper (attack / sustain), with a focus filter and clip guard
+- **HEM TRIBAND** — three-band compressor, with LISTEN to hear one band
+- **HEM WIDE** — stereo width with mono bass, side tone, SAFE (backs off width that would cancel in mono)
+- **HEM HUSH** — hiss / noise remover that learns the noise floor itself
+- **HEM DE-ESS** — S and T tamer, SPLIT or WIDE mode, LISTEN
+- **HEM DOUBLE** — instant double-track, 2 or 4 voices
+- **HEM DESK** — mixing-desk glue (4 desk characters), now 4x oversampled
+- **HEM DUST** — lo-fi: wow, flutter, bits, sample rate, vinyl that follows the music
+- **HEM TUNE** — vocal pitch correction (key, scale, retune speed) with sticky notes
+- **HEM BALANCE** — automatic tone balance, 10 bands
+- **HEM ECHO** — tempo-synced stereo / ping-pong delay with ducking and tape wobble
+- **HEM SWIRL KILLER** — removes AI / codec swirl in the stereo sides
+
+Measured in the tests (cloud computer): TUNE pulled 448 Hz to 439.6 Hz; DE-ESS took a loud 8 kHz ess down 8.7 dB and left 500 Hz at 0.0 dB; HUSH took hiss down 7.2 dB with the tone moved 0.3 dB; WIDE took the stereo spread at 40 Hz down 46 dB.
+
+### Faceplates for every plug-in
+All 22 HEM effects and HEM WAVE now open their own faceplate in your DAW (and in the FX RACK): polished obsidian, every knob, button and meter in its own CNC-routed pocket, violet and HEM-lime neon.
+
+Not tried on your PC yet: the faceplates inside a DAW, and the FX RACK with your own songs. The cloud tests rendered all 23 faceplates and ran the app with effects in the rack.
+
+---
+
 ## The Hybrid Core — 0.13.1: REMAKE, the HEM effects, the HEM WAVE synth
 
 (0.13.1: the REMAKE button is one wide button so the word fits.)
