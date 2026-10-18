@@ -99,7 +99,7 @@ void FxPanelView::drawKnob(Renderer& r, const PanelKnob& k, const PanelHost& hos
     const Rect v = at(k.value, ox, oy);
     r.fillRound(v.inset(3 * layout_.zoom), 7 * layout_.zoom, kGlass, Blend::Over);
     const std::string t = on ? host.text(k.param) : std::string("--");
-    const TextStyle vs = fit(r, TextStyle::Value, t, v.w - 10 * layout_.zoom);
+    const TextStyle vs = fit(r, TextStyle::Title, t, v.w - 12 * layout_.zoom);
     r.text(vs, t, v.cx(), v.cy() + r.capHeight(vs) * 0.5f, !on ? kTextDim : hot ? kText : pal_.lime, Align::Center, on ? TextFx::NeonCrisp : TextFx::Shadowed);
 }
 
@@ -152,7 +152,7 @@ void FxPanelView::drawMeter(Renderer& r, const PanelMeterSlot& s, float raw, flo
     const Rect vbox = at(s.value, ox, oy);
     r.fillRound(vbox.inset(2 * z), 7 * z, kGlass, Blend::Over);
     const std::string num = formatPanelMeter(m, number);
-    const TextStyle ns = fit(r, TextStyle::Value, num, vbox.w - 8 * z);
+    const TextStyle ns = fit(r, TextStyle::Title, num, vbox.w - 10 * z);
     r.text(ns, num, vbox.cx(), vbox.cy() + r.capHeight(ns) * 0.5f, pal_.lime, Align::Center, TextFx::NeonCrisp);
     const Rect cap = at(s.caption, ox, oy);
     const TextStyle cs = fit(r, TextStyle::Caption, m.name, cap.w);

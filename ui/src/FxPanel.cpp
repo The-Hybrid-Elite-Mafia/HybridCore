@@ -86,12 +86,12 @@ void layoutCell(PanelLayout& L, const PanelSpec& spec, int param, float x, float
 } // namespace
 
 namespace {
-PanelLayout layoutAtOne(const PanelSpec& spec);
+PanelLayout layoutAtOne(const PanelSpec& spec, int maxColsOverride);
 Rect zr(Rect r, float z) { return {r.x * z, r.y * z, r.w * z, r.h * z}; }
 } // namespace
 
-PanelLayout layoutFxPanel(const PanelSpec& spec, float zoom) {
-    PanelLayout L = layoutAtOne(spec);
+PanelLayout layoutFxPanel(const PanelSpec& spec, float zoom, int maxCols) {
+    PanelLayout L = layoutAtOne(spec, maxCols);
     const float z = std::clamp(zoom, 0.25f, 4.0f);
     if (std::fabs(z - 1.0f) < 1e-6f) return L;
     L.zoom = z;
@@ -110,7 +110,7 @@ PanelLayout layoutFxPanel(const PanelSpec& spec, float zoom) {
 }
 
 namespace {
-PanelLayout layoutAtOne(const PanelSpec& spec) {
+PanelLayout layoutAtOne(const PanelSpec& spec, int maxColsOverride) {
     PanelLayout L;
     L.name = spec.name;
     L.blurb = spec.blurb;
@@ -119,7 +119,7 @@ PanelLayout layoutAtOne(const PanelSpec& spec) {
 
     // ---- sections: flow left to right, wrap at a comfortable width -----------------------
     const bool single = groups.size() == 1;
-    const int  maxCols = single ? kPanelMaxCols : 4;
+    const int  maxCols = maxColsOverride > 0 ? std::clamp(maxColsOverride, 1, 12) : single ? kPanelMaxCols : 4;
     struct Placed { Rect bay; int g; int cols; };
     std::vector<Placed> placed;
     const float rowMaxW = single ? 1e9f : 2000.0f;

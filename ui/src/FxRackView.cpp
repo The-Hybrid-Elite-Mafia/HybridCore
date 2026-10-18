@@ -115,8 +115,14 @@ void FxRackView::syncPanel(FxRackModel& model, Renderer* r, float scale) {
             if (t >= 0 && t < static_cast<int>(list.size())) {
                 auto p = std::make_shared<Panel>();
                 p->spec = panelSpecFor(list[static_cast<std::size_t>(t)], *e);
+                // the shape (controls per row) that lets the plate grow the most in this space
+                int bestCols = 0;
                 zoom_ = zoomFor(layoutFxPanel(p->spec), right_);
-                p->layout = layoutFxPanel(p->spec, zoom_);
+                for (int cols = 2; cols <= 10; ++cols) {
+                    const float zc = zoomFor(layoutFxPanel(p->spec, 1.0f, cols), right_);
+                    if (zc > zoom_ + 0.01f) { zoom_ = zc; bestCols = cols; }
+                }
+                p->layout = layoutFxPanel(p->spec, zoom_, bestCols);
                 p->host = std::make_unique<RackHost>(*e, model, stem_, slot_);
                 p->view = std::make_unique<FxPanelView>(p->layout, p->spec);
                 p->ctrl = std::make_unique<FxPanelController>(p->layout, p->spec, *p->host);

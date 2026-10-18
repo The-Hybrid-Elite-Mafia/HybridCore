@@ -125,7 +125,8 @@ inline constexpr float kPanelCellW = 230.0f, kPanelCellH = 270.0f;
 inline constexpr int   kPanelMaxCols = 6;
 
 // zoom > 1 makes the whole plate bigger (the FX rack fills its space with it); < 1 smaller.
-[[nodiscard]] PanelLayout layoutFxPanel(const PanelSpec& spec, float zoom = 1.0f);
+// maxCols > 0 overrides how many controls sit side by side (the FX rack picks the shape that fills its space).
+[[nodiscard]] PanelLayout layoutFxPanel(const PanelSpec& spec, float zoom = 1.0f, int maxCols = 0);
 
 // ---- the obsidian slab ------------------------------------------------------------------
 // Straight-alpha sRGB, opaque, `pixelsPerUnit` × the layout size. Deterministic.
