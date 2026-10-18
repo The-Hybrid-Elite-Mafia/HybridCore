@@ -694,6 +694,13 @@ void Renderer::text(TextStyle style, std::string_view s, float x, float baseline
         pass(0, 0, col.withAlpha(0.85f * col.a), Blend::Add, kModeTextBlur, pad, true);
         pass(0, 0, col, Blend::Over, kModeText, 0, true);
         break;
+    case TextFx::NeonCrisp: {
+        pass(0, 0, col.withAlpha(0.45f * col.a), Blend::Add, kModeTextBlur, pad, true);   // glow (bloomed)
+        pass(0.75f * onePx, 1.0f * onePx, {0, 0, 0, 0.85f * col.a}, Blend::Over, kModeText, 0, false);   // dark edge for contrast
+        const Rgba core{col.r + (1.0f - col.r) * 0.35f, col.g + (1.0f - col.g) * 0.35f, col.b + (1.0f - col.b) * 0.35f, col.a};
+        pass(0, 0, core, Blend::Over, kModeText, 0, false);   // not emissive: stays sharp
+        break;
+    }
     }
 }
 

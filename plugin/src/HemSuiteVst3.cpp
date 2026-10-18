@@ -283,7 +283,7 @@ public:
 private:
     static const Vst::TChar* unitFor(const fx::ParamInfo& p) {
         const std::string u = p.unit ? p.unit : "";
-        if (u == "dB") return STR16("dB");
+        if (u == "dB" || u == "dBr") return STR16("dB");
         if (u == "Hz") return STR16("Hz");
         if (u == "ms") return STR16("ms");
         if (u == "s") return STR16("s");
@@ -298,7 +298,7 @@ class Controller;
 // The faceplate edits parameters the VST3 way: begin / perform / end edit through the controller.
 class ControllerHost final : public ui::PanelHost {
 public:
-    ControllerHost(Vst::EditController& c, const fx::Effect& e, bool gainMeter) : c_(c), e_(e), gainMeter_(gainMeter) {}
+    ControllerHost(Vst::EditController& c, fx::Effect& e, bool gainMeter) : c_(c), e_(e), gainMeter_(gainMeter) {}
     float normalized(int i) const override { return static_cast<float>(c_.getParamNormalized(static_cast<Vst::ParamID>(i))); }
     void beginEdit(int i) override { c_.beginEdit(static_cast<Vst::ParamID>(i)); }
     void setNormalized(int i, float v) override {
@@ -317,6 +317,13 @@ public:
         if (m < static_cast<int>(ms.size())) return normToMeter(ms[static_cast<std::size_t>(m)], c_.getParamNormalized(kMeterBase + static_cast<Vst::ParamID>(m)));
         return gainMeter_ ? static_cast<float>((c_.getParamNormalized(kMeterId) - 1.0) * 30.0) : 0.0f;
     }
+    // Whether a control is in use depends on the others (ECHO: TIME vs TEMPO SYNC): ask the controller's
+    // own copy of the effect (it never processes audio) with the current values.
+    bool active(int i) const override {
+        const auto ps = e_.params();
+        for (std::size_t j = 0; j < ps.size(); ++j) e_.set(static_cast<int>(j), fx::toPlain(ps[j], normalized(static_cast<int>(j))));
+        return e_.paramActive(i);
+    }
     bool bypassed() const override { return c_.getParamNormalized(kBypassId) >= 0.5; }
     void setBypassed(bool on) override {
         c_.beginEdit(kBypassId);
@@ -327,7 +334,7 @@ public:
 
 private:
     Vst::EditController& c_;
-    const fx::Effect&    e_;
+    fx::Effect&          e_;
     bool                 gainMeter_;
 };
 

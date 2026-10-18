@@ -39,6 +39,7 @@ class BusPress final : public Effect {
 public:
     BusPress() { setDefaults(); }
     std::span<const ParamInfo> params() const noexcept override { return kParams; }
+    bool paramActive(int i) const noexcept override { return i != Release || p(AutoRel) < 0.5f; }
     void prepare(double fs, std::uint32_t) override { fs_ = fs; reset(); }
     void reset() noexcept override {
         scL_.clear(); scR_.clear();

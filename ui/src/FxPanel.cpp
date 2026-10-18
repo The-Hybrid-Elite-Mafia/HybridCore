@@ -13,7 +13,7 @@ namespace hc::ui {
 // =============================================================================================
 namespace {
 
-constexpr float kMargin = 44.0f, kHeaderH = 190.0f, kFooterH = 112.0f, kBayPad = 22.0f, kGap = 26.0f;
+constexpr float kMargin = 44.0f, kHeaderH = 210.0f, kFooterH = 112.0f, kBayPad = 22.0f, kGap = 26.0f;
 constexpr float kBayDepth = 5.0f, kWellDepth = 14.0f, kWindowDepth = 7.0f, kButtonDepth = 8.0f, kMeterDepth = 10.0f;
 constexpr float kSectionCaptionH = 60.0f;
 
@@ -25,7 +25,7 @@ int balancedCols(int cells, int maxCols) {
 
 float meterColW(const PanelMeter& m) {
     const float textW = 14.5f * static_cast<float>(m.name.size()) + 18.0f;
-    return std::max(82.0f, textW);
+    return std::max(112.0f, textW);   // room for "-28.2" in the value window
 }
 
 void addRectPocket(PanelLayout& L, Rect r, float radius, float depth, bool rings = false) {
@@ -62,7 +62,7 @@ void layoutCell(PanelLayout& L, const PanelSpec& spec, int param, float x, float
             const float top = y + 50, avail = 212.0f, gap = 8.0f;
             const float h = std::min(52.0f, (avail - gap * static_cast<float>(n - 1)) / static_cast<float>(std::max(1, n)));
             for (int c = 0; c < n; ++c) {
-                PanelButton b{param, c, {cx - 96, top + static_cast<float>(c) * (h + gap), 192, h}, p.choices[static_cast<std::size_t>(c)]};
+                PanelButton b{param, c, {cx - 104, top + static_cast<float>(c) * (h + gap), 208, h}, p.choices[static_cast<std::size_t>(c)]};
                 addRectPocket(L, b.rect.inset(-5), 12, baseDepth + kButtonDepth);
                 L.buttons.push_back(b);
             }
@@ -85,7 +85,32 @@ void layoutCell(PanelLayout& L, const PanelSpec& spec, int param, float x, float
 
 } // namespace
 
-PanelLayout layoutFxPanel(const PanelSpec& spec) {
+namespace {
+PanelLayout layoutAtOne(const PanelSpec& spec);
+Rect zr(Rect r, float z) { return {r.x * z, r.y * z, r.w * z, r.h * z}; }
+} // namespace
+
+PanelLayout layoutFxPanel(const PanelSpec& spec, float zoom) {
+    PanelLayout L = layoutAtOne(spec);
+    const float z = std::clamp(zoom, 0.25f, 4.0f);
+    if (std::fabs(z - 1.0f) < 1e-6f) return L;
+    L.zoom = z;
+    L.width *= z; L.height *= z;
+    for (Rect* r : {&L.header, &L.titleArea, &L.footer, &L.bypass, &L.logo, &L.meterBay}) *r = zr(*r, z);
+    for (auto& p : L.pockets) { p.r = zr(p.r, z); p.radius *= z; }
+    for (auto& g : L.grooves) { g.x0 *= z; g.y0 *= z; g.x1 *= z; g.y1 *= z; }
+    for (auto& s : L.sections) { s.bay = zr(s.bay, z); s.captionArea = zr(s.captionArea, z); }
+    for (auto& k : L.knobs) { k.well = zr(k.well, z); k.caption = zr(k.caption, z); k.value = zr(k.value, z); }
+    for (auto& b : L.buttons) b.rect = zr(b.rect, z);
+    for (auto& s : L.selectors) { s.caption = zr(s.caption, z); s.box = zr(s.box, z); s.prev = zr(s.prev, z); s.next = zr(s.next, z); }
+    for (auto& m : L.meters) { m.bar = zr(m.bar, z); m.caption = zr(m.caption, z); m.value = zr(m.value, z); }
+    for (auto& c : L.captions) c.r = zr(c.r, z);
+    for (auto& s : L.screws) { s[0] *= z; s[1] *= z; }
+    return L;
+}
+
+namespace {
+PanelLayout layoutAtOne(const PanelSpec& spec) {
     PanelLayout L;
     L.name = spec.name;
     L.blurb = spec.blurb;
@@ -188,6 +213,7 @@ PanelLayout layoutFxPanel(const PanelSpec& spec) {
     L.screws = {{si, si}, {L.width - si, si}, {si, L.height - si}, {L.width - si, L.height - si}};
     return L;
 }
+} // namespace
 
 // =============================================================================================
 //  The obsidian slab
@@ -261,7 +287,9 @@ Image renderFxPlate(const PanelLayout& L, const FxPalette& pal, float ppu) {
             for (int tx = std::max(0, static_cast<int>(r.x / kTile)); tx <= std::min(tw - 1, static_cast<int>(r.right() / kTile)); ++tx)
                 tiles[static_cast<std::size_t>(ty * tw + tx)].push_back(static_cast<int>(i));
     }
-    const float outerR = 38.0f, bevel = 16.0f;
+    // A zoomed plate is the same plate, bigger: every depth and detail scales with it.
+    const float z = L.zoom, kCh = kChamfer * z;
+    const float outerR = 38.0f * z, bevel = 16.0f * z;
     const Rect slab{0, 0, L.width, L.height};
 
     auto surfaceAt = [&](float x, float y) {
@@ -279,9 +307,9 @@ Image renderFxPlate(const PanelLayout& L, const FxPalette& pal, float ppu) {
             const float d = pocketInside(p, x, y);
             if (d <= 0) continue;
             float h; std::uint8_t k;
-            if (d < kChamfer) { h = -d; k = 1; }
-            else { h = -kChamfer - (d - kChamfer) * 6.0f; k = 2; }
-            if (h <= -p.depth) { h = -p.depth; k = 3; }
+            if (d < kCh) { h = -d; k = 1; }
+            else { h = -kCh - (d - kCh) * 6.0f; k = 2; }
+            if (h <= -p.depth * z) { h = -p.depth * z; k = 3; }
             if (h < s.h) { s.h = h; s.pocket = i; s.inside = d; s.kind = k; }
         }
         for (const PanelGroove& g : L.grooves) {
@@ -289,19 +317,19 @@ Image renderFxPlate(const PanelLayout& L, const FxPalette& pal, float ppu) {
             const float t = std::clamp(((x - g.x0) * vx + (y - g.y0) * vy) / std::max(len2, 1e-6f), 0.0f, 1.0f);
             const float dx = x - (g.x0 + t * vx), dy = y - (g.y0 + t * vy);
             const float d = std::sqrt(dx * dx + dy * dy);
-            constexpr float hw = 6.0f;
+            const float hw = 6.0f * z;
             if (d < hw) {
-                const float h = -5.0f * std::sqrt(1.0f - (d / hw) * (d / hw));
+                const float h = -5.0f * z * std::sqrt(1.0f - (d / hw) * (d / hw));
                 if (h < s.h) { s.h = h; s.kind = 4; s.pocket = -1; }
             }
         }
         for (const auto& sc : L.screws) {
-            const float dx = x - sc[0], dy = y - sc[1], r = std::sqrt(dx * dx + dy * dy);
+            const float dx = x - sc[0], dy = y - sc[1], r = std::sqrt(dx * dx + dy * dy) / z;
             if (r < 15.0f) {
                 // chrome dome with a hex socket
                 const float ang = std::atan2(dy, dx);
                 const float hexR = 5.5f / std::cos(std::fmod(std::fabs(ang) + std::numbers::pi_v<float> / 6, std::numbers::pi_v<float> / 3) - std::numbers::pi_v<float> / 6);
-                s.h = r < hexR ? 1.0f : 3.5f * std::sqrt(std::max(0.0f, 1.0f - (r / 15.0f) * (r / 15.0f)));
+                s.h = z * (r < hexR ? 1.0f : 3.5f * std::sqrt(std::max(0.0f, 1.0f - (r / 15.0f) * (r / 15.0f))));
                 s.kind = 6; s.pocket = -1;
             }
         }
@@ -332,6 +360,7 @@ Image renderFxPlate(const PanelLayout& L, const FxPalette& pal, float ppu) {
         for (std::uint32_t px = 0; px < W; ++px) {
             const Surface& s = surf[static_cast<std::size_t>(py) * W + px];
             const float x = (static_cast<float>(px) + 0.5f) / ppu, y = (static_cast<float>(py) + 0.5f) / ppu;
+            const float tx = x / z, ty = y / z;   // texture patterns are laid out at zoom 1, so they scale with the plate
             // normal from the height field (heights in design units, step = one pixel)
             const float step = 1.0f / ppu;
             const float dhx = (hAt(static_cast<int>(px) + 1, static_cast<int>(py)) - hAt(static_cast<int>(px) - 1, static_cast<int>(py))) / (2 * step);
@@ -342,7 +371,7 @@ Image renderFxPlate(const PanelLayout& L, const FxPalette& pal, float ppu) {
             float shadow = 1.0f;
             if (s.h < -0.5f) {
                 const float dirx = light.x / lxy, diry = light.y / lxy;
-                for (float t = 1.5f; t < 40.0f; t += 1.5f) {
+                for (float t = 1.5f * z; t < 40.0f * z; t += 1.5f * z) {
                     const float rayH = s.h + t * rise;
                     if (rayH >= 0.0f) break;
                     const float hh = hAt(static_cast<int>((x + dirx * t) * ppu), static_cast<int>((y + diry * t) * ppu));
@@ -355,9 +384,9 @@ Image renderFxPlate(const PanelLayout& L, const FxPalette& pal, float ppu) {
             bool  metal = false;
             if (s.kind == 0 || s.kind == 5) {
                 // polished obsidian: flow banding and a faint violet / green sheen inside the glass
-                const float warp = fbm(x * 0.004f, y * 0.004f, 3) * 6.0f;
-                const float band = 0.5f + 0.5f * std::sin(x * 0.006f + y * 0.017f + warp);
-                const float grain = fbm(x * 0.05f, y * 0.05f, 2);
+                const float warp = fbm(tx * 0.004f, ty * 0.004f, 3) * 6.0f;
+                const float band = 0.5f + 0.5f * std::sin(tx * 0.006f + ty * 0.017f + warp);
+                const float grain = fbm(tx * 0.05f, ty * 0.05f, 2);
                 const float sheen = std::pow(band, 6.0f) * 0.010f;
                 albedo = {0.008f + 0.006f * grain + sheen * violet.x * 1.4f, 0.008f + 0.006f * grain + sheen * lime.y * 0.25f,
                           0.010f + 0.007f * grain + sheen * violet.z * 1.4f};
@@ -367,15 +396,15 @@ Image renderFxPlate(const PanelLayout& L, const FxPalette& pal, float ppu) {
                 float marks;
                 if (p.rings || p.circle) {
                     const float dx = x - p.r.cx(), dy = y - p.r.cy();
-                    marks = 0.5f + 0.5f * std::sin(std::sqrt(dx * dx + dy * dy) * 1.6f);
+                    marks = 0.5f + 0.5f * std::sin(std::sqrt(dx * dx + dy * dy) / z * 1.6f);
                 } else {
-                    marks = 0.5f + 0.5f * std::sin(y * 1.3f + fbm(x * 0.02f, y * 0.02f, 2) * 3.0f);
+                    marks = 0.5f + 0.5f * std::sin(ty * 1.3f + fbm(tx * 0.02f, ty * 0.02f, 2) * 3.0f);
                 }
-                const float grain = fbm(x * 0.4f, y * 0.4f, 2);
+                const float grain = fbm(tx * 0.4f, ty * 0.4f, 2);
                 const float a = 0.0075f + 0.0045f * marks + 0.003f * grain;
                 albedo = {a, a, a * 1.08f};
                 specPow = 24.0f; specAmt = 0.12f; envAmt = 0.35f;
-                ao = 0.35f + 0.65f * smooth01(kChamfer, kChamfer + p.depth * 2.2f, s.inside);
+                ao = 0.35f + 0.65f * smooth01(kCh, kCh + p.depth * z * 2.2f, s.inside);
             } else if (s.kind == 1) {
                 // polished chamfer: catches the light
                 albedo = {0.030f, 0.030f, 0.034f};
@@ -528,7 +557,7 @@ void FxPanelController::mouseDown(float x, float y, bool doubleClick, bool) {
 void FxPanelController::mouseMove(float x, float y, bool fine) {
     if (active_.kind == PanelHit::Kind::Knob) {
         const int param = layout_.knobs[static_cast<std::size_t>(active_.index)].param;
-        dragValue_ = std::clamp(dragValue_ + (lastY_ - y) / kDragUnitsForFullRange * (fine ? 0.15f : 1.0f), 0.0f, 1.0f);
+        dragValue_ = std::clamp(dragValue_ + (lastY_ - y) / (kDragUnitsForFullRange * layout_.zoom) * (fine ? 0.15f : 1.0f), 0.0f, 1.0f);
         lastY_ = y;
         host_.setNormalized(param, dragValue_);
         return;

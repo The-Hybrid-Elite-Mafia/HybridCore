@@ -22,6 +22,7 @@
 #include "hybrid/dsp/StemMatrix.hpp"
 #include "hybrid/fx/Fx.hpp"
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <memory>
@@ -55,6 +56,10 @@ public:
     [[nodiscard]] bool anyEffect() const noexcept;
     [[nodiscard]] int  count(std::uint32_t stem) const noexcept;
     void setTempo(double bpm) noexcept;
+    // The song's tempo as set in the FX RACK (message thread). 0 = follow Beat Forge's tempo.
+    // Saved with the rack text ("tempo=92"), so sessions and exports keep it.
+    void setSongTempo(float bpm) noexcept { songTempo_ = bpm <= 0.0f ? 0.0f : std::clamp(bpm, 40.0f, 250.0f); }
+    [[nodiscard]] float songTempo() const noexcept { return songTempo_; }
     void clear();                     // empties every slot
     void collectRetired() noexcept;
     // Total delay the rack adds right now (all stems are aligned to it). Any thread.
@@ -99,6 +104,7 @@ private:
     std::uint32_t maxLat_ = 0;
     std::atomic<std::uint32_t> latencyPub_{0};
     std::atomic<float> tempo_{120.0f};
+    float songTempo_ = 0.0f;
     float fadeStep_ = 0.002f;
     core::SpscRing<Command, 64>      commands_;
     core::SpscRing<fx::Effect*, 128> retired_;

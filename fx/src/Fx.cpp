@@ -1,5 +1,6 @@
 #include "hybrid/fx/Fx.hpp"
 
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 
@@ -44,6 +45,11 @@ std::string formatValue(const ParamInfo& p, float v) {
     } else if (u == "dB") {
         std::snprintf(b, sizeof b, "%+.1f dB", v);
         if (std::fabs(v) < 0.05f) std::snprintf(b, sizeof b, "0.0 dB");
+    } else if (u == "dBr") {   // an amount of reduction: shown as how far it turns down
+        std::snprintf(b, sizeof b, "-%.1f dB", std::fabs(v));
+        if (std::fabs(v) < 0.05f) std::snprintf(b, sizeof b, "0.0 dB");
+    } else if (u == "bit") {
+        std::snprintf(b, sizeof b, "%.1f bit", v);
     } else if (u == "ms") {
         std::snprintf(b, sizeof b, v < 10.0f ? "%.2f ms" : v < 100.0f ? "%.1f ms" : "%.0f ms", v);
     } else if (u == "s") {
@@ -74,6 +80,7 @@ bool parseValue(const ParamInfo& p, const std::string& s, float& out) {
     if (end == s.c_str()) return false;
     while (*end == ' ') ++end;
     if ((*end == 'k' || *end == 'K') && p.unit && std::string(p.unit) == "Hz") v *= 1000.0f;
+    if (p.unit && std::string(p.unit) == "dBr") v = std::fabs(v);   // "-60 dB" and "60" mean the same reduction
     out = clampPlain(p, v);
     return true;
 }

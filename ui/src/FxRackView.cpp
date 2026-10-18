@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdio>
 
 namespace hc::ui {
 namespace {
@@ -28,6 +29,19 @@ void button(Renderer& r, Rect b, const std::string& text, bool lit, bool hot, Rg
 std::string upper(std::string s) {
     for (char& c : s) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
     return s;
+}
+
+// Shortens `s` with ".." until it fits `width` in style `ts`.
+std::string fitText(const Renderer& r, TextStyle ts, std::string s, float width) {
+    if (r.textWidth(ts, s) <= width) return s;
+    while (s.size() > 3 && r.textWidth(ts, s + "..") > width) s.pop_back();
+    while (!s.empty() && s.back() == ' ') s.pop_back();
+    return s + "..";
+}
+
+// The faceplate size that fills the space: as big as fits, never more than twice the base size.
+float zoomFor(const PanelLayout& base, Rect room) {
+    return std::clamp(std::min(room.w * 0.97f / base.width, room.h * 0.97f / base.height), 0.5f, 2.0f);
 }
 
 // The faceplate's host: knobs go to the live effect, BYPASS goes to the rack slot.
@@ -76,6 +90,9 @@ Rect FxRackView::slotRow(int k) const noexcept { return {left_.x, left_.y + 680 
 Rect FxRackView::slotName(int k) const noexcept { const Rect r = slotRow(k); return {r.x + 70, r.y + 10, r.w - 70 - 250, r.h - 20}; }
 Rect FxRackView::slotOn(int k) const noexcept { const Rect r = slotRow(k); return {r.right() - 240, r.y + 18, 136, r.h - 36}; }
 Rect FxRackView::slotRemove(int k) const noexcept { const Rect r = slotRow(k); return {r.right() - 92, r.y + 18, 92, r.h - 36}; }
+Rect FxRackView::tempoDown() const noexcept { return {left_.x + 330, left_.y + 6, 62, 68}; }
+Rect FxRackView::tempoBox() const noexcept { return {left_.x + 400, left_.y + 2, left_.w - 400 - 70, 76}; }
+Rect FxRackView::tempoUp() const noexcept { return {left_.right() - 62, left_.y + 6, 62, 68}; }
 Rect FxRackView::pickerButton(std::size_t i) const noexcept {
     const int cols = 4;
     const float gap = 18;
@@ -98,7 +115,8 @@ void FxRackView::syncPanel(FxRackModel& model, Renderer* r, float scale) {
             if (t >= 0 && t < static_cast<int>(list.size())) {
                 auto p = std::make_shared<Panel>();
                 p->spec = panelSpecFor(list[static_cast<std::size_t>(t)], *e);
-                p->layout = layoutFxPanel(p->spec);
+                zoom_ = zoomFor(layoutFxPanel(p->spec), right_);
+                p->layout = layoutFxPanel(p->spec, zoom_);
                 p->host = std::make_unique<RackHost>(*e, model, stem_, slot_);
                 p->view = std::make_unique<FxPanelView>(p->layout, p->spec);
                 p->ctrl = std::make_unique<FxPanelController>(p->layout, p->spec, *p->host);
@@ -120,6 +138,17 @@ void FxRackView::syncPanel(FxRackModel& model, Renderer* r, float scale) {
 
 bool FxRackView::mouseDown(float x, float y, bool doubleClick, bool fine, FxRackModel& model) {
     if (!area_.contains(x, y)) return false;
+    const float step = fine ? 0.1f : 1.0f;
+    if (tempoDown().contains(x, y)) { model.setSongTempo(std::round((model.tempo() - step) * 10.0f) / 10.0f); return true; }
+    if (tempoUp().contains(x, y))   { model.setSongTempo(std::round((model.tempo() + step) * 10.0f) / 10.0f); return true; }
+    if (tempoBox().contains(x, y)) {
+        if (doubleClick) { model.setSongTempo(0.0f); return true; }   // back to following Beat Forge
+        tempoDrag_ = true;
+        tempoY_ = y;
+        tempoStart_ = model.tempo();
+        dragModel_ = &model;
+        return true;
+    }
     for (std::uint32_t s = 0; s < hc::kStemCount; ++s)
         if (stemButton(s).contains(x, y)) { stem_ = s; picker_ = false; return true; }
     for (int k = 0; k < kSlots; ++k) {
@@ -147,6 +176,11 @@ bool FxRackView::mouseDown(float x, float y, bool doubleClick, bool fine, FxRack
 }
 
 void FxRackView::mouseMove(float x, float y, bool fine) {
+    if (tempoDrag_ && dragModel_) {   // drag up / down: 1 BPM per 10 units (Shift: 0.1)
+        const float bpm = tempoStart_ + (tempoY_ - y) / 10.0f * (fine ? 0.1f : 1.0f);
+        dragModel_->setSongTempo(std::round(bpm * 10.0f) / 10.0f);
+        return;
+    }
     hoverStem_ = hoverSlot_ = hoverPick_ = -1;
     for (std::uint32_t s = 0; s < hc::kStemCount; ++s) if (stemButton(s).contains(x, y)) hoverStem_ = static_cast<int>(s);
     for (int k = 0; k < kSlots; ++k) if (slotRow(k).contains(x, y)) hoverSlot_ = k;
@@ -155,16 +189,23 @@ void FxRackView::mouseMove(float x, float y, bool fine) {
 }
 
 void FxRackView::mouseUp(float x, float y) {
+    tempoDrag_ = false;
+    dragModel_ = nullptr;
     if (panel_) panel_->ctrl->mouseUp(x - ox_, y - oy_);
 }
 
 bool FxRackView::wheel(float x, float y, float notches, bool fine) {
     if (!area_.contains(x, y)) return false;
+    if (tempoBox().contains(x, y) && lastModel_) {
+        lastModel_->setSongTempo(std::round((lastModel_->tempo() + notches * (fine ? 0.1f : 1.0f)) * 10.0f) / 10.0f);
+        return true;
+    }
     if (panel_ && !picker_) panel_->ctrl->wheel(x - ox_, y - oy_, notches, fine);
     return true;
 }
 
 void FxRackView::draw(Renderer& r, float canvasScale, FxRackModel& model) {
+    lastModel_ = &model;
     syncPanel(model, &r, canvasScale);
     // the rack's own glass, over the stem strips
     r.fillRound(area_, 28, rgb8(0x060509, 1.0f), Blend::Over);
@@ -176,13 +217,24 @@ void FxRackView::draw(Renderer& r, float canvasScale, FxRackModel& model) {
     for (std::uint32_t s = 0; s < hc::kStemCount; ++s) {
         int used = 0;
         for (int k = 0; k < kSlots; ++k) used += model.type(s, k) >= 0;
-        std::string name = upper(model.stemName(s));
-        if (name.size() > 14) name = name.substr(0, 13) + ".";
-        if (used) name += "  [" + std::to_string(used) + "]";
-        button(r, stemButton(s), name, s == stem_, hoverStem_ == static_cast<int>(s), used ? kLime : kViolet, TextStyle::Caption);
+        const Rect b = stemButton(s);
+        const std::string tag = used ? "  [" + std::to_string(used) + "]" : std::string();
+        const std::string name = fitText(r, TextStyle::Caption, upper(model.stemName(s)), b.w - 24 - r.textWidth(TextStyle::Caption, tag)) + tag;
+        button(r, b, name, s == stem_, hoverStem_ == static_cast<int>(s), used ? kLime : kViolet, TextStyle::Caption);
     }
-    std::string title = "INSERTS  -  " + upper(model.stemName(stem_));
-    if (title.size() > 34) title = title.substr(0, 33) + ".";
+    // song tempo (HEM ECHO's sync): - / + buttons, drag or wheel the box, double-click = follow Beat Forge
+    {
+        char bpm[32];
+        std::snprintf(bpm, sizeof bpm, "%.1f BPM", static_cast<double>(model.tempo()));
+        const Rect tb = tempoBox();
+        r.fillRound(tb, 14, kGlass, Blend::Over);
+        r.fillRound({tb.x + 3, tb.y + 3, tb.w - 6, 3}, 1.5f, (model.tempoSet() ? kLime : kViolet).withAlpha(0.7f), Blend::Over, true);
+        r.text(TextStyle::Caption, model.tempoSet() ? "SONG TEMPO" : "TEMPO  (BEAT FORGE)", tb.cx(), tb.y + 30, kDim, Align::Center, TextFx::Shadowed);
+        r.text(TextStyle::Title, bpm, tb.cx(), tb.y + 66, kLime, Align::Center, TextFx::NeonCrisp);
+        button(r, tempoDown(), "-", false, false, kViolet, TextStyle::Title);
+        button(r, tempoUp(), "+", false, false, kViolet, TextStyle::Title);
+    }
+    const std::string title = fitText(r, TextStyle::Label, "INSERTS  -  " + upper(model.stemName(stem_)), left_.w);
     r.text(TextStyle::Label, title, left_.x, slotRow(0).y - 22, kViolet, Align::Left, TextFx::Neon);
     const auto list = fx::effects();
     for (int k = 0; k < kSlots; ++k) {
@@ -214,10 +266,8 @@ void FxRackView::draw(Renderer& r, float canvasScale, FxRackModel& model) {
             const bool hot = hoverPick_ == static_cast<int>(i);
             r.fillRound(b, 14, hot ? rgb8(0x1A1328, 0.97f) : kGlass, Blend::Over);
             r.fillRound({b.x + 3, b.y + 3, b.w - 6, 3}, 1.5f, (hot ? kLime : kViolet).withAlpha(hot ? 0.95f : 0.5f), Blend::Over, true);
-            r.text(TextStyle::Title, list[i].name, b.x + 22, b.y + 54, hot ? kLime : kText, Align::Left, TextFx::Neon);
-            std::string blurb = list[i].blurb;
-            if (blurb.size() > 58) blurb = blurb.substr(0, 56) + "...";
-            r.text(TextStyle::Caption, blurb, b.x + 22, b.y + 96, kDim, Align::Left, TextFx::Shadowed);
+            r.text(TextStyle::Title, fitText(r, TextStyle::Title, list[i].name, b.w - 44), b.x + 22, b.y + 54, hot ? kLime : kText, Align::Left, TextFx::Neon);
+            r.text(TextStyle::Caption, fitText(r, TextStyle::Caption, list[i].blurb, b.w - 44), b.x + 22, b.y + 96, kDim, Align::Left, TextFx::Shadowed);
         }
         button(r, {right_.right() - 300, right_.bottom() - 110, 300, 90}, "CANCEL", false, false, kViolet);
     } else if (panel_) {

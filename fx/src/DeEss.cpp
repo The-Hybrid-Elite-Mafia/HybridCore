@@ -19,7 +19,7 @@ const char* const kOnOff[] = {"OFF", "ON"};
 const ParamInfo kParams[kCount] = {
     {"freq",      "Frequency", "Hz", 3000.0f, 12000.0f, 6500.0f, Taper::Log},
     {"threshold", "Threshold", "dB", -60.0f, 0.0f, -30.0f},
-    {"range",     "Range",     "dB", 0.0f, 20.0f, 10.0f},
+    {"range",     "Range",     "dBr", 0.0f, 20.0f, 10.0f},
     {"mode",      "Mode",      "", 0.0f, 1.0f, 0.0f, Taper::Choice, kModes},
     {"listen",    "Listen",    "", 0.0f, 1.0f, 0.0f, Taper::Toggle, kOnOff},
     {"output",    "Output",    "dB", -24.0f, 12.0f, 0.0f},

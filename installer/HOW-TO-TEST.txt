@@ -60,7 +60,9 @@ Turn your speakers/headphones DOWN first. Close any app that is playing audio
    - FX (top bar) opens the FX RACK: every stem strip takes 3 HEM effects (22 to choose from).
        Pick a strip on the left, click a slot (1, 2, 3), pick an effect - its faceplate opens on
        the right: drag the knobs, click the buttons. ON / OFF bypasses that slot, X removes it.
-       FX again (or SCOPE) closes the rack. Effects are saved with the session and in EXPORT.
+       FX again (or SCOPE, or another page) closes the rack. Effects are saved with the session
+       and in EXPORT. SONG TEMPO (top left of the rack): set your song's BPM with - / +, or drag /
+       scroll the box; HEM ECHO's TEMPO SYNC uses it. Double-click it = follow Beat Forge again.
    - LIM (bottom bar, blue = on) is a safety limiter on the main output: nothing goes over
      -0.3 dB. GR next to it shows how much it is turning down. It adds 1 ms of delay.
    - Knobs: drag up/down. Hold Shift for fine moves. Double-click = reset. Mouse wheel works too.

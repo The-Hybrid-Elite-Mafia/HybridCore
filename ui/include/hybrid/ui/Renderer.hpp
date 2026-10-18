@@ -36,6 +36,7 @@ enum class TextFx : std::uint8_t {
     Engraved,   // on chrome: dark text with a 1 px light edge underneath
     Shadowed,   // on dark glass: light text with a soft shadow down-right
     Neon,       // emissive text with glow (glass display, lit captions)
+    NeonCrisp,  // small neon numbers: a soft glow behind, a sharp core on top that the bloom doesn't smear
 };
 
 struct RenderStats {

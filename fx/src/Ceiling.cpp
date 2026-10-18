@@ -57,6 +57,7 @@ class Ceiling final : public Effect {
 public:
     Ceiling() { setDefaults(); }
     std::span<const ParamInfo> params() const noexcept override { return kParams; }
+    bool paramActive(int i) const noexcept override { return i != Release || p(Auto) < 0.5f; }
     std::uint32_t latency() const noexcept override { return kAlign + kW - 1; }
 
     void prepare(double fs, std::uint32_t maxBlock) override {

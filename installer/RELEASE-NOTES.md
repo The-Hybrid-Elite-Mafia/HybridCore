@@ -1,3 +1,20 @@
+## The Hybrid Core — 0.14.1: faceplates that fill the rack, sharp numbers, song tempo
+
+Fixes from testing 0.14.0 on your PC with your song:
+- **Bigger, sharper faceplates in the FX RACK.** The faceplate now grows to fill the space on the right (up to twice the size) or shrinks to fit (EQ-6, TRIBAND no longer run into the edges). Knob values and meter numbers use a larger size and a sharp core with the glow behind it, so they no longer look blurry.
+- **Meters you can read.** Bars rise at once and fall back smoothly; the numbers change about 7 times a second instead of every frame.
+- **SONG TEMPO in the FX RACK** (top of the left side): − / + buttons, drag or scroll the box, Shift for 0.1 BPM steps. HEM ECHO's TEMPO SYNC follows it. Double-click it to go back to Beat Forge's tempo. Saved with sessions and exports.
+- **Controls not in use are dimmed** and show "--": ECHO's TIME while TEMPO SYNC is on (and NOTE while it is off); RELEASE on BUS PRESS and CEILING while AUTO RELEASE is on.
+- **Reductions read as reductions:** STRIP gate range, CALM depth, HUSH reduction, DE-ESS range show "-60.0 dB", not "+60.0 dB". DUST shows "16.0 bit".
+- **HEM STRIP's meter shows the gate** as well as the compressor.
+- **Text fits:** "AMERICAN PUNCH" and other long button names, effect names and descriptions in the effect list, long strip names ("DEAD INSIDE BUT BREATHING..." now as much as fits). Long descriptions on faceplates go on two lines.
+- **The FX RACK closes when you change page** (MIX / EQ / DYNAMICS / BEAT FORGE), so it never covers another page.
+- **Knobs are less touchy:** a full turn now takes a longer drag; the faceplate footer says how (Shift = fine, double-click = reset).
+
+Not tried on your PC yet: everything above — the cloud tests check the layout, the text sizes and the controls, but how sharp it looks on your screen is for you to judge.
+
+---
+
 ## The Hybrid Core — 0.14.0: 12 new HEM effects, obsidian faceplates, the FX RACK
 
 ### FX RACK (new FX button in the top bar)

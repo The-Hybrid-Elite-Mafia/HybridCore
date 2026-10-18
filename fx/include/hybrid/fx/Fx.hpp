@@ -86,6 +86,10 @@ public:
         return i >= 0 && i < kMaxMeters ? meters_[static_cast<std::size_t>(i)].load(std::memory_order_relaxed) : 0.0f;
     }
 
+    // False when a control does nothing with the current settings (HEM ECHO's TIME while TEMPO SYNC
+    // is on, a RELEASE knob while AUTO RELEASE is on). Faceplates dim it. Reads the current values only.
+    [[nodiscard]] virtual bool paramActive(int) const noexcept { return true; }
+
     // Song tempo for tempo-synced effects (the host's or Beat Forge's). Any thread.
     void setTempo(double bpm) noexcept { tempo_.store(static_cast<float>(std::clamp(bpm, 20.0, 400.0)), std::memory_order_relaxed); }
     [[nodiscard]] float tempo() const noexcept { return tempo_.load(std::memory_order_relaxed); }

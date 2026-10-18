@@ -274,6 +274,16 @@ struct App {
             if (!app->audio.fxRack().setEffect(s, k, t)) app->say("FX RACK busy - try again");
             else if (t >= 0) app->say(std::string(fx::effects()[static_cast<std::size_t>(t)].name) + " on " + stemName(s) + ", slot " + std::to_string(k + 1));
         }
+        float tempo() const override {
+            const float song = app->audio.fxRack().songTempo();
+            if (song > 0.0f) return song;
+            const params::Parameter* bpm = app->tree.find(forge::id::bpm);
+            return bpm ? bpm->plain() : 120.0f;
+        }
+        bool  tempoSet() const override { return app->audio.fxRack().songTempo() > 0.0f; }
+        void  setSongTempo(float bpm) override {
+            app->audio.fxRack().setSongTempo(bpm);   // reaches the effects on the next frame
+        }
         std::string stemName(std::uint32_t s) const override {
             const std::string& n = app->stems.slot(s).name;
             if (!n.empty()) { const auto dot = n.rfind('.'); return dot != std::string::npos && dot > 0 ? n.substr(0, dot) : n; }
@@ -761,7 +771,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                         a.forgeReroll(at);
                     break;
                 }
-                case ui::UiAction::SelectPage:   console.setPage(static_cast<ui::Page>(idx)); break;
+                case ui::UiAction::SelectPage:   a.rackOpen = false; console.setPage(static_cast<ui::Page>(idx)); break;   // a page shows its own strips
                 case ui::UiAction::ToStart:      a.audio.seek(0); a.analyzer.reset(); break;
                 case ui::UiAction::ResetAll: a.resetPressed(); console.interaction().mouseUp(); break;
                 case ui::UiAction::ToggleFx:
@@ -893,9 +903,14 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         a.audio.poll();
         a.stems.pump();
         a.pumpScope(console.scope());
-        if (const params::Parameter* bpm = a.tree.find(forge::id::bpm); bpm && bpm->plain() != a.rackTempo) {   // tempo-synced effects (HEM ECHO)
-            a.rackTempo = bpm->plain();
-            a.audio.fxRack().setTempo(a.rackTempo);
+        {   // tempo-synced effects (HEM ECHO): the song tempo set in the FX RACK, else Beat Forge's
+            const params::Parameter* bpm = a.tree.find(forge::id::bpm);
+            const float song = a.audio.fxRack().songTempo();
+            const float want = song > 0.0f ? song : bpm ? bpm->plain() : 120.0f;
+            if (want != a.rackTempo) {
+                a.rackTempo = want;
+                a.audio.fxRack().setTempo(want);
+            }
         }
 
         const auto  now = std::chrono::steady_clock::now();

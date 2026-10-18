@@ -105,6 +105,7 @@ struct PanelSection {
 
 struct PanelLayout {
     float width = 0, height = 0;
+    float zoom = 1.0f;     // every size × zoom (text picks a matching larger style)
     Rect  header, titleArea, footer, bypass, logo;
     std::string name, blurb;
     bool hasBypass = true;
@@ -123,7 +124,8 @@ struct PanelLayout {
 inline constexpr float kPanelCellW = 230.0f, kPanelCellH = 270.0f;
 inline constexpr int   kPanelMaxCols = 6;
 
-[[nodiscard]] PanelLayout layoutFxPanel(const PanelSpec& spec);
+// zoom > 1 makes the whole plate bigger (the FX rack fills its space with it); < 1 smaller.
+[[nodiscard]] PanelLayout layoutFxPanel(const PanelSpec& spec, float zoom = 1.0f);
 
 // ---- the obsidian slab ------------------------------------------------------------------
 // Straight-alpha sRGB, opaque, `pixelsPerUnit` × the layout size. Deterministic.
@@ -139,6 +141,7 @@ public:
     virtual void endEdit(int param) = 0;
     [[nodiscard]] virtual std::string text(int param) const = 0;   // formatted current value
     [[nodiscard]] virtual float meter(int) const { return 0.0f; }
+    [[nodiscard]] virtual bool  active(int) const { return true; }   // false: the control does nothing right now (dimmed)
     [[nodiscard]] virtual bool  hasBypass() const { return true; }
     [[nodiscard]] virtual bool  bypassed() const { return false; }
     virtual void setBypassed(bool) {}
@@ -168,7 +171,8 @@ public:
     [[nodiscard]] PanelHit hover() const noexcept { return hover_; }
     [[nodiscard]] PanelHit active() const noexcept { return active_; }
 
-    static constexpr float kDragUnitsForFullRange = 360.0f;
+    // Drag distance for the whole range at zoom 1 (× layout zoom). Shift / Ctrl = fine (× 0.15).
+    static constexpr float kDragUnitsForFullRange = 560.0f;
 
 private:
     void stepChoice(int param, int delta);
@@ -202,6 +206,7 @@ public:
     void endEdit(int) override {}
     [[nodiscard]] std::string text(int param) const override;
     [[nodiscard]] float meter(int m) const override;
+    [[nodiscard]] bool active(int param) const override;
     [[nodiscard]] bool bypassed() const override { return bypass_; }
     void setBypassed(bool on) override { bypass_ = on; }
 

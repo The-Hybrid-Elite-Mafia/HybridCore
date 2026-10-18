@@ -47,6 +47,23 @@ void testFxPanel() {
     }
     CHECK(clean == static_cast<int>(fx::effects().size()));
 
+    // Zoomed plates (the FX rack fills its space): every rectangle scales, nothing starts to overlap,
+    // and dragging a knob the same distance on screen does the same thing at any zoom.
+    int zoomedOk = 0;
+    for (const fx::EffectInfo& info : fx::effects()) {
+        auto e = info.create();
+        const ui::PanelSpec spec = ui::panelSpecFor(info, *e);
+        const ui::PanelLayout a = ui::layoutFxPanel(spec), b = ui::layoutFxPanel(spec, 1.7f), c = ui::layoutFxPanel(spec, 0.6f);
+        bool ok = b.zoom == 1.7f && std::fabs(b.width - a.width * 1.7f) < 0.01f && std::fabs(c.height - a.height * 0.6f) < 0.01f;
+        ok = ok && b.knobs.size() == a.knobs.size() && b.pockets.size() == a.pockets.size() && b.meters.size() == a.meters.size();
+        for (std::size_t i = 0; i < a.knobs.size() && ok; ++i)
+            ok = std::fabs(b.knobs[i].well.x - a.knobs[i].well.x * 1.7f) < 0.01f && std::fabs(b.knobs[i].value.w - a.knobs[i].value.w * 1.7f) < 0.01f;
+        for (std::size_t i = 0; i < a.buttons.size() && ok; ++i) ok = std::fabs(b.buttons[i].rect.bottom() - a.buttons[i].rect.bottom() * 1.7f) < 0.01f;
+        ok = ok && std::fabs(b.bypass.right() - a.bypass.right() * 1.7f) < 0.01f;
+        zoomedOk += ok;
+    }
+    CHECK(zoomedOk == static_cast<int>(fx::effects().size()));
+
     // Controls through a host, on the real HEM TUNE.
     const auto list = fx::effects();
     std::size_t tuneIdx = 0;
@@ -85,6 +102,44 @@ void testFxPanel() {
     }
     c.mouseDown(L.bypass.cx(), L.bypass.cy(), false, false);
     CHECK(host.bypassed());
+
+    // The same knob drag on a zoomed plate: twice the zoom, twice the distance for the same change.
+    {
+        auto t2 = list[tuneIdx].create();
+        const ui::PanelLayout Z = ui::layoutFxPanel(spec, 2.0f);
+        ui::EffectPanelHost h2(*t2);
+        ui::FxPanelController c2(Z, spec, h2);
+        const ui::PanelKnob* k = nullptr;
+        for (const auto& kk : Z.knobs) if (spec.params[static_cast<std::size_t>(kk.param)].name == "Retune Speed") k = &kk;
+        CHECK(k != nullptr);
+        if (k) {
+            const float before = h2.normalized(k->param);
+            c2.mouseDown(k->well.cx(), k->well.cy(), false, false);
+            c2.mouseMove(k->well.cx(), k->well.cy() - ui::FxPanelController::kDragUnitsForFullRange * 2.0f * 0.25f, false);
+            c2.mouseUp(k->well.cx(), k->well.cy());
+            CHECK(std::fabs(h2.normalized(k->param) - (before + 0.25f)) < 1e-3f);
+        }
+    }
+
+    // Controls that do nothing right now are reported (and dimmed): HEM ECHO's TIME vs TEMPO SYNC.
+    {
+        std::size_t echoIdx = 0;
+        for (std::size_t i = 0; i < list.size(); ++i) if (std::string(list[i].name) == "HEM ECHO") echoIdx = i;
+        auto echo = list[echoIdx].create();
+        ui::EffectPanelHost eh(*echo);
+        int time = -1, sync = -1, note = -1;
+        const auto ps = echo->params();
+        for (std::size_t i = 0; i < ps.size(); ++i) {
+            if (std::string(ps[i].id) == "time") time = static_cast<int>(i);
+            if (std::string(ps[i].id) == "sync") sync = static_cast<int>(i);
+            if (std::string(ps[i].id) == "note") note = static_cast<int>(i);
+        }
+        CHECK(time >= 0 && sync >= 0 && note >= 0);
+        echo->set(sync, 1.0f);
+        CHECK(!eh.active(time) && eh.active(note) && eh.active(sync));
+        echo->set(sync, 0.0f);
+        CHECK(eh.active(time) && !eh.active(note));
+    }
 
     // meter text
     const ui::PanelMeter note{"NOTE", "note", 36, 84}, cents{"C", "cents", -100, 100, true}, gr{"GR", "dB", -24, 0};

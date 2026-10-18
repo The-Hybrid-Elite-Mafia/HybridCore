@@ -114,9 +114,16 @@ void testFxDynamics() {
         e->setDefaults();
         e->set(param(*e, "gatethr"), -40.0f);
         e->set(param(*e, "gaterange"), 80.0f);
-        const double quiet = gainAtDb(*e, 1000.0, 0.001f), loud = gainAtDb(*e, 1000.0, 0.316f);
-        std::printf("  STRIP gate -40 dB: quiet signal %.1f dB, loud signal %.2f dB\n", quiet, loud);
-        CHECK(quiet < -40.0 && std::fabs(loud) < 0.2);
+        const double quiet = gainAtDb(*e, 1000.0, 0.001f);
+        const float grShut = e->reductionDb();   // the meter shows the closed gate too
+        const double loud = gainAtDb(*e, 1000.0, 0.316f);
+        std::printf("  STRIP gate -40 dB: quiet signal %.1f dB (meter %.1f dB), loud signal %.2f dB\n", quiet, grShut, loud);
+        CHECK(quiet < -40.0 && std::fabs(loud) < 0.2 && grShut < -40.0f);
+        // Reduction amounts read as reductions: "-60.0 dB", and typing either sign means the same.
+        const fx::ParamInfo& range = e->params()[static_cast<std::size_t>(param(*e, "gaterange"))];
+        float back = 0;
+        CHECK(fx::formatValue(range, 60.0f) == "-60.0 dB" && fx::parseValue(range, "-60 dB", back) && back == 60.0f &&
+              fx::parseValue(range, "30", back) && back == 30.0f);
     }
 
     // ---- VOX ONE --------------------------------------------------------------------

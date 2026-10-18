@@ -37,6 +37,10 @@ public:
     Echo() { setDefaults(); }
     std::span<const ParamInfo> params() const noexcept override { return kParams; }
     std::span<const MeterInfo> meters() const noexcept override { return kMeters; }
+    bool paramActive(int i) const noexcept override {   // TIME counts with sync off, NOTE with sync on
+        const bool sync = p(Sync) >= 0.5f;
+        return i == Time ? !sync : i == Note ? sync : true;
+    }
 
     void prepare(double fs, std::uint32_t) override {
         fs_ = fs;

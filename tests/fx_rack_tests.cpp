@@ -121,6 +121,12 @@ void testFxRack() {
         CHECK(b.effect(4, 2) && std::fabs(b.effect(4, 2)->get(fxt::param(*b.effect(4, 2), "feedback")) - 63.0f) < 1e-4f);
         CHECK(b.toText() == t);
         CHECK(note.find("HEM FUTURE") != std::string::npos);
+        CHECK(b.songTempo() == 0.0f);                          // follows Beat Forge until set
+        a.setSongTempo(92.5f);
+        CHECK(b.fromText(a.toText()).empty() && std::fabs(b.songTempo() - 92.5f) < 1e-3f && b.toText() == a.toText());
+        CHECK(b.fromText(t).empty() && b.songTempo() == 0.0f);   // a rack without a tempo goes back to following
+        b.setSongTempo(1000.0f);
+        CHECK(b.songTempo() == 250.0f);
         CHECK(b.count(4) == 1 && b.count(1) == 0 && b.anyEffect());
         b.clear();
         CHECK(!b.anyEffect());

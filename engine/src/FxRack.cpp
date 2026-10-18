@@ -108,6 +108,10 @@ std::string FxRack::toText() const {
     std::string out;
     const auto list = fx::effects();
     char key[32], num[48];
+    if (songTempo_ > 0.0f) {
+        std::snprintf(num, sizeof num, "tempo=%.2f\n", static_cast<double>(songTempo_));
+        out += num;
+    }
     for (std::uint32_t s = 0; s < kStems; ++s)
         for (int k = 0; k < kSlots; ++k) {
             const int t = types_[s][static_cast<std::size_t>(k)];
@@ -129,11 +133,13 @@ std::string FxRack::toText() const {
 
 std::string FxRack::fromText(const std::string& text) {
     clear();
+    songTempo_ = 0.0f;
     std::string skipped;
     const auto list = fx::effects();
     std::istringstream in(text);
     std::string line;
     while (std::getline(in, line)) {
+        if (line.rfind("tempo=", 0) == 0) { setSongTempo(std::strtof(line.c_str() + 6, nullptr)); continue; }
         unsigned stem = 0;
         int slot = 0;
         if (std::sscanf(line.c_str(), "stem%u.fx%d=", &stem, &slot) != 2 || stem < 1 || stem > kStems || slot < 1 || slot > kSlots) continue;

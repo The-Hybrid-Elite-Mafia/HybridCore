@@ -14,7 +14,7 @@ enum P { LowCut, GateThr, GateRange, CompThr, Ratio, Attack, Release, Low, Mid, 
 const ParamInfo kParams[kCount] = {
     {"lowcut", "Low Cut", "Hz", 20.0f, 400.0f, 20.0f, Taper::Log},
     {"gatethr", "Gate Threshold", "dB", -80.0f, 0.0f, -80.0f},
-    {"gaterange", "Gate Range", "dB", 0.0f, 80.0f, 60.0f},
+    {"gaterange", "Gate Range", "dBr", 0.0f, 80.0f, 60.0f},
     {"compthr", "Comp Threshold", "dB", -60.0f, 0.0f, 0.0f},
     {"ratio", "Comp Ratio", ":1", 1.0f, 20.0f, 3.0f, Taper::Log},
     {"attack", "Comp Attack", "ms", 0.1f, 100.0f, 10.0f, Taper::Log},
@@ -79,7 +79,7 @@ public:
             // Compressor (detects after the gate).
             const float target = gainComputer(gainToDb(a * gateGain_), cThr, ratio, kKneeDb);
             gr_ = target + (target < gr_ ? att : rel) * (gr_ - target);
-            deepest = std::min(deepest, gr_);
+            deepest = std::min(deepest, gr_ + std::max(-80.0f, gainToDb(gateGain_)));   // the meter shows the gate too
             const float g = gateGain_ * dbToGain(gr_);
             l *= g; r *= g;
             // EQ, output.

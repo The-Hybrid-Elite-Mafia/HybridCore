@@ -22,7 +22,7 @@ enum P { Amount, Reduction, From, Tone, Learn, Listen, Output, kCount };
 const char* const kOnOff[] = {"OFF", "ON"};
 const ParamInfo kParams[kCount] = {
     {"amount",    "Amount",    "%", 0.0f, 100.0f, 50.0f},
-    {"reduction", "Reduction", "dB", 3.0f, 30.0f, 12.0f},
+    {"reduction", "Reduction", "dBr", 3.0f, 30.0f, 12.0f},
     {"from",      "From",      "Hz", 20.0f, 8000.0f, 20.0f, Taper::Log},
     {"tone",      "Tone",      "%", -100.0f, 100.0f, 0.0f},
     {"learn",     "Learn",     "", 0.0f, 1.0f, 1.0f, Taper::Toggle, kOnOff},

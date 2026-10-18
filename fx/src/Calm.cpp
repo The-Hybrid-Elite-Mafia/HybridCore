@@ -23,7 +23,7 @@ namespace {
 enum P { Depth, Sharpness, Speed, LowHz, HighHz, Mix, Delta, kCount };
 const char* const kOnOff[] = {"OFF", "ON"};
 const ParamInfo kParams[kCount] = {
-    {"depth",     "Depth",     "dB", 0.0f, 12.0f, 5.0f},
+    {"depth",     "Depth",     "dBr", 0.0f, 12.0f, 5.0f},
     {"sharpness", "Sharpness", "%", 0.0f, 100.0f, 50.0f},
     {"speed",     "Speed",     "%", 0.0f, 100.0f, 50.0f},
     {"lowhz",     "Low Hz",    "Hz", 20.0f, 20000.0f, 200.0f, Taper::Log},

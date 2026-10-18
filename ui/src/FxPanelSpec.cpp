@@ -54,3 +54,7 @@ float EffectPanelHost::meter(int m) const {
 }
 
 } // namespace hc::ui
+
+namespace hc::ui {
+bool EffectPanelHost::active(int param) const { return fx_.paramActive(param); }
+} // namespace hc::ui

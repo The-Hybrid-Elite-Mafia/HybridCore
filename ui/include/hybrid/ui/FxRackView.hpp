@@ -31,6 +31,11 @@ public:
     virtual void setBypass(std::uint32_t stem, int slot, bool on) = 0;
     virtual void setType(std::uint32_t stem, int slot, int type) = 0;                    // -1 = remove
     [[nodiscard]] virtual std::string stemName(std::uint32_t stem) const = 0;
+    // Song tempo for tempo-synced effects (HEM ECHO): the tempo in use, whether it was set here
+    // (false = it follows Beat Forge), and setting it (0 = follow Beat Forge again).
+    [[nodiscard]] virtual float tempo() const { return 120.0f; }
+    [[nodiscard]] virtual bool  tempoSet() const { return false; }
+    virtual void setSongTempo(float) {}
 };
 
 class FxRackView {
@@ -59,18 +64,26 @@ private:
     [[nodiscard]] Rect slotOn(int k) const noexcept;
     [[nodiscard]] Rect slotRemove(int k) const noexcept;
     [[nodiscard]] Rect pickerButton(std::size_t i) const noexcept;
+    [[nodiscard]] Rect tempoBox() const noexcept;
+    [[nodiscard]] Rect tempoDown() const noexcept;
+    [[nodiscard]] Rect tempoUp() const noexcept;
 
     Rect area_, left_, right_;
     std::uint32_t stem_ = 0;
     int           slot_ = 0;
     bool          picker_ = false;
     int           hoverStem_ = -1, hoverSlot_ = -1, hoverPick_ = -1;
+    bool          tempoDrag_ = false;
+    float         tempoY_ = 0, tempoStart_ = 0;
+    FxRackModel*  dragModel_ = nullptr;
+    FxRackModel*  lastModel_ = nullptr;   // the model of the last draw (for the wheel)
 
     // the faceplate on the right
     struct Panel;
     std::shared_ptr<Panel> panel_;
     fx::Effect*   shown_ = nullptr;
     float         uploadedScale_ = 0.0f;
+    float         zoom_ = 1.0f;
     float         ox_ = 0, oy_ = 0;
 };
 
