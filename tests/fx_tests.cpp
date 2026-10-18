@@ -85,7 +85,7 @@ void testFxCommon() {
         if (diff >= 1e-3) std::printf("  FAIL detail: %s block-size difference %.5f\n", info.name, diff);
         std::printf("  %-14s %2zu params  latency %u  ok\n", info.name, ps.size(), lat);
     }
-    CHECK(fx::effects().size() == 10);
+    CHECK(fx::effects().size() == 22);
 }
 
 void testFxClip() {

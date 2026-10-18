@@ -231,6 +231,7 @@ int main(int argc, char** argv) {
     testFxHeat();
     testFxDynamics();
     testFxTone();
+    testFxNew();
     testSynth();
     testUiImage();
     testUiLayout();

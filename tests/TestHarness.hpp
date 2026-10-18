@@ -49,6 +49,7 @@ void testFxCeiling();
 void testFxHeat();
 void testFxDynamics();
 void testFxTone();
+void testFxNew();
 void testSynth();
 void testExport();
 void testLoudness();

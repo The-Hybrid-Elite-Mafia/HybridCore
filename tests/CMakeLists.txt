@@ -11,6 +11,7 @@ add_executable(hc_tests
     fx_tests.cpp
     fx_dyn_tests.cpp
     fx_tone_tests.cpp
+    fx_new_tests.cpp
     synth_tests.cpp
     AllocTracker.cpp)
 target_include_directories(hc_tests PRIVATE

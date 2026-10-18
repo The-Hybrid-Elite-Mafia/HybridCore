@@ -26,6 +26,14 @@ enum class Taper : std::uint8_t {
     Toggle    // 0 = OFF, 1 = ON
 };
 
+// A live readout an effect publishes for its faceplate (pitch, correlation, band moves ...).
+struct MeterInfo {
+    const char* name;          // "PITCH"
+    const char* unit;          // "Hz", "dB", "cents", "note", "corr", "%", "ms"
+    float       min, max;      // bar range
+    bool        centred = false;   // bar grows from the middle (signed values)
+};
+
 struct ParamInfo {
     const char*        id;        // stable, used in saved state ("drive")
     const char*        name;      // shown in hosts ("Drive")
@@ -71,12 +79,28 @@ public:
     // What the effect is doing right now, for meters: gain reduction in dB (<= 0) where it applies.
     [[nodiscard]] float reductionDb() const noexcept { return grDb_.load(std::memory_order_relaxed); }
 
+    // Extra readouts (optional): what each one is, and its latest value (any thread, lock-free).
+    static constexpr int kMaxMeters = 10;
+    [[nodiscard]] virtual std::span<const MeterInfo> meters() const noexcept { return {}; }
+    [[nodiscard]] float meter(int i) const noexcept {
+        return i >= 0 && i < kMaxMeters ? meters_[static_cast<std::size_t>(i)].load(std::memory_order_relaxed) : 0.0f;
+    }
+
+    // Song tempo for tempo-synced effects (the host's or Beat Forge's). Any thread.
+    void setTempo(double bpm) noexcept { tempo_.store(static_cast<float>(std::clamp(bpm, 20.0, 400.0)), std::memory_order_relaxed); }
+    [[nodiscard]] float tempo() const noexcept { return tempo_.load(std::memory_order_relaxed); }
+
 protected:
     Effect() = default;
     [[nodiscard]] float p(int i) const noexcept { return vals_[static_cast<std::size_t>(i)].load(std::memory_order_relaxed); }
     void publishReduction(float db) noexcept { grDb_.store(db, std::memory_order_relaxed); }
+    void publishMeter(int i, float v) noexcept {
+        if (i >= 0 && i < kMaxMeters) meters_[static_cast<std::size_t>(i)].store(v, std::memory_order_relaxed);
+    }
 
 private:
+    std::array<std::atomic<float>, kMaxMeters> meters_{};
+    std::atomic<float> tempo_{120.0f};
     std::array<std::atomic<float>, kMaxParams> vals_{};
     std::atomic<float> grDb_{0.0f};
 };

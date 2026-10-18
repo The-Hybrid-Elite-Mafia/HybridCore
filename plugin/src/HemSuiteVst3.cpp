@@ -15,6 +15,7 @@
 
 #include "pluginterfaces/base/ibstream.h"
 #include "pluginterfaces/vst/ivstparameterchanges.h"
+#include "pluginterfaces/vst/ivstprocesscontext.h"
 #include "pluginterfaces/vst/vsttypes.h"
 #include "public.sdk/source/main/pluginfactory.h"
 #include "public.sdk/source/vst/vstaudioeffect.h"
@@ -156,6 +157,8 @@ public:
                 else if (id < ps.size()) fx_->set(static_cast<int>(id), fx::toPlain(ps[id], static_cast<float>(v)));
             }
         }
+        if (data.processContext && (data.processContext->state & Vst::ProcessContext::kTempoValid))
+            fx_->setTempo(data.processContext->tempo);   // tempo-synced effects (HEM ECHO)
         if (data.numSamples <= 0 || data.numInputs < 1 || data.numOutputs < 1 || maxBlock_ == 0) return kResultOk;
         Vst::AudioBusBuffers& in = data.inputs[0];
         Vst::AudioBusBuffers& out = data.outputs[0];
