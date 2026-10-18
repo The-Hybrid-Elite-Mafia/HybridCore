@@ -44,6 +44,7 @@ bool saveSession(const std::filesystem::path& file, const SessionData& d, const 
     s.set("state", "playhead", std::to_string(d.playhead));
     if (!d.forgeSong.empty()) s.setSectionText("forge", d.forgeSong);
     if (!d.forgeSeeds.empty()) s.set("forge.meta", "seeds", d.forgeSeeds);
+    if (!d.fxRack.empty()) s.setSectionText("fx", d.fxRack);
     if (!s.save(file)) {
         if (error) *error = "could not write " + toUtf8(file.filename()) + " (folder read-only or disk full?)";
         return false;
@@ -80,6 +81,7 @@ std::expected<LoadedSession, std::string> loadSession(const std::filesystem::pat
     out.data.playhead  = std::strtoull(s.get("state", "playhead", "0").c_str(), nullptr, 10);
     out.data.forgeSong  = s.sectionText("forge");
     out.data.forgeSeeds = s.get("forge.meta", "seeds");
+    out.data.fxRack     = s.sectionText("fx");
     return out;
 }
 

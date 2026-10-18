@@ -13,7 +13,7 @@
 //    bus titles   : click MAIN / AUX 1–3 = what the 13 stem faders control (main mix or that aux send)
 //    left panel   : 4 bus strips (Main, Aux 1–3)
 //    main panel   : 13 stem strips
-//    top bar      : title, OPEN / SAVE / EXPORT, status line (engraved)
+//    top bar      : title, OPEN / SAVE / EXPORT / SCOPE / RESET / FX, status line (engraved)
 //    bottom bar   : song overview (click / drag to seek), LIM (main limiter) + main output L/R meter
 //  The left/main panels grow with Canvas::extraH (windows taller than 16:9).
 // =============================================================================
@@ -34,7 +34,8 @@ enum class WidgetKind : std::uint8_t { Knob, SendKnob, Fader, Button, StemMeter,
                                        Command, BusTitle };
 enum class UiAction : std::uint8_t { None, PrevDevice, NextDevice, LoadStems, CycleSource, ClearSolo, ClearMute, FaderBank,
                                      ToStart, PlayPause, Stop, ToggleLoop, Seek, SelectPage,
-                                     OpenSession, SaveSession, ExportMix, ForgeGenerate, ForgeUndo, ForgeClear, ToggleScope, ResetAll, ForgeRemake };
+                                     OpenSession, SaveSession, ExportMix, ForgeGenerate, ForgeUndo, ForgeClear, ToggleScope, ResetAll, ForgeRemake,
+                                     ToggleFx };
 
 // What the 5 knobs of every stem strip control.
 enum class Page : std::uint8_t { Mix, Eq, Dynamics, Forge };

@@ -17,7 +17,8 @@ add_library(hc_ui STATIC
     src/FxPanel.cpp
     src/FxPanelSpec.cpp
     src/FxPanelView.cpp
-    src/FxPanelWindow.cpp)
+    src/FxPanelWindow.cpp
+    src/FxRackView.cpp)
 add_library(hc::ui ALIAS hc_ui)
 
 target_include_directories(hc_ui PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")

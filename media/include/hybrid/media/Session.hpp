@@ -9,6 +9,7 @@
 //    [params]  <id>=<value> for every parameter (ParameterTree::serialize)
 //    [state]   loop, page, faderBank, source, playhead (frames at 48 kHz)
 //    [forge]   Beat Forge pattern + arrangement (forge::songToText) and composer seeds
+//    [fx]      HEM effect inserts on the stem strips (engine::FxRack::toText)
 //  Saving is crash-safe (temp file + rename, via params::Settings).
 //  Loading resolves each stem relative to the session file first (a song folder that was
 //  moved or copied to another drive still opens), then by its absolute path.
@@ -34,6 +35,7 @@ struct SessionData {
     std::uint64_t playhead  = 0;
     std::string   forgeSong;           // forge::songToText() (Beat Forge pattern + arrangement); "" = none
     std::string   forgeSeeds;          // composer seeds, "harmony,t0,..,t7"
+    std::string   fxRack;              // engine::FxRack::toText() (effect inserts); "" = none
 };
 
 struct LoadedSession {

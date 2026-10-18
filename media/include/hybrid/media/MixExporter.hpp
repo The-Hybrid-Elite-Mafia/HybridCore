@@ -31,6 +31,7 @@ struct ExportRequest {
     std::array<std::filesystem::path, hc::kStemCount> stems{};   // empty = slot not used
     std::string           params;                                // ParameterTree::serialize() snapshot (mixer + forge.*)
     std::string           forgeSong;                             // forge::songToText(); used when forge.on
+    std::string           fxRack;                                // engine::FxRack::toText(): effect inserts on the stems
     std::filesystem::path out;
     WavEncoding           encoding = WavEncoding::Pcm24;
     // Loudness step after the render: raise a quiet mix to masterSettings.targetLufs with a

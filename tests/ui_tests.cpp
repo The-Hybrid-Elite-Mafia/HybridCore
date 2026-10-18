@@ -278,9 +278,9 @@ void testUiLayout() {
     }
     CHECK(in.mouseDown(ui::plate::kNamePanel.cx(), ui::plate::kNamePanel.cy(), false, false) == ui::UiAction::NextDevice);
     in.mouseUp();
-    {   // OPEN / SAVE / EXPORT / SCOPE / RESET sit in the top bar, between the title and the status line, without overlapping.
-        const ui::UiAction want[5] = {ui::UiAction::OpenSession, ui::UiAction::SaveSession, ui::UiAction::ExportMix, ui::UiAction::ToggleScope,
-                                      ui::UiAction::ResetAll};
+    {   // OPEN / SAVE / EXPORT / SCOPE / RESET / FX sit in the top bar, between the title and the status line, without overlapping.
+        const ui::UiAction want[6] = {ui::UiAction::OpenSession, ui::UiAction::SaveSession, ui::UiAction::ExportMix, ui::UiAction::ToggleScope,
+                                      ui::UiAction::ResetAll, ui::UiAction::ToggleFx};
         int ok = 0;
         float lastRight = 740.0f;   // end of the engraved title
         for (const auto& w : L.widgets()) {
@@ -291,7 +291,7 @@ void testUiLayout() {
             in.mouseUp();
             lastRight = w.rect.right();
         }
-        CHECK(ok == 5);
+        CHECK(ok == 6);
     }
     {   // ANALYZER on: nothing under it takes clicks (stem strips), the bus strips and top bar still do; off: back.
         int stemKnob = -1, busFader = -1;

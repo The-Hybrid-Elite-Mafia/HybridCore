@@ -23,6 +23,7 @@
 //  is installed in the engine; lifetime ends when the engine retires the processor.
 // =============================================================================
 #include "hybrid/engine/AudioProcessor.hpp"
+#include "hybrid/engine/FxRack.hpp"
 #include "hybrid/engine/StemAudio.hpp"
 #include "hybrid/core/AlignedBuffer.hpp"
 #include "hybrid/core/SpscRing.hpp"
@@ -52,7 +53,11 @@ public:
     [[nodiscard]] const dsp::StemMatrix& matrix() const noexcept { return matrix_; }
     [[nodiscard]] dsp::BusLimiter&       limiter() noexcept { return limiter_; }
     [[nodiscard]] const dsp::BusLimiter& limiter() const noexcept { return limiter_; }
-    [[nodiscard]] std::uint32_t latencyFrames() const noexcept { return limiter_.latency(); }
+    // Limiter look-ahead + the effect inserts' delay compensation.
+    [[nodiscard]] std::uint32_t latencyFrames() const noexcept { return limiter_.latency() + rack_.latency(); }
+    // HEM effect inserts on the stem strips (3 per stem).
+    [[nodiscard]] FxRack&       fxRack() noexcept { return rack_; }
+    [[nodiscard]] const FxRack& fxRack() const noexcept { return rack_; }
     [[nodiscard]] forge::ForgeEngine&       forge() noexcept { return forge_; }
     [[nodiscard]] const forge::ForgeEngine& forge() const noexcept { return forge_; }
     // ANALYZER feed: the Main output after the limiter. Created by the first prepare() (null before);
@@ -102,11 +107,13 @@ private:
     bool renderStems(std::uint32_t frames) noexcept;   // false: silent this block
 
     std::atomic<Source>                               source_;
+    FxRack                                            rack_;      // before matrix_: the matrix calls into it
     dsp::StemMatrix                                   matrix_;
     dsp::BusLimiter                                   limiter_;
     forge::ForgeEngine                                forge_;
     std::unique_ptr<analysis::ScopeTap>               tap_;        // allocated once (message thread), never replaced
     core::AlignedBuffer<float>                        mainMix_;    // 2 × maxFrames: Main + Beat Forge FX return
+    core::AlignedBuffer<float>                        auxMix_;     // 2 × maxFrames: the FX return, delay-compensated
     bool                                              forgeActive_ = false, forgeWasOn_ = false, forgeRendered_ = false;
     std::atomic<bool>                                 forgePub_{false};
     std::uint64_t                                     stemFrames_ = 0;   // longest loaded stem

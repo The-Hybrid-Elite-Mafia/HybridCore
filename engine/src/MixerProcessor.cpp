@@ -12,7 +12,7 @@ namespace {
 constexpr double kToneLevel = 0.031622776601683794;   // -30 dBFS: 13 tones summed stay below 0 dBFS
 } // namespace
 
-MixerProcessor::MixerProcessor(Source source) noexcept : source_(source) {}
+MixerProcessor::MixerProcessor(Source source) noexcept : source_(source) { matrix_.setInsertHook(&rack_); }
 
 MixerProcessor::~MixerProcessor() {
     for (StemAudio*& s : slots_) { delete s; s = nullptr; }
@@ -31,6 +31,7 @@ bool MixerProcessor::submitStem(std::uint32_t slot, std::unique_ptr<StemAudio>& 
 void MixerProcessor::collectRetired() noexcept {
     StemAudio* s = nullptr;
     while (retired_.tryPop(s)) delete s;
+    rack_.collectRetired();
 }
 
 void MixerProcessor::drainStemCommands() noexcept {
@@ -137,6 +138,8 @@ void MixerProcessor::prepare(const io::StreamConfig& config) {
     matrix_.prepare(maxFrames_, static_cast<double>(config.sampleRate));
     forge_.prepare(static_cast<double>(config.sampleRate), maxFrames_);
     mainMix_.allocate(static_cast<std::size_t>(2) * maxFrames_);
+    auxMix_.allocate(static_cast<std::size_t>(2) * maxFrames_);
+    rack_.prepare(static_cast<double>(config.sampleRate), maxFrames_);
     limiter_.prepare(static_cast<double>(config.sampleRate), maxFrames_);
     toneData_.allocate(static_cast<std::size_t>(dsp::StemMatrix::kStems) * maxFrames_);
     stemData_.allocate(static_cast<std::size_t>(dsp::StemMatrix::kStems) * 2 * maxFrames_);
@@ -216,7 +219,10 @@ void MixerProcessor::process(const ProcessContext& ctx) noexcept {
         for (std::uint32_t c = 0; c < 2; ++c) {
             float* m = mainMix_.data() + static_cast<std::size_t>(c) * maxFrames_;
             dsp::copy(m, matrix_.busChannel(0, c), ctx.frames);
-            dsp::mixAdd(m, forge_.fxReturn(static_cast<int>(c)), 1.0f, ctx.frames);
+            float* aux = auxMix_.data() + static_cast<std::size_t>(c) * maxFrames_;
+            dsp::copy(aux, forge_.fxReturn(static_cast<int>(c)), ctx.frames);
+            rack_.delayAux(static_cast<int>(c), aux, ctx.frames);   // in time with delay-compensated stems
+            dsp::mixAdd(m, aux, 1.0f, ctx.frames);
             buses[c] = m;
         }
     }

@@ -15,10 +15,6 @@
 
 namespace hc::ui {
 
-// Text and bar position for a meter value ("452 Hz", "A4", "-6.0 dB" ...).
-[[nodiscard]] std::string formatPanelMeter(const PanelMeter& m, float value);
-[[nodiscard]] float       panelMeterFraction(const PanelMeter& m, float value) noexcept;   // 0..1 (centred: -1..1)
-
 class FxPanelView {
 public:
     FxPanelView(const PanelLayout& layout, const PanelSpec& spec, FxPalette palette = {}) noexcept

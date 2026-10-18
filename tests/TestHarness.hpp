@@ -50,6 +50,8 @@ void testFxHeat();
 void testFxDynamics();
 void testFxTone();
 void testFxNew();
+void testFxRack();
+void testFxPanel();
 void testSynth();
 void testExport();
 void testLoudness();

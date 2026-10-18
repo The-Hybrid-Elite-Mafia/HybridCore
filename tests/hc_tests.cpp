@@ -232,6 +232,8 @@ int main(int argc, char** argv) {
     testFxDynamics();
     testFxTone();
     testFxNew();
+    testFxRack();
+    testFxPanel();
     testSynth();
     testUiImage();
     testUiLayout();

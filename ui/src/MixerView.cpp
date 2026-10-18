@@ -533,8 +533,8 @@ void MixerView::drawDynamic(Renderer& r, const ViewState& v, const MeterState& m
         case WidgetKind::Command: {   // OPEN / SAVE / EXPORT in the top bar
             const bool exporting = w.action == UiAction::ExportMix && v.exportProgress >= 0.0f;
             std::string cap = exporting ? fmt("%.0f%%", 100.0 * v.exportProgress) : w.caption;
-            bool lit = exporting || (w.action == UiAction::ToggleScope && v.scope);
-            Rgba litCol = w.action == UiAction::ToggleScope ? kLitCyan : kLitAmber;
+            bool lit = exporting || (w.action == UiAction::ToggleScope && v.scope) || (w.action == UiAction::ToggleFx && v.fxRack);
+            Rgba litCol = (w.action == UiAction::ToggleScope || w.action == UiAction::ToggleFx) ? kLitCyan : kLitAmber;
             if (w.action == UiAction::ResetAll && v.resetStage > 0) {
                 cap = v.resetStage == 1 ? "SURE?" : "UNDO";
                 lit = true;

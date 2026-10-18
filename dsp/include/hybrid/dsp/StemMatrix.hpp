@@ -25,6 +25,16 @@
 
 namespace hc::dsp {
 
+// Effect inserts after a stem's channel strip (engine::FxRack). Called on the RT thread only.
+class StemInsertHook {
+public:
+    virtual ~StemInsertHook() = default;
+    virtual void beginBlock() noexcept {}                       // once per process() call, before the stems
+    [[nodiscard]] virtual bool active(std::uint32_t stem) noexcept = 0;   // this stem goes through process() this block
+    // In place, separate L / R buffers, frames <= the matrix's maxFrames.
+    virtual void process(std::uint32_t stem, float* left, float* right, std::uint32_t frames) noexcept = 0;
+};
+
 class StemMatrix {
 public:
     static constexpr std::uint32_t kStems = hc::kStemCount;
@@ -49,6 +59,9 @@ public:
     void setSendDb(std::uint32_t stem, std::uint32_t bus, float db) noexcept;
     void setBusGainDb(std::uint32_t bus, float db) noexcept;
     void setBusMute(std::uint32_t bus, bool mute) noexcept;
+
+    // Effect inserts (nullptr = none). Set from the message thread; the hook must outlive the matrix's use.
+    void setInsertHook(StemInsertHook* hook) noexcept { hook_.store(hook, std::memory_order_release); }
 
     // Per-stem EQ + compressor (setters are thread-safe atomics).
     [[nodiscard]] ChannelStrip&       strip(std::uint32_t stem) noexcept { return strips_[stem]; }
@@ -98,6 +111,7 @@ private:
     std::array<Meter, kBuses * 2>      busMeters_{};
 
     std::array<ChannelStrip, kStems>   strips_{};
+    std::atomic<StemInsertHook*>       hook_{nullptr};
 
     // RT-owned ramp state
     float prevSend_[kStems][kBuses][2]{};

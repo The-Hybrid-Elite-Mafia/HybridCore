@@ -89,6 +89,7 @@ void Console::drawFrame(const ViewState& view, const MeterState& meters) {
     renderer_.beginFrame(canvas_);
     const auto t0 = std::chrono::steady_clock::now();
     view_->drawDynamic(renderer_, view, meters);
+    if (overlay_) overlay_(renderer_, canvas_);
     timings_.recordMs = msSince(t0);
 }
 

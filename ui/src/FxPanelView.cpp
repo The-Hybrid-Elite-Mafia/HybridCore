@@ -18,45 +18,8 @@ const Rgba kGlass   = rgb8(0x050507, 0.86f);
 
 Rect at(Rect r, float ox, float oy) { return r.offset(ox, oy); }
 
-std::string fmt(const char* f, double v) {
-    char b[48];
-    std::snprintf(b, sizeof b, f, v);
-    return b;
-}
 
 } // namespace
-
-std::string formatPanelMeter(const PanelMeter& m, float v) {
-    const std::string& u = m.unit;
-    if (u == "note") {
-        static const char* kNames[] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
-        const int n = static_cast<int>(std::lround(v));
-        if (n <= 0) return "--";
-        return std::string(kNames[n % 12]) + std::to_string(n / 12 - 1);
-    }
-    if (u == "Hz") {
-        if (v < 1.0f) return "--";
-        return v >= 1000.0f ? fmt("%.1fk", v / 1000.0) : fmt("%.0f", v);
-    }
-    if (u == "corr") return fmt("%+.2f", v);
-    if (u == "cents") return fmt("%+.0f", v);
-    if (u == "%" || u == "ms") return fmt("%.0f", v);
-    if (u == "dBFS") return v <= -95.0f ? "--" : fmt("%.1f", v);
-    if (m.centred) return fmt("%+.1f", v);
-    return fmt("%.1f", v);
-}
-
-float panelMeterFraction(const PanelMeter& m, float v) noexcept {
-    if (m.centred) {
-        const float half = std::max(std::fabs(m.min), std::fabs(m.max));
-        return half > 0 ? std::clamp(v / half, -1.0f, 1.0f) : 0.0f;
-    }
-    if (m.unit == "note" && v <= 0.0f) return 0.0f;
-    if (m.unit == "Hz" && v < 1.0f) return 0.0f;
-    if (m.max <= m.min) return 0.0f;
-    if (m.max <= 0.0f && m.unit == "dB") return std::clamp(v / m.min, 0.0f, 1.0f);   // reduction: 0 dB empty, min full
-    return std::clamp((v - m.min) / (m.max - m.min), 0.0f, 1.0f);
-}
 
 void FxPanelView::drawCrown(Renderer& r, Rect a) const {
     // A simple five-point crown in neon (our own mark for the HEM plug-ins).

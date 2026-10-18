@@ -6,8 +6,9 @@
   With -StemsDir, a session file (.hcs) naming two stems from that folder is written and passed
   on the command line, as Explorer does on a double-click: the run must open it (settings show the
   session and both stem slots, and the screenshot shows them loaded).
+  With -FxDemo, the FX RACK opens with HEM PUNCH and HEM TUNE on strip 1; settings must keep both.
 #>
-param([Parameter(Mandatory = $true)][string]$Exe, [Parameter(Mandatory = $true)][string]$Shot, [string]$StemsDir = '')
+param([Parameter(Mandatory = $true)][string]$Exe, [Parameter(Mandatory = $true)][string]$Shot, [string]$StemsDir = '', [switch]$FxDemo)
 $ErrorActionPreference = 'Stop'
 $settings = Join-Path $env:APPDATA 'HybridCore\settings.ini'
 Remove-Item $settings -ErrorAction SilentlyContinue
@@ -16,6 +17,7 @@ $shotFull = [IO.Path]::GetFullPath($Shot)
 
 $argsList = @('--exit-after','10','--device','offline','--screenshot',"`"$shotFull`"")
 $session = ''
+if ($FxDemo) { $argsList += '--fx-demo' }
 if ($StemsDir) {
     $dir = Join-Path $env:RUNNER_TEMP 'hc-session'
     New-Item -ItemType Directory -Force -Path $dir | Out-Null
@@ -40,5 +42,12 @@ if ($session) {
     $slots  = ([regex]::Matches($text, '(?m)^slot0[12]=.+\S')).Count
     Write-Host "session opened from the command line: $opened; stem slots filled: $slots"
     if (-not $opened -or $slots -ne 2) { $ok = $false }
+}
+if ($FxDemo) {
+    $text = if (Test-Path $settings) { Get-Content $settings -Raw } else { '' }
+    $punch = $text -match '(?m)^stem01\.fx1=HEM PUNCH\|'
+    $tune  = $text -match '(?m)^stem01\.fx2=HEM TUNE\|'
+    Write-Host "FX RACK saved in settings: HEM PUNCH $punch, HEM TUNE $tune"
+    if (-not $punch -or -not $tune) { $ok = $false }
 }
 if ($ok) { Write-Host 'APP SMOKE PASS'; exit 0 } else { Write-Host 'APP SMOKE FAIL'; exit 1 }

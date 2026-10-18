@@ -21,6 +21,8 @@
 #include "hybrid/ui/Console.hpp"
 #include "hybrid/ui/GlWindow.hpp"
 #include "hybrid/ui/ScopeView.hpp"
+#include "hybrid/ui/FxRackView.hpp"
+#include "hybrid/fx/Effects.hpp"
 
 #include <windows.h>
 #include <shellapi.h>
@@ -71,6 +73,7 @@ struct Options {
     std::filesystem::path screenshot;
     bool                  offline   = false;
     std::filesystem::path session;   // a .hcs given on the command line (double-click in Explorer)
+    bool                  fxDemo    = false;   // CI: open the FX RACK with two effects on strip 1
 };
 
 Options parseOptions() {
@@ -82,6 +85,7 @@ Options parseOptions() {
         if (k == L"--exit-after" && i + 1 < argc) o.exitAfter = std::wcstod(argv[++i], nullptr);
         else if (k == L"--screenshot" && i + 1 < argc) o.screenshot = argv[++i];
         else if (k == L"--device" && i + 1 < argc) o.offline = std::wstring(argv[++i]) == L"offline";
+        else if (k == L"--fx-demo") o.fxDemo = true;
         else if (!k.empty() && k[0] != L'-') o.session = k;
     }
     if (argv) ::LocalFree(argv);
@@ -259,6 +263,28 @@ struct App {
     }
     bool                  orbiting = false;
     float                 orbitX = 0, orbitY = 0;
+    // FX RACK: HEM effect inserts on the stem strips (FX in the top bar).
+    struct RackModel final : ui::FxRackModel {
+        App* app = nullptr;
+        int  type(std::uint32_t s, int k) const override { return app->audio.fxRack().type(s, k); }
+        fx::Effect* effect(std::uint32_t s, int k) const override { return app->audio.fxRack().effect(s, k); }
+        bool bypass(std::uint32_t s, int k) const override { return app->audio.fxRack().bypass(s, k); }
+        void setBypass(std::uint32_t s, int k, bool on) override { app->audio.fxRack().setBypass(s, k, on); }
+        void setType(std::uint32_t s, int k, int t) override {
+            if (!app->audio.fxRack().setEffect(s, k, t)) app->say("FX RACK busy - try again");
+            else if (t >= 0) app->say(std::string(fx::effects()[static_cast<std::size_t>(t)].name) + " on " + stemName(s) + ", slot " + std::to_string(k + 1));
+        }
+        std::string stemName(std::uint32_t s) const override {
+            const std::string& n = app->stems.slot(s).name;
+            if (!n.empty()) { const auto dot = n.rfind('.'); return dot != std::string::npos && dot > 0 ? n.substr(0, dot) : n; }
+            return "STEM " + std::to_string(s + 1);
+        }
+    };
+    RackModel             rackModel;
+    ui::FxRackView        rackView;
+    bool                  rackOpen = false;
+    std::string           savedRack;
+    float                 rackTempo = 0.0f;
 
     // Feeds the analyzer with what the audio thread sent (every UI frame).
     void pumpScope(bool show) {
@@ -310,6 +336,7 @@ struct App {
         d.source    = sourceName(audio.source());
         d.playhead  = audio.stemPlayhead();
         if (forge && !forge->song().pattern.isEmpty()) { d.forgeSong = forge->songText(); d.forgeSeeds = forge->seedsText(); }
+        d.fxRack = audio.fxRack().toText();
         std::string err;
         if (!media::saveSession(file, d, HC_VERSION_STR, &err)) { say("Save failed: " + err); return false; }
         session = file;
@@ -334,6 +361,7 @@ struct App {
         audio.setSource(sourceFromName(l->data.source));
         pendingSeek = l->data.playhead;
         if (forge) forge->restore(l->data.forgeSong, l->data.forgeSeeds);
+        const std::string fxNote = audio.fxRack().fromText(l->data.fxRack);
         session = file;
         settings.set("app", "session", app::toUtf8(file.wstring()));
         std::string msg = "Opened " + app::toUtf8(file.filename().wstring());
@@ -341,6 +369,7 @@ struct App {
             msg += "  \xC2\xB7  " + std::to_string(l->missing.size()) + " stem(s) not found: ";
             for (std::size_t i = 0; i < l->missing.size(); ++i) msg += (i ? ", " : "") + l->missing[i];
         }
+        if (!fxNote.empty()) msg += "  \xC2\xB7  " + fxNote;
         say(msg);
     }
     // Where exports go when there is no session or stem folder: the last export folder, else
@@ -410,6 +439,7 @@ struct App {
             if (!stems.slot(s).name.empty()) req.stems[s] = stems.slot(s).file;
         req.params   = tree.serialize();
         if (beat) req.forgeSong = forge->songText();
+        req.fxRack   = audio.fxRack().toText();
         req.out      = target;
         req.encoding = media::WavEncoding::Pcm24;
         // Song-level loudness (settings.ini [export] target=-14 sets the level).
@@ -458,6 +488,8 @@ struct App {
             settings.setSectionText("forge", forge->songText());
             settings.set("forge.meta", "seeds", forge->seedsText());
         }
+        savedRack = audio.fxRack().toText();
+        settings.setSectionText("fx", savedRack);
         settings.save(params::Settings::defaultFile());
     }
     void restoreStems() {
@@ -603,6 +635,9 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     a.audio.forge().bind(a.tree);
     a.forge = std::make_unique<app::ForgeController>(a.tree, a.audio.forge());
     a.forge->restore(a.settings.sectionText("forge"), a.settings.get("forge.meta", "seeds"));
+    a.rackModel.app = &a;
+    (void)a.audio.fxRack().fromText(a.settings.sectionText("fx"));   // effect inserts as you left them
+    a.savedRack = a.audio.fxRack().toText();
     {   // Say so when knobs and faders come back the way they were left last time.
         std::size_t moved = 0;
         for (std::size_t i = 0; i < a.tree.size(); ++i) {
@@ -638,6 +673,21 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     console.setFaderBank(static_cast<std::uint32_t>(std::clamp(std::atoi(a.settings.get("app", "faderBank", "0").c_str()), 0, 3)));
     console.setPage(static_cast<ui::Page>(std::clamp(std::atoi(a.settings.get("app", "page", "0").c_str()), 0, 2)));
     console.setScope(a.settings.get("app", "scope", "0") == "1");
+    console.setOverlay([&a, &console](ui::Renderer& r, const ui::Canvas& c) {
+        if (!a.rackOpen) return;
+        a.rackView.setArea(console.layout().scopeRect());
+        a.rackView.draw(r, c.scale, a.rackModel);
+    });
+    if (opts.fxDemo) {   // CI: an effect on strip 1 shown in the open FX RACK
+        const auto list = fx::effects();
+        for (std::size_t t = 0; t < list.size(); ++t) {
+            if (std::string(list[t].name) == "HEM PUNCH") (void)a.audio.fxRack().setEffect(0, 0, static_cast<int>(t));
+            if (std::string(list[t].name) == "HEM TUNE") (void)a.audio.fxRack().setEffect(0, 1, static_cast<int>(t));
+        }
+        console.setScope(false);
+        a.rackOpen = true;
+        a.rackView.select(0, 0);
+    }
     auto uiState = [&console] { return console.faderBank() + 4u * static_cast<std::uint32_t>(console.page()) + (console.scope() ? 64u : 0u); };
     if (!opts.session.empty()) a.openSession(opts.session, console);
     std::filesystem::path shownSession = L"?";
@@ -665,6 +715,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             const float x = cv.toDesignX(e.x), y = cv.toDesignY(e.y);
             switch (e.type) {
             case ui::InputEvent::Type::MouseDown: {
+                if (a.rackOpen && a.rackView.mouseDown(x, y, e.doubleClick, e.fine, a.rackModel)) break;   // FX RACK
                 if (console.scope() && ui::scopeViewArea(console.layout().scopeRect()).contains(x, y)) {   // turn the 3D view
                     if (e.doubleClick) a.camera = {};
                     a.orbiting = !e.doubleClick;
@@ -713,7 +764,16 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                 case ui::UiAction::SelectPage:   console.setPage(static_cast<ui::Page>(idx)); break;
                 case ui::UiAction::ToStart:      a.audio.seek(0); a.analyzer.reset(); break;
                 case ui::UiAction::ResetAll: a.resetPressed(); console.interaction().mouseUp(); break;
+                case ui::UiAction::ToggleFx:
+                    a.rackOpen = !a.rackOpen;
+                    if (a.rackOpen) {
+                        console.setScope(false);
+                        a.say("FX RACK: pick a strip, then a slot, then an effect. Its faceplate opens on the right.");
+                    }
+                    console.interaction().mouseUp();
+                    break;
                 case ui::UiAction::ToggleScope:
+                    a.rackOpen = false;
                     console.setScope(!console.scope());
                     if (console.scope()) a.say("ANALYZER: press PLAY, or OPEN a WAV / MP3 to measure it. Drag the 3D view to turn it.");
                     console.interaction().mouseUp();
@@ -772,12 +832,21 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                     a.orbitX = x;
                     a.orbitY = y;
                 } else {
-                    console.interaction().mouseMove(x, y, e.fine);
+                    if (a.rackOpen) a.rackView.mouseMove(x, y, e.fine);
+                    if (!a.rackOpen || !a.rackView.contains(x, y)) console.interaction().mouseMove(x, y, e.fine);
                 }
                 break;
-            case ui::InputEvent::Type::MouseUp:   a.orbiting = false; console.interaction().mouseUp(); break;
-            case ui::InputEvent::Type::Wheel:     console.interaction().wheel(x, y, e.wheel, e.fine); break;
+            case ui::InputEvent::Type::MouseUp:
+                a.orbiting = false;
+                if (a.rackOpen) a.rackView.mouseUp(x, y);
+                console.interaction().mouseUp();
+                break;
+            case ui::InputEvent::Type::Wheel:
+                if (a.rackOpen && a.rackView.wheel(x, y, e.wheel, e.fine)) break;
+                console.interaction().wheel(x, y, e.wheel, e.fine);
+                break;
             case ui::InputEvent::Type::Drop: {   // onto a stem strip: from that slot; elsewhere: first empty slot
+                if (a.rackOpen && a.rackView.contains(x, y)) break;
                 if (console.scope() && e.files.size() == 1) { a.openAny(e.files.front(), console); break; }   // onto the ANALYZER: listen to it
                 const int at = console.layout().stemStripAt(x, y);
                 const int first = at >= 0 ? at : std::max(0, a.stems.firstEmptySlot());
@@ -785,6 +854,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                 break;
             }
             case ui::InputEvent::Type::RightDown: {
+                if (a.rackOpen && a.rackView.contains(x, y)) break;
                 // Right-click: stem title = empty that slot; name panel = previous device; any S / M = clear all solos / mutes.
                 const int hit = console.layout().hitTest(x, y);
                 const ui::Widget* w = hit >= 0 ? &console.layout().widgets()[static_cast<std::size_t>(hit)] : nullptr;
@@ -823,6 +893,10 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         a.audio.poll();
         a.stems.pump();
         a.pumpScope(console.scope());
+        if (const params::Parameter* bpm = a.tree.find(forge::id::bpm); bpm && bpm->plain() != a.rackTempo) {   // tempo-synced effects (HEM ECHO)
+            a.rackTempo = bpm->plain();
+            a.audio.fxRack().setTempo(a.rackTempo);
+        }
 
         const auto  now = std::chrono::steady_clock::now();
         const float dt  = std::chrono::duration<float>(now - lastFrame).count();
@@ -840,7 +914,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         if (now - lastSave > std::chrono::seconds(5)) {
             lastSave = now;
             if (a.tree.version() != savedVersion || uiState() != savedBank || a.audio.loop() != savedLoop || a.stems.loading() ||
-                a.forge->version() != savedForge) {
+                a.forge->version() != savedForge || a.audio.fxRack().toText() != a.savedRack) {
                 a.saveSettings(uiState());
                 savedForge   = a.forge->version();
                 savedVersion = a.tree.version();
@@ -922,6 +996,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         vs.camera      = a.camera;
         vs.scopeSource = a.scopeSource;
         vs.resetStage  = a.resetStageNow();
+        vs.fxRack      = a.rackOpen;
         vs.hover   = console.interaction().hoverWidget();
         vs.active  = console.interaction().activeWidget();
         vs.pressed = console.interaction().pressedWidget();

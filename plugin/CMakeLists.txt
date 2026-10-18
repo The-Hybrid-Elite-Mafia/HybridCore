@@ -34,14 +34,19 @@ target_link_libraries(HybridCoreVST3 PRIVATE sdk hc::params hc::dsp)
 # HEM Suite: every HEM effect (hc::fx) in one bundle, one plug-in per effect.
 # Faceplates (hc::ui, OpenGL) need the Poppins fonts and the console faceplate (knob parts) at run
 # time: they ship inside each bundle's Resources folder.
-set(HC_PLUGIN_FONTS
-    "${PROJECT_SOURCE_DIR}/assets/fonts/Poppins-Medium.ttf"
-    "${PROJECT_SOURCE_DIR}/assets/fonts/Poppins-SemiBold.ttf"
-    "${PROJECT_SOURCE_DIR}/assets/fonts/Poppins-Bold.ttf"
-    "${PROJECT_SOURCE_DIR}/assets/fonts/OFL.txt")
 function(hc_add_faceplate_resources target)
-    smtg_target_add_plugin_resources(${target} RESOURCES ${HC_PLUGIN_FONTS} OUTPUT_SUBDIRECTORY fonts)
-    smtg_target_add_plugin_resources(${target} RESOURCES "${PROJECT_SOURCE_DIR}/assets/faceplates/Main-Faceplate.png" OUTPUT_SUBDIRECTORY faceplates)
+    # Copied after the build into <bundle>/Contents/Resources (the SDK's per-file resource rules
+    # don't cope with a space in the bundle name under MSBuild).
+    get_target_property(pkg ${target} SMTG_PLUGIN_PACKAGE_PATH)
+    add_custom_command(TARGET ${target} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${pkg}/Contents/Resources/fonts" "${pkg}/Contents/Resources/faceplates"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${PROJECT_SOURCE_DIR}/assets/fonts/Poppins-Medium.ttf" "${PROJECT_SOURCE_DIR}/assets/fonts/Poppins-SemiBold.ttf"
+                "${PROJECT_SOURCE_DIR}/assets/fonts/Poppins-Bold.ttf" "${PROJECT_SOURCE_DIR}/assets/fonts/OFL.txt"
+                "${pkg}/Contents/Resources/fonts/"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${PROJECT_SOURCE_DIR}/assets/faceplates/Main-Faceplate.png"
+                "${pkg}/Contents/Resources/faceplates/"
+        VERBATIM)
 endfunction()
 
 smtg_add_vst3plugin(HemSuite PACKAGE_NAME "HEM Suite" SOURCES_LIST src/HemSuiteVst3.cpp

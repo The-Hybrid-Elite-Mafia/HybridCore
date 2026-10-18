@@ -149,6 +149,10 @@ struct PanelHit {
 };
 [[nodiscard]] PanelHit hitTestPanel(const PanelLayout& layout, float x, float y) noexcept;
 
+// Text and bar position for a meter value ("452", "A4", "-6.0" ...).
+[[nodiscard]] std::string formatPanelMeter(const PanelMeter& m, float value);
+[[nodiscard]] float       panelMeterFraction(const PanelMeter& m, float value) noexcept;   // 0..1 (centred: -1..1)
+
 // Mouse handling in panel design units. Knobs: drag up/down (Shift / Ctrl = fine), wheel,
 // double-click = default. Buttons select / toggle; selectors step (wrap around).
 class FxPanelController {

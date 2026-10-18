@@ -40,7 +40,9 @@ std::expected<ExportResult, std::string> renderMix(const ExportRequest& req, con
         const std::uint64_t forgeFrames = forgeOn ? forge::ForgeEngine::songLength(fsong, hc::kSampleRate, tree.find(forge::id::bpm)->plain(),
                                                                                      tree.find(forge::id::arrange)->isOn())
                                                   : 0;
-        const std::uint64_t tail = forgeOn ? 2 * hc::kSampleRate : 0;   // reverb / delay tails
+        if (!req.fxRack.empty()) (void)mp->fxRack().fromText(req.fxRack);
+        const bool effects = mp->fxRack().anyEffect();
+        const std::uint64_t tail = (forgeOn || effects) ? 2 * hc::kSampleRate : 0;   // reverb / delay tails
 
         // 2) Stems, decoded again (first half of the progress bar).
         std::uint32_t used = 0;
@@ -68,7 +70,8 @@ std::expected<ExportResult, std::string> renderMix(const ExportRequest& req, con
         song = std::max(song, forgeFrames) + tail;
 
         // 3) Render: song + limiter look-ahead, dropping the first look-ahead samples.
-        const std::uint64_t lat = mp->latencyFrames();
+        // limiter look-ahead + effect inserts' delay compensation (planned: no block has run yet)
+        const std::uint64_t lat = mp->limiter().latency() + mp->fxRack().plannedLatency();
         std::vector<float> outL(kBlock), outR(kBlock);
         float* outs[2] = {outL.data(), outR.data()};
         engine::ProcessContext ctx;

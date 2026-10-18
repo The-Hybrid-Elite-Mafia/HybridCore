@@ -107,6 +107,8 @@ void StemMatrix::process(const float* const* stemL, const float* const* stemR, s
 
     bool anySolo = false;
     for (const auto& s : stems_) anySolo |= s.solo.load(kRelaxed);
+    StemInsertHook* hook = hook_.load(std::memory_order_acquire);
+    if (hook) hook->beginBlock();
 
     const float invFrames = 1.0f / static_cast<float>(frames);
 
@@ -127,24 +129,28 @@ void StemMatrix::process(const float* const* stemL, const float* const* stemR, s
             continue;
         }
 
-        // EQ / compressor in use: trim (ramped) is applied into a scratch copy, the strip runs
-        // on it, and the sends below carry no trim. Switching paths re-expresses the send ramps
-        // with or without trim, so the total gain stays continuous at the block boundary.
+        // EQ / compressor or effect inserts in use: trim (ramped) is applied into a scratch copy,
+        // the strip and the inserts run on it, and the sends below carry no trim. Switching paths
+        // re-expresses the send ramps with or without trim, so the total gain stays continuous.
         ChannelStrip& cs = strips_[s];
         const bool strip = cs.engaged();
-        if (strip != viaStrip_[s]) {
-            const float k = strip ? 1.0f / prevTrim_[s] : prevTrim_[s];
+        const bool fx = hook && hook->active(s);
+        const bool viaScratch = strip || fx;
+        if (viaScratch != viaStrip_[s]) {
+            const float k = viaScratch ? 1.0f / prevTrim_[s] : prevTrim_[s];
             for (std::uint32_t b = 0; b < kBuses; ++b) { prevSend_[s][b][0] *= k; prevSend_[s][b][1] *= k; }
-            viaStrip_[s] = strip;
+            viaStrip_[s] = viaScratch;
         }
-        if (strip) {
+        if (viaScratch) {
             float* sl = stripData_.data();
             float* sr = sl + maxFrames_;
             copy(sl, L, frames);
             copy(sr, R, frames);
             scaleRamp(sl, prevTrim_[s], trim, frames);
             scaleRamp(sr, prevTrim_[s], trim, frames);
-            cs.process(sl, sr, frames);
+            if (strip) cs.process(sl, sr, frames);
+            else if (cs.gainReductionDb() != 0.0f) cs.reset();
+            if (fx) hook->process(s, sl, sr, frames);
             prevTrim_[s] = trim;
             L = sl;
             R = sr;

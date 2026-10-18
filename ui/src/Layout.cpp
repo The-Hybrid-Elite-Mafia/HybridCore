@@ -138,10 +138,11 @@ Layout::Layout(const params::ParameterTree& tree, float extraH) : extraH_(std::m
     overview_ = {130, by + 26, 2270, 90};
     limit_    = {2448, by + 47, 112, 48};
     widgets_.push_back({WidgetKind::Button, limit_, paramIndex(tree, params::busParamId(0, "limit")), 0, UiAction::None, "LIM"});
-    status_   = {1680, plate::kTopBar.y, 1400, plate::kTopBar.h};   // engraved in the top bar
-    static const UiAction kCmd[5] = {UiAction::OpenSession, UiAction::SaveSession, UiAction::ExportMix, UiAction::ToggleScope, UiAction::ResetAll};
-    static const char* const kCmdCap[5] = {"OPEN", "SAVE", "EXPORT", "SCOPE", "RESET"};
-    for (std::uint32_t i = 0; i < 5; ++i)
+    status_   = {1860, plate::kTopBar.y, 1220, plate::kTopBar.h};   // engraved in the top bar
+    static const UiAction kCmd[6] = {UiAction::OpenSession, UiAction::SaveSession, UiAction::ExportMix, UiAction::ToggleScope, UiAction::ResetAll,
+                                     UiAction::ToggleFx};
+    static const char* const kCmdCap[6] = {"OPEN", "SAVE", "EXPORT", "SCOPE", "RESET", "FX"};
+    for (std::uint32_t i = 0; i < 6; ++i)
         widgets_.push_back({WidgetKind::Command, {770.0f + 178.0f * static_cast<float>(i), plate::kTopBar.cy() - 32.0f, 160.0f, 64.0f}, -1, i, kCmd[i],
                             kCmdCap[i]});
     widgets_.push_back({WidgetKind::MasterMeter, master_, -1, 0, UiAction::None, ""});

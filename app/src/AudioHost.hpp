@@ -52,6 +52,7 @@ public:
     [[nodiscard]] dsp::StemMatrix& matrix() noexcept { return mixer_->matrix(); }
     [[nodiscard]] dsp::BusLimiter& limiter() noexcept { return mixer_->limiter(); }
     [[nodiscard]] forge::ForgeEngine& forge() noexcept { return mixer_->forge(); }
+    [[nodiscard]] engine::FxRack& fxRack() noexcept { return mixer_->fxRack(); }
     [[nodiscard]] bool forgeActive() const noexcept { return mixer_->forgeActive(); }
     // ANALYZER feed (null until a device has been opened once).
     [[nodiscard]] analysis::ScopeTap* scopeTap() noexcept { return mixer_->scopeTap(); }

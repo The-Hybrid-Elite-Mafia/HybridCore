@@ -18,6 +18,8 @@
 #include "hybrid/ui/Parts.hpp"
 #include "hybrid/ui/Renderer.hpp"
 
+#include <functional>
+
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -51,6 +53,8 @@ public:
     // Draws one frame into `targetFbo` (0 = window) or into the capture buffer.
     void render(const ViewState& view, const MeterState& meters, unsigned int targetFbo);
     void renderToCapture(const ViewState& view, const MeterState& meters);
+    // Drawn after the console every frame (the app's FX RACK). Empty = nothing.
+    void setOverlay(std::function<void(Renderer&, const Canvas&)> overlay) { overlay_ = std::move(overlay); }
     [[nodiscard]] Image capture() const { return renderer_.capture(); }
 
     [[nodiscard]] Interaction&       interaction() noexcept { return *interaction_; }
@@ -67,6 +71,7 @@ private:
 
     params::ParameterTree&        tree_;
     Renderer                      renderer_;
+    std::function<void(Renderer&, const Canvas&)> overlay_;
     std::optional<FaceplateArt>   art_;
     FontSet                       fonts_;
     FontAtlas                     font_;
