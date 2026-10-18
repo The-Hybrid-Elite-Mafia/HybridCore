@@ -8,6 +8,7 @@
 //  Talks to the engine through FxRackModel (message thread); knob turns go straight to the
 //  effect's lock-free parameters. Coordinates are console design units.
 // =============================================================================
+#include "hybrid/core/Config.hpp"
 #include "hybrid/ui/FxPanel.hpp"
 #include "hybrid/ui/FxPanelView.hpp"
 #include "hybrid/ui/Renderer.hpp"
