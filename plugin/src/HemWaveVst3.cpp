@@ -5,25 +5,31 @@
 //  (same ids, ranges and text), plus PRESET (a list: picking one loads that factory sound
 //  and reports every changed value back to the host), and hidden PITCH BEND / MOD WHEEL
 //  parameters that the host feeds from MIDI through IMidiMapping.
-//  No custom editor yet: hosts show their generic controls.
+//  Editor: the HEM obsidian faceplate (hc::ui::FxPanelWindow) with OSC / FILTER / ENV / LFO / VOICE sections.
 //  Audio thread: notes go into the synth's fixed event queue with their sample offsets;
 //  parameter changes apply at the start of the block; no allocation, locks or waiting.
 //  Steinberg VST3 SDK: MIT licence (verified from the SDK's LICENSE.txt, v3.8.1).
 // =============================================================================
 #include "hybrid/synth/Wave.hpp"
+#include "hybrid/ui/FxPanel.hpp"
+#include "hybrid/ui/FxPanelWindow.hpp"
 
 #include "pluginterfaces/base/ibstream.h"
 #include "pluginterfaces/vst/ivstevents.h"
 #include "pluginterfaces/vst/ivstmidicontrollers.h"
 #include "pluginterfaces/vst/ivstparameterchanges.h"
 #include "pluginterfaces/vst/vsttypes.h"
+#include "public.sdk/source/common/pluginview.h"
 #include "public.sdk/source/main/pluginfactory.h"
 #include "public.sdk/source/vst/vstaudioeffect.h"
 #include "public.sdk/source/vst/vsteditcontroller.h"
 #include "public.sdk/source/vst/vstparameters.h"
 
+#include <windows.h>
+
 #include <algorithm>
 #include <cstdlib>
+#include <filesystem>
 #include <cstring>
 #include <memory>
 #include <sstream>
@@ -257,9 +263,109 @@ private:
     const synth::ParamInfo& info_;
 };
 
+// ---- faceplate --------------------------------------------------------------------------
+std::filesystem::path bundleResources() {
+    HMODULE m = nullptr;
+    ::GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                         reinterpret_cast<LPCWSTR>(&bundleResources), &m);
+    wchar_t buf[MAX_PATH * 4];
+    const DWORD n = ::GetModuleFileNameW(m, buf, static_cast<DWORD>(std::size(buf)));
+    return std::filesystem::path(std::wstring(buf, n)).parent_path().parent_path() / "Resources";
+}
+
+// Panel parameter i: synth parameters 0..kParamCount-1, then the preset list.
+ui::PanelSpec waveSpec() {
+    ui::PanelSpec s;
+    s.name = "HEM WAVE";
+    s.blurb = "Morphing wavetable synth: 8 tables, unison, sub, filter, two envelopes, LFO";
+    for (const synth::ParamInfo& p : synth::WaveSynth::params()) {
+        ui::PanelParam pp;
+        pp.name = p.name;
+        if (p.taper == synth::Taper::Toggle) pp.kind = ui::PanelParam::Kind::Toggle;
+        else if (p.taper == synth::Taper::Choice) {
+            pp.kind = ui::PanelParam::Kind::Choice;
+            for (int c = 0; c <= static_cast<int>(p.max); ++c) pp.choices.emplace_back(p.choices ? p.choices[c] : std::to_string(c));
+        }
+        pp.defNormalized = synth::toNormalized(p, p.def);
+        pp.bipolar = pp.kind == ui::PanelParam::Kind::Knob && p.min < 0.0f && p.max > 0.0f && p.taper == synth::Taper::Linear;
+        s.params.push_back(std::move(pp));
+    }
+    ui::PanelParam preset;
+    preset.name = "Preset";
+    preset.kind = ui::PanelParam::Kind::Choice;
+    for (int i = 0; i < synth::WaveSynth::presetCount(); ++i) preset.choices.emplace_back(synth::WaveSynth::presetName(i));
+    s.params.push_back(std::move(preset));
+    using P = synth::Param;
+    s.groups = {{"OSCILLATOR", P::Table, P::FilterType - P::Table},
+                {"FILTER", P::FilterType, P::AmpAttack - P::FilterType},
+                {"AMP ENVELOPE", P::AmpAttack, P::ModAttack - P::AmpAttack},
+                {"MOD ENVELOPE", P::ModAttack, P::LfoShape - P::ModAttack},
+                {"LFO", P::LfoShape, P::VelAmp - P::LfoShape},
+                {"VOICE", P::VelAmp, P::kParamCount - P::VelAmp + 1}};   // + the preset list
+    return s;
+}
+
+class WaveHost final : public ui::PanelHost {
+public:
+    explicit WaveHost(Vst::EditController& c) : c_(c) {}
+    static Vst::ParamID idOf(int i) { return i < synth::kParamCount ? static_cast<Vst::ParamID>(i) : kPresetId; }
+    float normalized(int i) const override { return static_cast<float>(c_.getParamNormalized(idOf(i))); }
+    void beginEdit(int i) override { c_.beginEdit(idOf(i)); }
+    void setNormalized(int i, float v) override {
+        c_.setParamNormalized(idOf(i), v);
+        c_.performEdit(idOf(i), v);
+    }
+    void endEdit(int i) override { c_.endEdit(idOf(i)); }
+    std::string text(int i) const override {
+        if (i >= synth::kParamCount) {
+            const int count = synth::WaveSynth::presetCount();
+            const int p = std::clamp(static_cast<int>(normalized(i) * static_cast<float>(count - 1) + 0.5f), 0, count - 1);
+            return synth::WaveSynth::presetName(p);
+        }
+        const auto& p = synth::WaveSynth::params()[static_cast<std::size_t>(i)];
+        return synth::formatValue(p, synth::toPlain(p, normalized(i)));
+    }
+    bool hasBypass() const override { return false; }
+
+private:
+    Vst::EditController& c_;
+};
+
+class WaveView final : public CPluginView {
+public:
+    WaveView(const ui::PanelSpec& spec, ui::PanelHost& host) : spec_(spec), host_(host) {
+        scale_ = ui::FxPanelWindow::defaultScale(spec_);
+        int w = 0, h = 0;
+        ui::FxPanelWindow::sizeFor(spec_, scale_, w, h);
+        ViewRect r(0, 0, w, h);
+        setRect(r);
+    }
+    tresult PLUGIN_API isPlatformTypeSupported(FIDString type) SMTG_OVERRIDE {
+        return std::strcmp(type, kPlatformTypeHWND) == 0 ? kResultTrue : kResultFalse;
+    }
+    void attachedToParent() SMTG_OVERRIDE {
+        std::string err;
+        if (!window_.openChild(systemWindow, spec_, host_, bundleResources(), scale_, &err))
+            ::OutputDebugStringA(("HEM WAVE: faceplate failed: " + err + "\n").c_str());
+    }
+    void removedFromParent() SMTG_OVERRIDE { window_.close(); }
+
+private:
+    const ui::PanelSpec& spec_;
+    ui::PanelHost&       host_;
+    ui::FxPanelWindow    window_;
+    float                scale_ = 0.62f;
+};
+
 class Controller final : public Vst::EditController, public Vst::IMidiMapping {
 public:
+    Controller() : spec_(waveSpec()), host_(*this) {}
     static FUnknown* createInstance(void*) { return static_cast<Vst::IEditController*>(new Controller); }
+
+    IPlugView* PLUGIN_API createView(FIDString name) SMTG_OVERRIDE {
+        if (name && std::strcmp(name, Vst::ViewType::kEditor) == 0) return new WaveView(spec_, host_);
+        return nullptr;
+    }
 
     tresult PLUGIN_API initialize(FUnknown* context) SMTG_OVERRIDE {
         const tresult r = EditController::initialize(context);
@@ -295,6 +401,10 @@ public:
     }
 
     OBJ_METHODS(Controller, EditController)
+private:
+    ui::PanelSpec spec_;
+    WaveHost      host_;
+public:
     DEFINE_INTERFACES
         DEF_INTERFACE(IMidiMapping)
     END_DEFINE_INTERFACES(EditController)

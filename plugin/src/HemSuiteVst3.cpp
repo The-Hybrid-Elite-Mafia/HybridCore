@@ -7,22 +7,29 @@
 //  Per effect: one stereo in, one stereo out; its parameters (ids 0..n-1, same ranges and
 //  text as hc::fx), a Bypass parameter (latency-matched, no click: 10 ms crossfade) and,
 //  for the dynamics ones, a read-only Gain Reduction meter for the host's generic editor.
-//  No custom editor yet: hosts show their generic controls.
+//  Editor: every effect has its own obsidian faceplate (hc::ui::FxPanelWindow, OpenGL, inside
+//  the host's window). Live meters reach it through read-only output parameters.
 //  Steinberg VST3 SDK: MIT licence (verified from the SDK's LICENSE.txt, v3.8.1).
 // =============================================================================
 #include "hybrid/fx/Dsp.hpp"
 #include "hybrid/fx/Effects.hpp"
+#include "hybrid/ui/FxPanel.hpp"
+#include "hybrid/ui/FxPanelWindow.hpp"
 
 #include "pluginterfaces/base/ibstream.h"
 #include "pluginterfaces/vst/ivstparameterchanges.h"
 #include "pluginterfaces/vst/ivstprocesscontext.h"
 #include "pluginterfaces/vst/vsttypes.h"
+#include "public.sdk/source/common/pluginview.h"
 #include "public.sdk/source/main/pluginfactory.h"
 #include "public.sdk/source/vst/vstaudioeffect.h"
 #include "public.sdk/source/vst/vsteditcontroller.h"
 
+#include <windows.h>
+
 #include <algorithm>
 #include <cstdlib>
+#include <filesystem>
 #include <cstring>
 #include <memory>
 #include <sstream>
@@ -38,6 +45,20 @@ namespace hc::hemfx {
 
 constexpr Vst::ParamID kBypassId = 1000;
 constexpr Vst::ParamID kMeterId  = 1001;
+constexpr Vst::ParamID kMeterBase = 1100;   // + i: the effect's own meters (read-only, for the faceplate)
+
+float meterToNorm(const fx::MeterInfo& m, float v) { return m.max > m.min ? std::clamp((v - m.min) / (m.max - m.min), 0.0f, 1.0f) : 0.0f; }
+float normToMeter(const fx::MeterInfo& m, double n) { return m.min + static_cast<float>(n) * (m.max - m.min); }
+
+// The bundle's Resources folder (fonts/, faceplates/): <bundle>/Contents/x86_64-win/<dll> -> <bundle>/Contents/Resources.
+std::filesystem::path bundleResources() {
+    HMODULE m = nullptr;
+    ::GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                         reinterpret_cast<LPCWSTR>(&bundleResources), &m);
+    wchar_t buf[MAX_PATH * 4];
+    const DWORD n = ::GetModuleFileNameW(m, buf, static_cast<DWORD>(std::size(buf)));
+    return std::filesystem::path(std::wstring(buf, n)).parent_path().parent_path() / "Resources";
+}
 constexpr char         kStateMagic[] = "HEMFX1\n";
 
 FUID toFuid(const std::array<std::uint32_t, 4>& u) { return FUID(u[0], u[1], u[2], u[3]); }
@@ -138,6 +159,7 @@ public:
     uint32 PLUGIN_API getLatencySamples() SMTG_OVERRIDE { return fx_->latency(); }
     uint32 PLUGIN_API getTailSamples() SMTG_OVERRIDE {
         if (std::string(info_->subCategory).find("Reverb") != std::string::npos) return static_cast<uint32>(15.0 * sampleRate_);
+        if (std::string(info_->subCategory).find("Delay") != std::string::npos) return static_cast<uint32>(8.0 * sampleRate_);
         return fx_->latency();
     }
 
@@ -198,6 +220,16 @@ public:
             if (Vst::IParamValueQueue* q = data.outputParameterChanges->addParameterData(kMeterId, idx)) {
                 int32 pi = 0;
                 q->addPoint(0, std::clamp(1.0 + fx_->reductionDb() / 30.0, 0.0, 1.0), pi);
+            }
+        }
+        if (data.outputParameterChanges) {   // the faceplate's meters
+            const auto ms = fx_->meters();
+            for (std::size_t m = 0; m < ms.size(); ++m) {
+                int32 idx = 0;
+                if (Vst::IParamValueQueue* q = data.outputParameterChanges->addParameterData(kMeterBase + static_cast<Vst::ParamID>(m), idx)) {
+                    int32 pi = 0;
+                    q->addPoint(0, meterToNorm(ms[m], fx_->meter(static_cast<int>(m))), pi);
+                }
             }
         }
         return kResultOk;
@@ -261,9 +293,75 @@ private:
     const fx::ParamInfo& p_;
 };
 
+class Controller;
+
+// The faceplate edits parameters the VST3 way: begin / perform / end edit through the controller.
+class ControllerHost final : public ui::PanelHost {
+public:
+    ControllerHost(Vst::EditController& c, const fx::Effect& e, bool gainMeter) : c_(c), e_(e), gainMeter_(gainMeter) {}
+    float normalized(int i) const override { return static_cast<float>(c_.getParamNormalized(static_cast<Vst::ParamID>(i))); }
+    void beginEdit(int i) override { c_.beginEdit(static_cast<Vst::ParamID>(i)); }
+    void setNormalized(int i, float v) override {
+        c_.setParamNormalized(static_cast<Vst::ParamID>(i), v);
+        c_.performEdit(static_cast<Vst::ParamID>(i), v);
+    }
+    void endEdit(int i) override { c_.endEdit(static_cast<Vst::ParamID>(i)); }
+    std::string text(int i) const override {
+        const auto ps = e_.params();
+        if (i < 0 || i >= static_cast<int>(ps.size())) return {};
+        const auto& p = ps[static_cast<std::size_t>(i)];
+        return fx::formatValue(p, fx::toPlain(p, normalized(i)));
+    }
+    float meter(int m) const override {
+        const auto ms = e_.meters();
+        if (m < static_cast<int>(ms.size())) return normToMeter(ms[static_cast<std::size_t>(m)], c_.getParamNormalized(kMeterBase + static_cast<Vst::ParamID>(m)));
+        return gainMeter_ ? static_cast<float>((c_.getParamNormalized(kMeterId) - 1.0) * 30.0) : 0.0f;
+    }
+    bool bypassed() const override { return c_.getParamNormalized(kBypassId) >= 0.5; }
+    void setBypassed(bool on) override {
+        c_.beginEdit(kBypassId);
+        c_.setParamNormalized(kBypassId, on ? 1.0 : 0.0);
+        c_.performEdit(kBypassId, on ? 1.0 : 0.0);
+        c_.endEdit(kBypassId);
+    }
+
+private:
+    Vst::EditController& c_;
+    const fx::Effect&    e_;
+    bool                 gainMeter_;
+};
+
+// The editor: an OpenGL child window inside the host's window.
+class FxView final : public CPluginView {
+public:
+    FxView(const ui::PanelSpec& spec, ui::PanelHost& host) : spec_(spec), host_(host) {
+        scale_ = ui::FxPanelWindow::defaultScale(spec_);
+        int w = 0, h = 0;
+        ui::FxPanelWindow::sizeFor(spec_, scale_, w, h);
+        ViewRect r(0, 0, w, h);
+        setRect(r);
+    }
+    tresult PLUGIN_API isPlatformTypeSupported(FIDString type) SMTG_OVERRIDE {
+        return std::strcmp(type, kPlatformTypeHWND) == 0 ? kResultTrue : kResultFalse;
+    }
+    void attachedToParent() SMTG_OVERRIDE {
+        std::string err;
+        if (!window_.openChild(systemWindow, spec_, host_, bundleResources(), scale_, &err))
+            ::OutputDebugStringA(("HEM Suite: faceplate failed: " + err + "\n").c_str());
+    }
+    void removedFromParent() SMTG_OVERRIDE { window_.close(); }
+
+private:
+    const ui::PanelSpec& spec_;
+    ui::PanelHost&       host_;
+    ui::FxPanelWindow    window_;
+    float                scale_ = 0.62f;
+};
+
 class Controller final : public Vst::EditController {
 public:
-    explicit Controller(const fx::EffectInfo* info) : info_(info), fx_(info->create()) {}
+    explicit Controller(const fx::EffectInfo* info)
+        : info_(info), fx_(info->create()), spec_(ui::panelSpecFor(*info, *fx_)), host_(*this, *fx_, hasMeter(*info)) {}
     static FUnknown* createInstance(void* ctx) {
         return static_cast<Vst::IEditController*>(new Controller(static_cast<const fx::EffectInfo*>(ctx)));
     }
@@ -276,6 +374,10 @@ public:
         parameters.addParameter(STR16("Bypass"), nullptr, 1, 0, Vst::ParameterInfo::kCanAutomate | Vst::ParameterInfo::kIsBypass, kBypassId);
         if (hasMeter(*info_))
             parameters.addParameter(STR16("Gain Reduction"), STR16("dB"), 0, 1, Vst::ParameterInfo::kIsReadOnly, kMeterId);
+        const auto ms = fx_->meters();
+        for (std::size_t m = 0; m < ms.size(); ++m)
+            parameters.addParameter(toU16(std::string("Meter ") + ms[m].name).c_str(), nullptr, 0, meterToNorm(ms[m], 0.0f),
+                                    Vst::ParameterInfo::kIsReadOnly | Vst::ParameterInfo::kIsHidden, kMeterBase + static_cast<Vst::ParamID>(m));
         return kResultOk;
     }
 
@@ -289,9 +391,16 @@ public:
         return kResultOk;
     }
 
+    IPlugView* PLUGIN_API createView(FIDString name) SMTG_OVERRIDE {
+        if (name && std::strcmp(name, Vst::ViewType::kEditor) == 0) return new FxView(spec_, host_);
+        return nullptr;
+    }
+
 private:
     const fx::EffectInfo*       info_;
-    std::unique_ptr<fx::Effect> fx_;   // holds the values for the generic editor (never processes audio)
+    std::unique_ptr<fx::Effect> fx_;   // parameter descriptions and text (never processes audio)
+    ui::PanelSpec               spec_;
+    ControllerHost              host_;
 };
 
 } // namespace hc::hemfx

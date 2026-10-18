@@ -58,6 +58,9 @@ public:
     bool setChassis(const TextureLevels& tex, std::string* error);
     bool setParts(const PartsAtlas& atlas, std::string* error);
     bool setFont(const FontAtlas& font, std::string* error);
+    // A plug-in faceplate (FxPanel): uploaded on its own texture unit, drawn with panel().
+    bool setPanel(const TextureLevels& tex, std::string* error);
+    void clearPanel() noexcept;
     // (Re)creates the render targets for a framebuffer size. Cheap when unchanged.
     bool setTargetSize(int width, int height, std::string* error);
 
@@ -73,6 +76,7 @@ public:
 
     // ---- primitives (design units) --------------------------------------------------
     void chassis(Rect plateSrc, Rect dst);   // a region of the faceplate texture
+    void panel(Rect dst);                    // the whole plug-in faceplate texture
     void sprite(Sprite s, Rect dst, Rgba tint = {}, Blend blend = Blend::Over, bool emissive = false);
     void spriteRotated(Sprite s, float cx, float cy, float w, float h, float angleRad, Rgba tint = {},
                        Blend blend = Blend::Over, bool emissive = false);
@@ -135,8 +139,8 @@ private:
     [[nodiscard]] float py(float y) const noexcept { return canvas_.offsetY + y * canvas_.scale; }
 
     unsigned int program_ = 0, post_ = 0, vao_ = 0, vbo_ = 0, emptyVao_ = 0;
-    unsigned int chassisTex_ = 0, partsTex_ = 0, fontTex_ = 0;
-    std::uint64_t chassisBytes_ = 0, partsBytes_ = 0, fontBytes_ = 0, targetBytes_ = 0;
+    unsigned int chassisTex_ = 0, partsTex_ = 0, fontTex_ = 0, panelTex_ = 0;
+    std::uint64_t chassisBytes_ = 0, partsBytes_ = 0, fontBytes_ = 0, panelBytes_ = 0, targetBytes_ = 0;
     float chassisW_ = 1, chassisH_ = 1;
     int   uScale_ = -1, uPostMode_ = -1, uPostTexel_ = -1, uPostStrength_ = -1;
     Target msaa_, static_, scene_, bloomA_, bloomB_, wideA_, wideB_, capture_;

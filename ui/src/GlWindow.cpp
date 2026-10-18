@@ -16,6 +16,10 @@ struct GlWindow::Impl {
     bool                    mouseDown = false;
     std::vector<InputEvent> events;
     gl::PFN_wglSwapIntervalEXT swapInterval = nullptr;
+    bool                    child = false;
+    std::function<void()>   onTimer;
+    HDC                     prevDc = nullptr;
+    HGLRC                   prevRc = nullptr;
 
     static LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         auto* self = reinterpret_cast<Impl*>(::GetWindowLongPtrW(h, GWLP_USERDATA));
@@ -43,6 +47,12 @@ struct GlWindow::Impl {
             return 0;
         case WM_ERASEBKGND:
             return 1;   // GL paints everything
+        case WM_TIMER:
+            if (onTimer) onTimer();
+            return 0;
+        case WM_MOUSEACTIVATE:
+            if (child) return MA_ACTIVATE;
+            return ::DefWindowProcW(h, msg, wp, lp);
         case WM_DPICHANGED: {
             const auto* r = reinterpret_cast<const RECT*>(lp);
             ::SetWindowPos(h, nullptr, r->left, r->top, r->right - r->left, r->bottom - r->top, SWP_NOZORDER | SWP_NOACTIVATE);
@@ -51,6 +61,7 @@ struct GlWindow::Impl {
         }
         case WM_LBUTTONDOWN:
         case WM_LBUTTONDBLCLK:
+            if (child) ::SetFocus(h);   // so the wheel reaches a plug-in view
             ::SetCapture(h);
             mouseDown = true;
             e.type = InputEvent::Type::MouseDown;
@@ -148,6 +159,28 @@ bool registerClass() {
     return done;
 }
 
+constexpr wchar_t kChildClassName[] = L"HEMPluginGlView";
+int gChildCount = 0;
+
+HINSTANCE thisModule() {
+    HMODULE m = nullptr;
+    ::GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                         reinterpret_cast<LPCWSTR>(&thisModule), &m);
+    return m;
+}
+
+bool registerChildClass() {
+    if (gChildCount > 0) return true;
+    WNDCLASSEXW wc{};
+    wc.cbSize        = sizeof(wc);
+    wc.style         = CS_OWNDC | CS_DBLCLKS;
+    wc.lpfnWndProc   = &GlWindow::Impl::proc;
+    wc.hInstance     = thisModule();
+    wc.hCursor       = ::LoadCursorW(nullptr, IDC_ARROW);
+    wc.lpszClassName = kChildClassName;
+    return ::RegisterClassExW(&wc) != 0 || ::GetLastError() == ERROR_CLASS_ALREADY_EXISTS;
+}
+
 bool setBasicPixelFormat(HDC dc) {
     PIXELFORMATDESCRIPTOR pfd{};
     pfd.nSize      = sizeof(pfd);
@@ -224,9 +257,91 @@ bool GlWindow::create(const std::wstring& title, int clientW, int clientH, bool 
 }
 
 void GlWindow::destroy() noexcept {
-    if (impl_->rc) { ::wglMakeCurrent(nullptr, nullptr); ::wglDeleteContext(impl_->rc); impl_->rc = nullptr; }
+    if (impl_->hwnd) ::KillTimer(impl_->hwnd, 1);
+    impl_->onTimer = nullptr;
+    if (impl_->rc) {
+        if (::wglGetCurrentContext() == impl_->rc) ::wglMakeCurrent(nullptr, nullptr);
+        ::wglDeleteContext(impl_->rc);
+        impl_->rc = nullptr;
+    }
     if (impl_->hdc && impl_->hwnd) { ::ReleaseDC(impl_->hwnd, impl_->hdc); impl_->hdc = nullptr; }
     if (impl_->hwnd) { ::DestroyWindow(impl_->hwnd); impl_->hwnd = nullptr; }
+    if (impl_->child) {
+        impl_->child = false;
+        if (--gChildCount == 0) ::UnregisterClassW(kChildClassName, thisModule());
+    }
+}
+
+bool GlWindow::createChild(void* parentHwnd, int clientW, int clientH, std::string* error) {
+    auto fail = [&](const char* why) {
+        if (error) *error = why;
+        destroy();
+        return false;
+    };
+    if (!registerChildClass()) { if (error) *error = "RegisterClassEx (plug-in view) failed"; return false; }
+    ++gChildCount;
+    impl_->child = true;
+    const HDC   prevDc = ::wglGetCurrentDC();
+    const HGLRC prevRc = ::wglGetCurrentContext();
+    auto restore = [&] { ::wglMakeCurrent(prevDc, prevRc); };
+
+    // 1) Throw-away context to obtain wglCreateContextAttribsARB.
+    HWND dummy = ::CreateWindowExW(0, kChildClassName, L"", WS_POPUP, 0, 0, 8, 8, nullptr, nullptr, thisModule(), impl_.get());
+    if (!dummy) return fail("dummy window failed");
+    HDC   ddc = ::GetDC(dummy);
+    HGLRC drc = nullptr;
+    gl::PFN_wglCreateContextAttribsARB createAttribs = nullptr;
+    if (setBasicPixelFormat(ddc) && (drc = ::wglCreateContext(ddc)) && ::wglMakeCurrent(ddc, drc))
+        createAttribs = reinterpret_cast<gl::PFN_wglCreateContextAttribsARB>(::wglGetProcAddress("wglCreateContextAttribsARB"));
+    ::wglMakeCurrent(nullptr, nullptr);
+    if (drc) ::wglDeleteContext(drc);
+    ::ReleaseDC(dummy, ddc);
+    ::DestroyWindow(dummy);
+    if (!createAttribs) { restore(); return fail("wglCreateContextAttribsARB unavailable (OpenGL 3.3 driver required)"); }
+
+    impl_->hwnd = ::CreateWindowExW(0, kChildClassName, L"HEM", WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN, 0, 0,
+                                    clientW, clientH, static_cast<HWND>(parentHwnd), nullptr, thisModule(), impl_.get());
+    if (!impl_->hwnd) { restore(); return fail("CreateWindowEx (plug-in view) failed"); }
+    impl_->hdc = ::GetDC(impl_->hwnd);
+    if (!setBasicPixelFormat(impl_->hdc)) { restore(); return fail("SetPixelFormat failed"); }
+    const int attribs[] = {gl::kWglContextMajorVersion, 3, gl::kWglContextMinorVersion, 3,
+                           gl::kWglContextProfileMask, gl::kWglContextCoreProfile, 0};
+    impl_->rc = createAttribs(impl_->hdc, nullptr, attribs);
+    if (!impl_->rc) { restore(); return fail("could not create an OpenGL 3.3 core context"); }
+    if (!::wglMakeCurrent(impl_->hdc, impl_->rc)) { restore(); return fail("wglMakeCurrent failed"); }
+    if (const char* missing = gl::loadFunctions()) {
+        static std::string msg;
+        msg = std::string("OpenGL function missing: ") + missing;
+        restore();
+        return fail(msg.c_str());
+    }
+    impl_->swapInterval = reinterpret_cast<gl::PFN_wglSwapIntervalEXT>(::wglGetProcAddress("wglSwapIntervalEXT"));
+    if (impl_->swapInterval) impl_->swapInterval(0);   // the host's message loop must never wait on our vsync
+    // Leave our context current for the caller's set-up (renderer, textures); it calls restoreContext().
+    impl_->prevDc = prevDc;
+    impl_->prevRc = prevRc;
+    return true;
+}
+
+void GlWindow::setTimer(unsigned int timerMs, std::function<void()> onTimer) {
+    impl_->onTimer = std::move(onTimer);
+    if (impl_->hwnd) ::SetTimer(impl_->hwnd, 1, timerMs, nullptr);
+}
+
+void GlWindow::resizeChild(int w, int h) noexcept {
+    if (impl_->hwnd) ::SetWindowPos(impl_->hwnd, nullptr, 0, 0, w, h, SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOMOVE);
+}
+
+void GlWindow::makeCurrent() noexcept {
+    impl_->prevDc = ::wglGetCurrentDC();
+    impl_->prevRc = ::wglGetCurrentContext();
+    if (impl_->hdc && impl_->rc) ::wglMakeCurrent(impl_->hdc, impl_->rc);
+}
+
+void GlWindow::restoreContext() noexcept {
+    ::wglMakeCurrent(impl_->prevDc, impl_->prevRc);
+    impl_->prevDc = nullptr;
+    impl_->prevRc = nullptr;
 }
 
 bool GlWindow::pump() {

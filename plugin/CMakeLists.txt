@@ -32,17 +32,33 @@ target_compile_definitions(HybridCoreVST3 PRIVATE HC_VERSION_STR="${PROJECT_VERS
 target_link_libraries(HybridCoreVST3 PRIVATE sdk hc::params hc::dsp)
 
 # HEM Suite: every HEM effect (hc::fx) in one bundle, one plug-in per effect.
-smtg_add_vst3plugin(HemSuite PACKAGE_NAME "HEM Suite" SOURCES_LIST src/HemSuiteVst3.cpp)
+# Faceplates (hc::ui, OpenGL) need the Poppins fonts and the console faceplate (knob parts) at run
+# time: they ship inside each bundle's Resources folder.
+set(HC_PLUGIN_FONTS
+    "${PROJECT_SOURCE_DIR}/assets/fonts/Poppins-Medium.ttf"
+    "${PROJECT_SOURCE_DIR}/assets/fonts/Poppins-SemiBold.ttf"
+    "${PROJECT_SOURCE_DIR}/assets/fonts/Poppins-Bold.ttf"
+    "${PROJECT_SOURCE_DIR}/assets/fonts/OFL.txt")
+function(hc_add_faceplate_resources target)
+    smtg_target_add_plugin_resources(${target} RESOURCES ${HC_PLUGIN_FONTS} OUTPUT_SUBDIRECTORY fonts)
+    smtg_target_add_plugin_resources(${target} RESOURCES "${PROJECT_SOURCE_DIR}/assets/faceplates/Main-Faceplate.png" OUTPUT_SUBDIRECTORY faceplates)
+endfunction()
+
+smtg_add_vst3plugin(HemSuite PACKAGE_NAME "HEM Suite" SOURCES_LIST src/HemSuiteVst3.cpp
+    "${vst3sdk_SOURCE_DIR}/public.sdk/source/common/pluginview.cpp")
 set_target_properties(HemSuite PROPERTIES CXX_STANDARD 23 CXX_STANDARD_REQUIRED ON)
 target_include_directories(HemSuite SYSTEM PRIVATE "${vst3sdk_SOURCE_DIR}")
 target_compile_definitions(HemSuite PRIVATE HC_VERSION_STR="${PROJECT_VERSION}")
-target_link_libraries(HemSuite PRIVATE sdk hc::fx)
+target_link_libraries(HemSuite PRIVATE sdk hc::fx hc::ui)
+hc_add_faceplate_resources(HemSuite)
 
 # HEM WAVE: the wavetable synth (hc::synth) as a VST3 instrument.
-smtg_add_vst3plugin(HemWave PACKAGE_NAME "HEM WAVE" SOURCES_LIST src/HemWaveVst3.cpp)
+smtg_add_vst3plugin(HemWave PACKAGE_NAME "HEM WAVE" SOURCES_LIST src/HemWaveVst3.cpp
+    "${vst3sdk_SOURCE_DIR}/public.sdk/source/common/pluginview.cpp")
 set_target_properties(HemWave PROPERTIES CXX_STANDARD 23 CXX_STANDARD_REQUIRED ON)
 target_include_directories(HemWave SYSTEM PRIVATE "${vst3sdk_SOURCE_DIR}")
 target_compile_definitions(HemWave PRIVATE HC_VERSION_STR="${PROJECT_VERSION}")
-target_link_libraries(HemWave PRIVATE sdk hc::synth)
+target_link_libraries(HemWave PRIVATE sdk hc::synth hc::ui)
+hc_add_faceplate_resources(HemWave)
 
 message(STATUS "[HybridCore] VST3 plug-in enabled (SDK ${vst3sdk_SOURCE_DIR})")

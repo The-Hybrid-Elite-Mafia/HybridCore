@@ -6,6 +6,7 @@
 // =============================================================================
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -35,6 +36,17 @@ public:
     // Creates the window and a GL 3.3 core context and makes it current on this thread.
     // clientW/H are in DESIGN-sized logical pixels; they are scaled by the monitor DPI.
     bool create(const std::wstring& title, int clientW, int clientH, bool visible, std::string* error);
+    // A child window filling `parentHwnd` (plug-in editors). clientW/H are physical pixels.
+    // The host pumps the messages; input arrives through takeEvents() and onTimer runs on the
+    // window's thread every `timerMs` (draw there). Uses its own window class, registered with
+    // this module and unregistered when the last child closes (safe when a DLL is unloaded).
+    bool createChild(void* parentHwnd, int clientW, int clientH, std::string* error);
+    void setTimer(unsigned int timerMs, std::function<void()> onTimer);
+    void resizeChild(int clientW, int clientH) noexcept;
+    // Makes this window's GL context current; restoreContext() puts back whatever was current
+    // before (hosts may have their own GL contexts on the same thread).
+    void makeCurrent() noexcept;
+    void restoreContext() noexcept;
     void destroy() noexcept;
 
     // Pumps Win32 messages; returns false once the window was closed.

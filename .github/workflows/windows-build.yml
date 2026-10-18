@@ -67,7 +67,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tools\ci\run-and-report.ps1 -Title "ui: fetch mesa" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\fetch-mesa.ps1','-TargetDirs','build\rig-full\tools\ui_snapshot\Release,build\rig-full\app\Release'
+          tools\ci\run-and-report.ps1 -Title "ui: fetch mesa" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\fetch-mesa.ps1','-TargetDirs','build\rig-full\tools\ui_snapshot\Release,build\rig-full\app\Release,build\rig-full\tools\fx_snapshot\Release'
 
       - name: GPU UI snapshot (live engine, 3840x2160 + 1389x868, faceplate comparison)
         env:
@@ -82,6 +82,12 @@ jobs:
           tools\ci\run-and-report.ps1 -Title "ui: snapshot, Beat Forge page" -Exe .\build\rig-full\tools\ui_snapshot\Release\hc_ui_snapshot.exe -ArgList '--out','shots','--sizes','3840x2160,1389x868','--seconds','3','--forge','0','--page','forge','--name','HybridCore-forge'
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           tools\ci\run-and-report.ps1 -Title "ui: snapshot, ANALYZER (3D)" -Exe .\build\rig-full\tools\ui_snapshot\Release\hc_ui_snapshot.exe -ArgList '--out','shots','--sizes','3840x2160,1389x868','--seconds','6','--forge','0','--scope','--name','HybridCore-scope'
+
+      - name: Plug-in faceplates (all 22 HEM effects + HEM WAVE, live meters)
+        env:
+          GALLIUM_DRIVER: llvmpipe
+        run: |
+          tools\ci\run-and-report.ps1 -Title "ui: plug-in faceplates" -Exe .\build\rig-full\tools\fx_snapshot\Release\hc_fx_snapshot.exe -ArgList '--out','shots','--scale','0.62'
 
       - name: Start the real app (HybridCore.exe) and capture its window
         env:
