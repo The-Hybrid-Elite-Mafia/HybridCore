@@ -48,6 +48,8 @@ std::string formatValue(const ParamInfo& p, float v) {
     } else if (u == "dBr") {   // an amount of reduction: shown as how far it turns down
         std::snprintf(b, sizeof b, "-%.1f dB", std::fabs(v));
         if (std::fabs(v) < 0.05f) std::snprintf(b, sizeof b, "0.0 dB");
+    } else if (u == "/10") {   // a 0..10 dial (HEM-Elite-Rack faceplates)
+        std::snprintf(b, sizeof b, "%.1f", v);
     } else if (u == "bit") {
         std::snprintf(b, sizeof b, "%.1f bit", v);
     } else if (u == "ms") {
