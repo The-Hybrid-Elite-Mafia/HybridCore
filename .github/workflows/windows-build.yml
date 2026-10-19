@@ -32,72 +32,70 @@ jobs:
           tools\ci\run-and-report.ps1 -Title "wasapi: device probe" -Exe .\build\rig\tools\device_probe\Release\hc_device_probe.exe -ArgList '--no-audio-ok'
 
   full:
-    name: Full build (ASIO + VST3, SDKs fetched at build time, never committed) + UI + installer
+    name: Public build (WASAPI + VST3, no ASIO code) + UI + installer + public release
     runs-on: windows-2022
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v5
 
-      - name: Fetch ASIO SDK
+      - name: Configure (VST3, no ASIO - safe to share)
         run: |
-          tools\ci\run-and-report.ps1 -Title "full: fetch asio sdk" -Exe powershell -ArgList '-ExecutionPolicy','Bypass','-File','tools\fetch-asio-sdk.ps1'
-
-      - name: Configure (ASIO + VST3)
-        run: |
-          tools\ci\run-and-report.ps1 -Title "full: configure" -Exe cmake -ArgList '--preset','rig-full'
+          tools\ci\run-and-report.ps1 -Title "public: configure" -Exe cmake -ArgList '--preset','rig-public'
 
       - name: Build Release (runs Steinberg's validator after the plug-in links)
         run: |
-          tools\ci\run-and-report.ps1 -Title "full: build" -Exe cmake -ArgList '--build','--preset','rig-full-release' -WarningSummary
+          tools\ci\run-and-report.ps1 -Title "public: build" -Exe cmake -ArgList '--build','--preset','rig-public-release' -WarningSummary
 
       - name: Unit tests
         run: |
-          tools\ci\run-and-report.ps1 -Title "full: unit tests" -Exe ctest -ArgList '--test-dir','build/rig-full','-C','Release','-V'
+          tools\ci\run-and-report.ps1 -Title "public: unit tests" -Exe ctest -ArgList '--test-dir','build/rig-public','-C','Release','-V'
 
       - name: VST3 validator
         run: |
-          tools\ci\run-and-report.ps1 -Title "full: vst3 validator" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\run-validator.ps1','-BuildDir','build\rig-full'
+          tools\ci\run-and-report.ps1 -Title "public: vst3 validator" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\run-validator.ps1','-BuildDir','build\rig-public'
 
       - name: Device probe
         run: |
-          tools\ci\run-and-report.ps1 -Title "full: device probe" -Exe .\build\rig-full\tools\device_probe\Release\hc_device_probe.exe -ArgList '--no-audio-ok'
+          tools\ci\run-and-report.ps1 -Title "public: device probe" -Exe .\build\rig-public\tools\device_probe\Release\hc_device_probe.exe -ArgList '--no-audio-ok'
 
       - name: Software OpenGL for UI tests (Mesa llvmpipe, CI only, not shipped)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tools\ci\run-and-report.ps1 -Title "ui: fetch mesa" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\fetch-mesa.ps1','-TargetDirs','build\rig-full\tools\ui_snapshot\Release,build\rig-full\app\Release,build\rig-full\tools\fx_snapshot\Release'
+          tools\ci\run-and-report.ps1 -Title "ui: fetch mesa" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\fetch-mesa.ps1','-TargetDirs','build\rig-public\tools\ui_snapshot\Release,build\rig-public\app\Release,build\rig-public\tools\fx_snapshot\Release'
 
       - name: GPU UI snapshot (live engine, 3840x2160 + 1389x868, faceplate comparison)
         env:
           GALLIUM_DRIVER: llvmpipe
         run: |
-          tools\ci\run-and-report.ps1 -Title "ui: snapshot" -Exe .\build\rig-full\tools\ui_snapshot\Release\hc_ui_snapshot.exe -ArgList '--out','shots','--sizes','3840x2160,1389x868','--seconds','2'
+          tools\ci\run-and-report.ps1 -Title "ui: snapshot" -Exe .\build\rig-public\tools\ui_snapshot\Release\hc_ui_snapshot.exe -ArgList '--out','shots','--sizes','3840x2160,1389x868','--seconds','2'
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          tools\ci\run-and-report.ps1 -Title "ui: snapshot with stems" -Exe .\build\rig-full\tools\ui_snapshot\Release\hc_ui_snapshot.exe -ArgList '--out','shots','--sizes','1389x868','--seconds','2','--stems','tests\data','--name','HybridCore-stems'
+          tools\ci\run-and-report.ps1 -Title "ui: snapshot with stems" -Exe .\build\rig-public\tools\ui_snapshot\Release\hc_ui_snapshot.exe -ArgList '--out','shots','--sizes','1389x868','--seconds','2','--stems','tests\data','--name','HybridCore-stems'
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          tools\ci\run-and-report.ps1 -Title "ui: snapshot, dynamics page" -Exe .\build\rig-full\tools\ui_snapshot\Release\hc_ui_snapshot.exe -ArgList '--out','shots','--sizes','1389x868','--seconds','2','--stems','tests\data','--page','dyn','--name','HybridCore-dynamics'
+          tools\ci\run-and-report.ps1 -Title "ui: snapshot, dynamics page" -Exe .\build\rig-public\tools\ui_snapshot\Release\hc_ui_snapshot.exe -ArgList '--out','shots','--sizes','1389x868','--seconds','2','--stems','tests\data','--page','dyn','--name','HybridCore-dynamics'
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          tools\ci\run-and-report.ps1 -Title "ui: snapshot, Beat Forge page" -Exe .\build\rig-full\tools\ui_snapshot\Release\hc_ui_snapshot.exe -ArgList '--out','shots','--sizes','3840x2160,1389x868','--seconds','3','--forge','0','--page','forge','--name','HybridCore-forge'
+          tools\ci\run-and-report.ps1 -Title "ui: snapshot, Beat Forge page" -Exe .\build\rig-public\tools\ui_snapshot\Release\hc_ui_snapshot.exe -ArgList '--out','shots','--sizes','3840x2160,1389x868','--seconds','3','--forge','0','--page','forge','--name','HybridCore-forge'
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          tools\ci\run-and-report.ps1 -Title "ui: snapshot, ANALYZER (3D)" -Exe .\build\rig-full\tools\ui_snapshot\Release\hc_ui_snapshot.exe -ArgList '--out','shots','--sizes','3840x2160,1389x868','--seconds','6','--forge','0','--scope','--name','HybridCore-scope'
+          tools\ci\run-and-report.ps1 -Title "ui: snapshot, ANALYZER (3D)" -Exe .\build\rig-public\tools\ui_snapshot\Release\hc_ui_snapshot.exe -ArgList '--out','shots','--sizes','3840x2160,1389x868','--seconds','6','--forge','0','--scope','--name','HybridCore-scope'
 
       - name: Plug-in faceplates (all 22 HEM effects + HEM WAVE, live meters)
         env:
           GALLIUM_DRIVER: llvmpipe
         run: |
-          tools\ci\run-and-report.ps1 -Title "ui: plug-in faceplates" -Exe .\build\rig-full\tools\fx_snapshot\Release\hc_fx_snapshot.exe -ArgList '--out','shots','--scale','0.62'
+          tools\ci\run-and-report.ps1 -Title "ui: plug-in faceplates" -Exe .\build\rig-public\tools\fx_snapshot\Release\hc_fx_snapshot.exe -ArgList '--out','shots','--scale','0.62'
 
       - name: Start the real app (HybridCore.exe) and capture its window
         env:
           GALLIUM_DRIVER: llvmpipe
         run: |
-          tools\ci\run-and-report.ps1 -Title "app: smoke run" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\run-app-smoke.ps1','-Exe','build\rig-full\app\Release\HybridCore.exe','-Shot','shots\app_window.png'
+          tools\ci\run-and-report.ps1 -Title "app: smoke run" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\run-app-smoke.ps1','-Exe','build\rig-public\app\Release\HybridCore.exe','-Shot','shots\app_window.png'
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          tools\ci\run-and-report.ps1 -Title "app: open a session from the command line" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\run-app-smoke.ps1','-Exe','build\rig-full\app\Release\HybridCore.exe','-Shot','shots\app_session.png','-StemsDir','tests\data'
+          tools\ci\run-and-report.ps1 -Title "app: open a session from the command line" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\run-app-smoke.ps1','-Exe','build\rig-public\app\Release\HybridCore.exe','-Shot','shots\app_session.png','-StemsDir','tests\data'
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          tools\ci\run-and-report.ps1 -Title "app: FX RACK with two effects" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\run-app-smoke.ps1','-Exe','build\rig-full\app\Release\HybridCore.exe','-Shot','shots\app_fxrack.png','-FxDemo'
+          tools\ci\run-and-report.ps1 -Title "app: FX RACK with two effects" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\run-app-smoke.ps1','-Exe','build\rig-public\app\Release\HybridCore.exe','-Shot','shots\app_fxrack.png','-FxDemo'
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          tools\ci\run-and-report.ps1 -Title "app: settings from an ASIO build fall back to WASAPI" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\run-app-smoke.ps1','-Exe','build\rig-public\app\Release\HybridCore.exe','-Shot','shots\app_saved_asio.png','-SavedAsio'
 
       - name: Publish screenshots to the ci-screenshots branch
         if: github.ref == 'refs/heads/main'

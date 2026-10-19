@@ -1,13 +1,15 @@
 ; =============================================================================
 ;  The Hybrid Core — Windows installer (Inno Setup 6)
-;  Built by CI:  ISCC /DAppVersion=x.y.z /DBinDir=<build dir> [/DVst3Bundle=<path>] [/DAsioLicense=<path>] HybridCore.iss
+;  Built by CI:  ISCC /DAppVersion=x.y.z /DBinDir=<build dir> [/DVst3Bundle=<path>] [/DAsioLicense=<path> /DPrivateAsio] HybridCore.iss
+;  Public installers (GitHub Releases) contain no ASIO code. /DPrivateAsio marks Steven's own ASIO build
+;  (file name ...-PRIVATE-ASIO.exe); it is published only in a private repository.
 ;  AppId is permanent: never change it, or upgrades will install side-by-side.
 ; =============================================================================
 #ifndef AppVersion
   #define AppVersion "0.0.0-dev"
 #endif
 #ifndef BinDir
-  #define BinDir "..\build\rig-full"
+  #define BinDir "..\build\rig-public"
 #endif
 
 [Setup]
@@ -19,7 +21,11 @@ AppPublisher=Hybrid Elite Mafia
 DefaultDirName={autopf}\Hybrid Elite Mafia\The Hybrid Core
 DefaultGroupName=The Hybrid Core
 DisableProgramGroupPage=yes
+#ifdef PrivateAsio
+OutputBaseFilename=HybridCore-Setup-{#AppVersion}-PRIVATE-ASIO
+#else
 OutputBaseFilename=HybridCore-Setup-{#AppVersion}
+#endif
 OutputDir=output
 SetupIconFile=..\app\resources\HybridCore.ico
 UninstallDisplayIcon={app}\HybridCore.exe
@@ -76,7 +82,9 @@ Name: "{autodesktop}\The Hybrid Core";         Filename: "{app}\HybridCore.exe";
 ; Diagnostics. cmd /k keeps the window open so the results can be read.
 Name: "{group}\Diagnostics\1 - Rig Check";             Filename: "{cmd}"; Parameters: "/k """"{app}\bin\hc_device_probe.exe"" --seconds 2"""; WorkingDir: "{app}\bin"
 Name: "{group}\Diagnostics\2 - Mixer Test (WASAPI)";   Filename: "{cmd}"; Parameters: "/k """"{app}\bin\hc_engine_smoke.exe"" --mixer --seconds 15"""; WorkingDir: "{app}\bin"
+#ifdef PrivateAsio
 Name: "{group}\Diagnostics\3 - Mixer Test (ASIO)";     Filename: "{cmd}"; Parameters: "/k """"{app}\bin\hc_engine_smoke.exe"" --asio --mixer --seconds 15"""; WorkingDir: "{app}\bin"
+#endif
 Name: "{group}\Diagnostics\4 - Engine Self-Test";      Filename: "{cmd}"; Parameters: "/k """"{app}\bin\hc_tests.exe"""""; WorkingDir: "{app}\bin"
 Name: "{group}\Diagnostics\5 - Screen Snapshots";      Filename: "{cmd}"; Parameters: "/k """"{app}\bin\hc_ui_snapshot.exe"""""; WorkingDir: "{app}\bin"
 Name: "{group}\How to test";                   Filename: "{app}\HOW-TO-TEST.txt"

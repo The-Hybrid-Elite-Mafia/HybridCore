@@ -1,3 +1,11 @@
+## The Hybrid Core — 0.14.1 (rebuilt): safe to share — no ASIO code
+
+This installer is the **public** build: it plays through WASAPI (Windows' own audio, exclusive mode) and contains **no Steinberg ASIO code**, so it can be shared. Everything else is the same as 0.14.1 below, including the HEM plug-ins (VST3).
+- If your settings came from an ASIO build, the app switches to WASAPI by itself and says so.
+- Only a pro audio interface with its own ASIO driver would notice a difference; laptop and built-in sound use WASAPI anyway.
+
+---
+
 ## The Hybrid Core — 0.14.1: faceplates that fill the rack, sharp numbers, song tempo
 
 Fixes from testing 0.14.0 on your PC with your song:

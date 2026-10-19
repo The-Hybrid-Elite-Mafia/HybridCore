@@ -43,6 +43,16 @@
         "HC_REQUIRE_ASIO_SDK": "ON",
         "HC_BUILD_VST3": "ON"
       }
+    },
+    {
+      "name": "rig-public",
+      "displayName": "HEM Rig \u2014 public build: WASAPI + VST3, no ASIO",
+      "inherits": "rig",
+      "binaryDir": "${sourceDir}/build/rig-public",
+      "cacheVariables": {
+        "HC_WITH_ASIO": "OFF",
+        "HC_BUILD_VST3": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -64,6 +74,11 @@
     {
       "name": "rig-full-release",
       "configurePreset": "rig-full",
+      "configuration": "Release"
+    },
+    {
+      "name": "rig-public-release",
+      "configurePreset": "rig-public",
       "configuration": "Release"
     }
   ]

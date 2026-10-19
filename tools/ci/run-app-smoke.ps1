@@ -7,8 +7,10 @@
   on the command line, as Explorer does on a double-click: the run must open it (settings show the
   session and both stem slots, and the screenshot shows them loaded).
   With -FxDemo, the FX RACK opens with HEM PUNCH and HEM TUNE on strip 1; settings must keep both.
+  With -SavedAsio, settings from an ASIO build (device.kind=asio) are put in place and the app is
+  started WITHOUT --device offline: it must start cleanly and fall back to WASAPI (settings then say wasapi).
 #>
-param([Parameter(Mandatory = $true)][string]$Exe, [Parameter(Mandatory = $true)][string]$Shot, [string]$StemsDir = '', [switch]$FxDemo)
+param([Parameter(Mandatory = $true)][string]$Exe, [Parameter(Mandatory = $true)][string]$Shot, [string]$StemsDir = '', [switch]$FxDemo, [switch]$SavedAsio)
 $ErrorActionPreference = 'Stop'
 $settings = Join-Path $env:APPDATA 'HybridCore\settings.ini'
 Remove-Item $settings -ErrorAction SilentlyContinue
@@ -16,6 +18,11 @@ Remove-Item $Shot -ErrorAction SilentlyContinue
 $shotFull = [IO.Path]::GetFullPath($Shot)
 
 $argsList = @('--exit-after','10','--device','offline','--screenshot',"`"$shotFull`"")
+if ($SavedAsio) {
+    New-Item -ItemType Directory -Force -Path (Split-Path $settings) | Out-Null
+    [IO.File]::WriteAllLines($settings, @('[app]', 'device.kind=asio', 'device.id=CI Fake ASIO Driver'), (New-Object Text.UTF8Encoding($false)))
+    $argsList = @('--exit-after','10','--screenshot',"`"$shotFull`"")
+}
 $session = ''
 if ($FxDemo) { $argsList += '--fx-demo' }
 if ($StemsDir) {
@@ -49,5 +56,11 @@ if ($FxDemo) {
     $tune  = $text -match '(?m)^stem01\.fx2=HEM TUNE\|'
     Write-Host "FX RACK saved in settings: HEM PUNCH $punch, HEM TUNE $tune"
     if (-not $punch -or -not $tune) { $ok = $false }
+}
+if ($SavedAsio) {
+    $text = if (Test-Path $settings) { Get-Content $settings -Raw } else { '' }
+    $fell = $text -match '(?m)^device\.kind=wasapi\s*$'
+    Write-Host "saved ASIO device fell back to WASAPI: $fell"
+    if (-not $fell) { $ok = $false }
 }
 if ($ok) { Write-Host 'APP SMOKE PASS'; exit 0 } else { Write-Host 'APP SMOKE FAIL'; exit 1 }

@@ -45,7 +45,7 @@ Every public header documents its threading rules (which thread may call what).
 ## CI (every push to main)
 GitHub Windows Server 2022 + Visual Studio 2022:
 1. WASAPI-only build (no third-party SDKs) + tests + device probe.
-2. Full build: ASIO SDK + VST3 SDK fetched (never committed) → tests → Steinberg VST3 validator →
+2. Public build (`rig-public`: WASAPI + VST3 SDK fetched, **no ASIO code**) → tests → Steinberg VST3 validator →
    UI snapshots at 3840×2160 and 1389×868 with the live engine (Mesa software OpenGL) → real app start + window screenshot →
    installer build → silent install / upgrade / uninstall check → GitHub Release `v<VERSION>`.
 Screenshots of each run: branch `ci-screenshots`.
@@ -54,12 +54,21 @@ Screenshots of each run: branch `ci-screenshots`.
 - stb (public domain / MIT) — vendored in `external/stb`.
 - Poppins (SIL Open Font License 1.1) — `assets/fonts`, bundled unmodified with its licence.
 - dr_mp3 0.7.3 / dr_flac 0.13.3 (public domain or MIT-0) — vendored in `external/dr_libs`.
-- Steinberg ASIO SDK 2.3.4 — GPLv3 or Steinberg proprietary licence; downloaded at build time, never committed.
-  Fine for this private build; before giving the app to anyone else, sign Steinberg's ASIO agreement or go GPLv3.
+- Steinberg ASIO SDK 2.3.4 — GPLv3 or Steinberg proprietary licence; never committed.
+  **Public builds contain no ASIO code**: the installers on this repository's Releases page are built with
+  `--preset rig-public` (`HC_WITH_ASIO=OFF`, WASAPI only), and the installer build refuses to package an app
+  that contains ASIO code. The ASIO build (`rig-full`) exists only as a private build for the owner's own PC,
+  published in a private repository, never here.
 - Steinberg VST3 SDK 3.8.1 — MIT licence (checked in its LICENSE.txt); fetched at configure time.
 - Inno Setup builds the installer. Its maker asks businesses earning over USD 5,000/year to buy a licence (not strictly required).
 
 ## Build on the rig (only if ever needed — the installer is the normal route)
+Public (shareable) build, no ASIO:
+```
+cmake --preset rig-public
+cmake --build --preset rig-public-release
+```
+Private ASIO build (owner's PC only — do not share the result):
 ```
 powershell -ExecutionPolicy Bypass -File tools\fetch-asio-sdk.ps1
 cmake --preset rig-full

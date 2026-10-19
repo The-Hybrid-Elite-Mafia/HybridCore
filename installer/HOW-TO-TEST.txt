@@ -80,8 +80,8 @@ Turn your speakers/headphones DOWN first. Close any app that is playing audio
    SILENCE through each one and measures the real buffer size and timing.
    Last line should say: RIG READY.   >> Screenshot it.
 
-3) Diagnostics > "2 - Mixer Test (WASAPI)" and "3 - Mixer Test (ASIO)"
-   15 seconds each. After 5 s only ONE low note (solo); after 10 s the chord returns
+3) Diagnostics > "2 - Mixer Test (WASAPI)" (and "3 - Mixer Test (ASIO)" in the private ASIO
+   build only - the public download has no ASIO). 15 seconds each. After 5 s only ONE low note (solo); after 10 s the chord returns
    with that note in the LEFT ear. Last line: STREAM OK.   >> Screenshot them.
 
 4) Diagnostics > "4 - Engine Self-Test" — runs the built-in tests (no sound).

@@ -26,8 +26,18 @@ list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 include(HybridCorePlatform)   # MSVC/x64 enforcement + rig compile flags (hc::build_flags)
 
 option(HC_REQUIRE_ASIO_SDK "Fail configuration if the Steinberg ASIO SDK is missing" OFF)
-find_package(ASIOSDK)          # cmake/FindASIOSDK.cmake -> hc::asio_sdk when present
-if(NOT ASIOSDK_FOUND)
+# Public builds (the GitHub Releases download) contain no ASIO code at all: Steinberg's ASIO SDK is
+# GPLv3 or Steinberg-proprietary and we have not signed their agreement. Only Steven's private build has it.
+option(HC_WITH_ASIO "Use the Steinberg ASIO SDK when it is present (OFF = public build, WASAPI only)" ON)
+if(HC_WITH_ASIO)
+    find_package(ASIOSDK)      # cmake/FindASIOSDK.cmake -> hc::asio_sdk when present
+elseif(HC_REQUIRE_ASIO_SDK)
+    message(FATAL_ERROR "[HybridCore] HC_WITH_ASIO=OFF and HC_REQUIRE_ASIO_SDK=ON contradict each other")
+else()
+    set(ASIOSDK_FOUND FALSE)
+    message(STATUS "[HybridCore] public build: no ASIO code (WASAPI only)")
+endif()
+if(HC_WITH_ASIO AND NOT ASIOSDK_FOUND)
     if(HC_REQUIRE_ASIO_SDK)
         message(FATAL_ERROR "[HybridCore] ASIO SDK required but not found. See external/asiosdk/README.md")
     else()

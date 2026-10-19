@@ -666,6 +666,14 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     a.deviceIndex = opts.offline ? static_cast<int>(a.devices.size()) - 1
                                  : findDevice(a.devices, a.settings.get("app", "device.kind", "wasapi"), a.settings.get("app", "device.id"));
     a.audio.open(a.devices[static_cast<std::size_t>(a.deviceIndex)]);
+    if (!opts.offline && a.settings.get("app", "device.kind", "wasapi") == "asio" &&
+        a.devices[static_cast<std::size_t>(a.deviceIndex)].kind != app::DeviceChoice::Kind::Asio) {
+#if defined(HC_HAS_ASIO_SDK)
+        a.say("Your ASIO device was not found - playing through WASAPI instead (DEVICE button to change)");
+#else
+        a.say("This version has no ASIO - playing through WASAPI instead (DEVICE button to change)");
+#endif
+    }
 
     ui::GlWindow window;
     std::string err;
