@@ -51,7 +51,7 @@ struct ParamInfo {
 
 class Effect {
 public:
-    static constexpr int kMaxParams = 32;
+    static constexpr int kMaxParams = 256;   // HEM ELITE EQ: 16 bands × 11 controls + globals
     static constexpr std::uint32_t kMaxBlock = 4096;   // process() is never called with more (hosts' blocks are split)
 
     virtual ~Effect() = default;
