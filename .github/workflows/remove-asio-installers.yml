@@ -1,0 +1,41 @@
+name: Remove ASIO installers from old releases
+
+# One-off clean-up (safe to run again): the installers attached to releases older than the
+# current VERSION were built with Steinberg ASIO code, which may not be shared publicly.
+# Release pages, tags and notes are KEPT; only the installer file is removed, and a note at the
+# top of each release says why. The current release (built ASIO-free) is left alone.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  clean:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Remove old installers, add a note
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          current="v$(tr -d '[:space:]' < VERSION)"
+          note='> **Installer removed.** This build contained Steinberg ASIO code, which may not be shared publicly. Download the newest release instead (safe to share, WASAPI only).'
+          removed=0
+          gh api "repos/$REPO/releases?per_page=100" --paginate -q '.[] | [.id, .tag_name] | @tsv' |
+          while IFS=$'\t' read -r id tag; do
+            [ "$tag" = "$current" ] && { echo "$tag: current release, kept"; continue; }
+            body=$(gh api "repos/$REPO/releases/$id" -q .body)
+            case "$body" in
+              "> **Installer removed."*) ;;
+              *) gh api -X PATCH "repos/$REPO/releases/$id" -f body="$note"$'\n\n'"$body" > /dev/null ;;
+            esac
+            for aid in $(gh api "repos/$REPO/releases/$id/assets" -q '.[].id'); do
+              gh api -X DELETE "repos/$REPO/releases/assets/$aid"
+              echo "$tag: installer removed"
+            done
+          done
+          echo "::notice::Releases still carrying files:"
+          gh api "repos/$REPO/releases?per_page=100" -q '[.[] | select((.assets | length) > 0) | .tag_name + " (" + (.assets | map(.name) | join(", ")) + ")"] | join("; ")'
