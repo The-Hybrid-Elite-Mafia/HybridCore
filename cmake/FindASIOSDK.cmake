@@ -1,8 +1,8 @@
 # =============================================================================
 #  FindASIOSDK.cmake
 #  Locates the Steinberg ASIO SDK under external/asiosdk (or HC_ASIO_SDK_DIR)
-#  and builds it as hc::asio_sdk. The SDK is not redistributable: it is never
-#  committed, only discovered.
+#  and builds it as hc::asio_sdk. The SDK is Steinberg's (GPLv3 or Steinberg proprietary):
+#  it is never committed, only fetched (tools/fetch-asio-sdk.ps1) and discovered.
 # =============================================================================
 include_guard(GLOBAL)
 

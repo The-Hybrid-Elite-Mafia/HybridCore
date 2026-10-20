@@ -18,7 +18,7 @@ string(STRIP "${HC_VERSION}" HC_VERSION)
 
 project(HybridCore
     VERSION ${HC_VERSION}
-    DESCRIPTION "Hybrid Elite Mafia proprietary real-time audio framework"
+    DESCRIPTION "Hybrid Elite Mafia real-time audio framework (GPLv3)"
     LANGUAGES CXX RC)
 
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
@@ -26,8 +26,8 @@ list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 include(HybridCorePlatform)   # MSVC/x64 enforcement + rig compile flags (hc::build_flags)
 
 option(HC_REQUIRE_ASIO_SDK "Fail configuration if the Steinberg ASIO SDK is missing" OFF)
-# Public builds (the GitHub Releases download) contain no ASIO code at all: Steinberg's ASIO SDK is
-# GPLv3 or Steinberg-proprietary and we have not signed their agreement. Only Steven's private build has it.
+# ASIO: Steinberg's SDK is dual-licensed (GPLv3 or Steinberg proprietary). The Hybrid Core is GPLv3, so apps built
+# on it may ship ASIO under the SDK's GPLv3 option. This repository's own installer stays the WASAPI-only rig-public.
 option(HC_WITH_ASIO "Use the Steinberg ASIO SDK when it is present (OFF = public build, WASAPI only)" ON)
 if(HC_WITH_ASIO)
     find_package(ASIOSDK)      # cmake/FindASIOSDK.cmake -> hc::asio_sdk when present

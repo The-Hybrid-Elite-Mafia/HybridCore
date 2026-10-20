@@ -50,15 +50,20 @@ GitHub Windows Server 2022 + Visual Studio 2022:
    installer build → silent install / upgrade / uninstall check → GitHub Release `v<VERSION>`.
 Screenshots of each run: branch `ci-screenshots`.
 
+## Licence
+The Hybrid Core is free software: you can redistribute it and/or modify it under the terms of the GNU General
+Public License as published by the Free Software Foundation, version 3 of the License, or (at your option) any
+later version (`LICENSE`). Copyright (C) 2026 Steven Reliford / Hybrid Elite Mafia. It comes with NO WARRANTY.
+GPLv3 is what lets HEM apps built on it ship Steinberg's ASIO SDK under the SDK's GPLv3 option.
+
 ## Third-party code
 - stb (public domain / MIT) — vendored in `external/stb`.
 - Poppins (SIL Open Font License 1.1) — `assets/fonts`, bundled unmodified with its licence.
 - dr_mp3 0.7.3 / dr_flac 0.13.3 (public domain or MIT-0) — vendored in `external/dr_libs`.
-- Steinberg ASIO SDK 2.3.4 — GPLv3 or Steinberg proprietary licence; never committed.
-  **Public builds contain no ASIO code**: the installers on this repository's Releases page are built with
-  `--preset rig-public` (`HC_WITH_ASIO=OFF`, WASAPI only), and the installer build refuses to package an app
-  that contains ASIO code. The ASIO build (`rig-full`) exists only as a private build for the owner's own PC,
-  published in a private repository, never here.
+- Steinberg ASIO SDK 2.3.4 — dual licence, GPLv3 or Steinberg proprietary (its LICENSE.txt); never committed,
+  fetched from download.steinberg.net and checked by SHA-512 (`tools/fetch-asio-sdk.ps1`). HEM apps that ship
+  ASIO in public installers (HEM-Elite-Rack) use it under its GPLv3 option. This repository's own installer is
+  still the WASAPI-only `rig-public` build. ASIO is a trademark of Steinberg Media Technologies GmbH.
 - Steinberg VST3 SDK 3.8.1 — MIT licence (checked in its LICENSE.txt); fetched at configure time.
 - Inno Setup builds the installer. Its maker asks businesses earning over USD 5,000/year to buy a licence (not strictly required).
 
@@ -68,7 +73,7 @@ Public (shareable) build, no ASIO:
 cmake --preset rig-public
 cmake --build --preset rig-public-release
 ```
-Private ASIO build (owner's PC only — do not share the result):
+ASIO build (under the SDK's GPLv3 option):
 ```
 powershell -ExecutionPolicy Bypass -File tools\fetch-asio-sdk.ps1
 cmake --preset rig-full
