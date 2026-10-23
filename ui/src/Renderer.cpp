@@ -12,7 +12,7 @@ using namespace hc::gl;
 namespace {
 
 constexpr float kModeTexture = 0, kModeText = 1, kModeTextBlur = 2, kModeArc = 3, kModeGlow = 4, kModeFill = 5, kModeFlat = 6;
-constexpr float kTexChassis = 0, kTexParts = 1, kTexStatic = 2, kTexPanel = 4;
+constexpr float kTexChassis = 0, kTexParts = 1, kTexStatic = 2, kTexPanel = 4, kTexAtlas = 5;
 constexpr float kBloomStrength = 0.32f;
 
 constexpr const char* kVertexSrc = R"(#version 330 core
@@ -38,6 +38,7 @@ uniform sampler2D uParts;
 uniform sampler2D uStatic;
 uniform sampler2D uFont;
 uniform sampler2D uPanel;
+uniform sampler2D uAtlas;
 out vec4 frag;
 float sdRoundRect(vec2 p, vec2 hs, float r) {
     vec2 q = abs(p) - hs + r;
@@ -54,6 +55,7 @@ void main() {
         vec4 t = tex == 0 ? textureGrad(uChassis, vUv, gx * 0.6, gy * 0.6)
                : tex == 1 ? textureGrad(uParts, vUv, gx * 0.6, gy * 0.6)
                : tex == 4 ? textureGrad(uPanel, vUv, gx, gy)
+               : tex == 5 ? textureGrad(uAtlas, vUv, gx, gy)
                           : textureGrad(uStatic, vUv, gx, gy);
         c *= t;
     } else if (mode == 1) {
@@ -199,6 +201,7 @@ bool Renderer::init(int wantSamples, std::string* error) {
     glUniform1i(glGetUniformLocation(program_, "uStatic"), 2);
     glUniform1i(glGetUniformLocation(program_, "uFont"), 3);
     glUniform1i(glGetUniformLocation(program_, "uPanel"), 4);
+    glUniform1i(glGetUniformLocation(program_, "uAtlas"), 5);
     glUseProgram(post_);
     uPostMode_     = glGetUniformLocation(post_, "uMode");
     uPostTexel_    = glGetUniformLocation(post_, "uTexel");
@@ -231,10 +234,10 @@ void Renderer::shutdown() noexcept {
     if (!glDeleteProgram) return;   // GL never loaded
     for (Target* t : {&msaa_, &static_, &scene_, &bloomA_, &bloomB_, &wideA_, &wideB_, &capture_}) freeTarget(*t);
     targetBytes_ = 0;
-    for (unsigned int* t : {&chassisTex_, &partsTex_, &fontTex_, &panelTex_})
+    for (unsigned int* t : {&chassisTex_, &partsTex_, &fontTex_, &panelTex_, &atlasTex_})
         if (*t) { ::glDeleteTextures(1, t); *t = 0; }
-    budget_.release(chassisBytes_ + partsBytes_ + fontBytes_ + panelBytes_);
-    chassisBytes_ = partsBytes_ = fontBytes_ = panelBytes_ = 0;
+    budget_.release(chassisBytes_ + partsBytes_ + fontBytes_ + panelBytes_ + atlasBytes_);
+    chassisBytes_ = partsBytes_ = fontBytes_ = panelBytes_ = atlasBytes_ = 0;
     if (vbo_) { glDeleteBuffers(1, &vbo_); vbo_ = 0; }
     if (vao_) { glDeleteVertexArrays(1, &vao_); vao_ = 0; }
     if (emptyVao_) { glDeleteVertexArrays(1, &emptyVao_); emptyVao_ = 0; }
@@ -287,6 +290,21 @@ bool Renderer::setPanel(const TextureLevels& t, std::string* error) {
 
 void Renderer::clearPanel() noexcept {
     if (panelTex_) { ::glDeleteTextures(1, &panelTex_); panelTex_ = 0; budget_.release(panelBytes_); panelBytes_ = 0; }
+}
+
+bool Renderer::setAtlas(const TextureLevels& t, std::string* error) {
+    return uploadLevels(atlasTex_, atlasBytes_, budget_, t, 5, "picture atlas", error);
+}
+
+void Renderer::clearAtlas() noexcept {
+    if (atlasTex_) { ::glDeleteTextures(1, &atlasTex_); atlasTex_ = 0; budget_.release(atlasBytes_); atlasBytes_ = 0; }
+}
+
+void Renderer::atlas(Rect uv, Rect dst, Rgba tint) {
+    float c[4];
+    premul(tint, Blend::Over, c);
+    const float p[2] = {0, 0}, q[4] = {0, 0, 0, 0};
+    rectQuad({px(dst.x), py(dst.y), dst.w * canvas_.scale, dst.h * canvas_.scale}, uv.x, uv.y, uv.right(), uv.bottom(), c, kModeTexture, kTexAtlas, p, q, false);
 }
 
 void Renderer::panel(Rect dst) {
@@ -392,8 +410,8 @@ void Renderer::beginPass(const Canvas& canvas) {
     glUniform2f(uScale_, 2.0f / static_cast<float>(fbW_), 2.0f / static_cast<float>(fbH_));
     glBindVertexArray(vao_);
     glBindBuffer(kArrayBuffer, vbo_);
-    const unsigned int texs[5] = {chassisTex_, partsTex_, static_.tex, fontTex_, panelTex_};
-    for (int i = 0; i < 5; ++i) { glActiveTexture(kTexture0 + static_cast<GLenum>(i)); ::glBindTexture(GL_TEXTURE_2D, texs[i]); }
+    const unsigned int texs[6] = {chassisTex_, partsTex_, static_.tex, fontTex_, panelTex_, atlasTex_};
+    for (int i = 0; i < 6; ++i) { glActiveTexture(kTexture0 + static_cast<GLenum>(i)); ::glBindTexture(GL_TEXTURE_2D, texs[i]); }
     glActiveTexture(kTexture0);
 }
 
