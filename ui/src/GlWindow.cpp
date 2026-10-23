@@ -14,6 +14,26 @@ struct GlWindow::Impl {
     HGLRC                   rc   = nullptr;
     bool                    closed = false;
     bool                    mouseDown = false;
+    // While a drag holds the mouse, the cursor that reaches the edge of the screen jumps to the other side and the
+    // drag goes on (as in a DAW: a knob never runs out of room); the jump is added back so the app sees one smooth move.
+    long                    dragDx = 0, dragDy = 0;
+
+    void wrapAtScreenEdge() {
+        POINT p{};
+        if (!::GetCursorPos(&p)) return;
+        MONITORINFO mi{};
+        mi.cbSize = sizeof(mi);
+        if (!::GetMonitorInfoW(::MonitorFromPoint(p, MONITOR_DEFAULTTONEAREST), &mi)) return;
+        const RECT& r = mi.rcMonitor;
+        const long spanX = (r.right - r.left) - 8, spanY = (r.bottom - r.top) - 8;
+        if (spanX < 100 || spanY < 100) return;
+        POINT to = p;
+        if (p.y <= r.top + 1) { to.y += spanY; dragDy -= spanY; }
+        else if (p.y >= r.bottom - 2) { to.y -= spanY; dragDy += spanY; }
+        if (p.x <= r.left + 1) { to.x += spanX; dragDx -= spanX; }
+        else if (p.x >= r.right - 2) { to.x -= spanX; dragDx += spanX; }
+        if (to.x != p.x || to.y != p.y) ::SetCursorPos(to.x, to.y);
+    }
     std::vector<InputEvent> events;
     gl::PFN_wglSwapIntervalEXT swapInterval = nullptr;
     bool                    child = false;
@@ -64,6 +84,7 @@ struct GlWindow::Impl {
             if (child) ::SetFocus(h);   // so the wheel reaches a plug-in view
             ::SetCapture(h);
             mouseDown = true;
+            dragDx = dragDy = 0;
             e.type = InputEvent::Type::MouseDown;
             e.x = static_cast<float>(GET_X_LPARAM(lp));
             e.y = static_cast<float>(GET_Y_LPARAM(lp));
@@ -74,15 +95,17 @@ struct GlWindow::Impl {
             if (mouseDown) ::ReleaseCapture();
             mouseDown = false;
             e.type = InputEvent::Type::MouseUp;
-            e.x = static_cast<float>(GET_X_LPARAM(lp));
-            e.y = static_cast<float>(GET_Y_LPARAM(lp));
+            e.x = static_cast<float>(GET_X_LPARAM(lp) + dragDx);
+            e.y = static_cast<float>(GET_Y_LPARAM(lp) + dragDy);
+            dragDx = dragDy = 0;
             events.push_back(e);
             return 0;
         case WM_MOUSEMOVE:
             e.type = InputEvent::Type::MouseMove;
-            e.x = static_cast<float>(GET_X_LPARAM(lp));
-            e.y = static_cast<float>(GET_Y_LPARAM(lp));
+            e.x = static_cast<float>(GET_X_LPARAM(lp) + dragDx);
+            e.y = static_cast<float>(GET_Y_LPARAM(lp) + dragDy);
             events.push_back(e);
+            if (mouseDown) wrapAtScreenEdge();
             return 0;
         case WM_MOUSEWHEEL: {
             POINT pt{GET_X_LPARAM(lp), GET_Y_LPARAM(lp)};
