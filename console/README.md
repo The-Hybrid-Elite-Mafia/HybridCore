@@ -12,6 +12,7 @@ Change a guess there and nowhere else. The stem count comes from `hybrid/core/Co
 | `hc::console_stepeq` | **HEM STEP EQ** (`makeStepEq()`) | 2-channel, 4-band stepped EQ with proportional Q and RANGE |
 | `hc::console_twinbus` | **HEM TWIN BUS** (`makeTwinBus()`) | 2-channel bus compressor (4 modes, colours, negative ratios) + 2-band dynamic EQ + transient expander |
 | `hc::console_colour` | **HEM COLOUR STAGE** (`makeColourStage()`) | stereo colour processor: HPF, drive, tone EQ, HF compressor / crush, M/S image, transformer, insert, trims, bypass, meter |
+| `hc::console_meter` | **HEM METER BRIDGE** (`MeterBridge`) | stereo meter: loudness (momentary / short-term / integrated / range / maxima), true peak, PLR, correlation, balance, mono check, 31-band RTA, loudness history, vectorscope |
 
 Real-time rules: `process()` never allocates, locks or waits (tested). Controls are lock-free atomics
 that any thread may set. Step EQ and Twin Bus implement `hc::fx::Effect`, so they plug into the same
@@ -143,3 +144,24 @@ real measured value). "Left out" = it only makes sense with a physical plug, dev
 | Master meter L/R, +24 dBu top, 3 s peak hold, input in BYPASS | meters `METER L/R`, `HOLD L/R` | Built |
 | Settings: brightness, relay click, factory reset, memory game, UID, soak test | — | Left out: no effect on sound |
 | Rear: XLR inputs/outputs, insert send/return jacks, fuse/voltage, power | — | Left out: hardware |
+
+### HEM METER BRIDGE
+
+Built from the reference desktop meter's product sheet plus the published standards it follows
+(ITU-R BS.1770-4, EBU R128, EBU Tech 3341 and 3342). The reference's full user manual is not in hand yet,
+so its own buttons and display settings (presets, radar speed, scales) are not built; they wait for the manual.
+
+| Reference feature | Engine reading | Status |
+|---|---|---|
+| Momentary / short-term / integrated loudness | `momentaryLufs()`, `shortTermLufs()`, `integratedLufs()` | Built (standard; checked with the standard's test signals) |
+| Loudness range (LRA) | `loudnessRangeLu()` | Built (standard) |
+| Max momentary / max short-term | `maxMomentaryLufs()`, `maxShortTermLufs()` | Built |
+| True peak per channel, sample peak | `truePeakDbtp()`, `truePeakNowDbtp()`, `samplePeakDbfs()` | Built (4x oversampled) |
+| PLR | `plrDb()` | Built |
+| Loudness radar history | `historyCount()`, `historyLufs()` | Built (short-term every 100 ms; radar drawing is Phase 2) |
+| Correlation, L/R balance, M/S balance, mono deviation | `correlation()`, `balanceLrLu()`, `balanceMsDb()`, `monoDeviationLu()` | Built (averaging times ASSUMED) |
+| 1/3-octave spectrum (RTA) with peak hold | `bandHz()`, `bandDb()`, `bandPeakDb()` | Built (averaging and hold ASSUMED) |
+| Vectorscope / stereo position | `scopeWritten()`, `scopeFrame()` | Built (data; drawing is Phase 2) |
+| RESET | `reset()` | Built |
+| AUTO, SCOPE, cursor/frequency knob, LIB, SYS, EDIT, presets, radar settings | — | UNKNOWN: waits for the reference user manual |
+| Inputs (digital/analog/HDMI), network/USB, power | — | Left out: hardware |
