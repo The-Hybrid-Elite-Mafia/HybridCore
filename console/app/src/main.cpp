@@ -29,6 +29,7 @@
 #include <fstream>
 #include <iterator>
 #include <map>
+#include <set>
 #include <sstream>
 #include <string>
 
@@ -196,6 +197,7 @@ struct Options {
     bool maximized = false;   // test runs: open maximized like a normal start (to check the real screen size)
     int page = -1;
     float zoom = 0;           // > 0: start at this zoom
+    fs::path clickTest;       // --click-test <report>: press every control with real window messages, write a report, exit
 };
 Options parseOptions() {
     Options o;
@@ -209,6 +211,7 @@ Options parseOptions() {
         else if (k == L"--page" && i + 1 < argc) o.page = static_cast<int>(std::wcstol(argv[++i], nullptr, 10));
         else if (k == L"--zoom" && i + 1 < argc) o.zoom = static_cast<float>(std::wcstod(argv[++i], nullptr));
         else if (k == L"--maximized") o.maximized = true;
+        else if (k == L"--click-test" && i + 1 < argc) o.clickTest = argv[++i];
         else if (!k.empty() && k[0] != L'-') o.session = k;
     }
     if (argv) ::LocalFree(argv);
@@ -570,6 +573,171 @@ struct App {
     }
 };
 
+// ---- --click-test: every control pressed with real window messages ------------------------------------------------
+// The same path a mouse takes (WM_LBUTTONDOWN / WM_MOUSEMOVE / WM_LBUTTONUP / WM_MOUSEWHEEL -> GlWindow -> screen ->
+// controller -> rig), on every page and every panel that comes and goes. Actions are recorded, not carried out (no file
+// dialogs, nothing loaded or saved). Writes one line per control and returns 0 when every control responded.
+template <typename Dispatch>
+int runClickTest(ui::GlWindow& window, U::ConsoleScreen& screen, App& a, std::vector<U::ActionEvent>& actions, const Dispatch& dispatch,
+                 const fs::path& reportPath) {
+    using namespace hc::console;
+    std::string report = "HEM Digital Console " HEM_CONSOLE_VERSION " - control check (real window messages)\n";
+    int tested = 0, failed = 0;
+    std::string err;
+    auto settle = [&] {
+        window.pump();
+        const int w = window.pixelWidth(), h = window.pixelHeight();
+        if (w > 0 && h > 0) screen.resize(w, h, &err);
+        for (const auto& e : window.takeEvents()) dispatch(e);
+        screen.render(0);
+        window.swap();
+    };
+    for (int k = 0; k < 10; ++k) settle();
+    {   // the real cursor away from the screen edges (a press at the edge wraps the cursor round for long knob drags)
+        RECT rc{};
+        ::GetWindowRect(a.hwnd, &rc);
+        ::SetCursorPos((rc.left + rc.right) / 2, (rc.top + rc.bottom) / 2);
+    }
+    char head[160];
+    std::snprintf(head, sizeof head, "window %d x %d pixels, zoom %.2f, 1 design unit = %.3f px\n\n", window.pixelWidth(), window.pixelHeight(),
+                  static_cast<double>(screen.zoom()), static_cast<double>(screen.canvas().scale));
+    report += head;
+    const HWND h = a.hwnd;
+    auto msg = [&](UINT m, WPARAM wp, int x, int y) { ::SendMessageW(h, m, wp, MAKELPARAM(x, y)); };
+    auto wheelMsg = [&](int x, int y, int delta) {
+        POINT pt{x, y};
+        ::ClientToScreen(h, &pt);
+        ::SendMessageW(h, WM_MOUSEWHEEL, MAKEWPARAM(0, static_cast<WORD>(static_cast<short>(delta))), MAKELPARAM(pt.x, pt.y));
+    };
+    const std::string meterBefore = a.rig.meter().settingsText();
+    const std::string rigBefore = a.rig.saveText();
+    std::set<std::pair<int, int>> done;   // (page, widget) already checked
+
+    auto kindName = [](U::Kind k) {
+        switch (k) {
+        case U::Kind::Knob: return "knob"; case U::Kind::Stepped: return "stepped knob"; case U::Kind::Switch: return "switch";
+        case U::Kind::Fader: return "fader"; case U::Kind::Selector: return "selector"; case U::Kind::Button: return "button";
+        case U::Kind::Seek: return "song bar"; case U::Kind::Custom: return "name strip"; default: return "?";
+        }
+    };
+    // one page in one state of its changing panels
+    auto pass = [&](U::PageId pg, const std::string& variant) {
+        screen.setPage(pg);
+        screen.waitForPlate(30);
+        settle(); settle();
+        const auto& ws = screen.currentPage().widgets;
+        const U::AppState saved = a.st;
+        for (std::size_t i = 0; i < ws.size(); ++i) {
+            const U::Widget& w = ws[i];
+            if (!U::widgetVisible(w)) continue;
+            const bool click = w.kind == U::Kind::Knob || w.kind == U::Kind::Stepped || w.kind == U::Kind::Switch || w.kind == U::Kind::Fader ||
+                               w.kind == U::Kind::Selector || w.kind == U::Kind::Button || w.kind == U::Kind::Seek ||
+                               (w.kind == U::Kind::Custom && w.custom == U::CustomId::StemName);
+            if (!click || !done.insert({static_cast<int>(pg), static_cast<int>(i)}).second) continue;
+            const auto& cv = screen.canvas();
+            const int px = static_cast<int>(std::lround(cv.toPixelX(w.r.cx()))), py = static_cast<int>(std::lround(cv.toPixelY(w.r.cy())));
+            const float v0 = w.ctl.valid() ? w.ctl.get() : 0.0f;
+            const float n0 = U::widgetNorm(w);
+            actions.clear();
+            bool ok = false, wheelOk = true;
+            std::string what;
+            switch (w.kind) {
+            case U::Kind::Knob:
+            case U::Kind::Stepped: {
+                const int dy = static_cast<int>(std::lround(U::Controller::kDragUnitsForFullRange * 0.3f * cv.scale)) * (n0 < 0.5f ? -1 : 1);
+                msg(WM_LBUTTONDOWN, MK_LBUTTON, px, py); settle();
+                for (int s = 1; s <= 4; ++s) { msg(WM_MOUSEMOVE, MK_LBUTTON, px, py + dy * s / 4); settle(); }
+                msg(WM_LBUTTONUP, 0, px, py + dy); settle();
+                const float v1 = w.ctl.get();
+                ok = v1 != v0;
+                w.ctl.set(v0); settle();
+                wheelMsg(px, py, n0 < 0.5f ? 120 : -120); settle();
+                wheelOk = w.ctl.get() != v0;
+                w.ctl.set(v0);
+                what = "drag " + U::widgetValueText(w) + " -> moved, wheel " + (wheelOk ? "moved" : "DID NOT MOVE");
+                break;
+            }
+            case U::Kind::Fader: {
+                const float t = n0 < 0.5f ? 0.85f : 0.2f;
+                const int fy = static_cast<int>(std::lround(cv.toPixelY(w.r.y + w.r.h * (1.0f - t))));
+                msg(WM_LBUTTONDOWN, MK_LBUTTON, px, fy); settle();
+                msg(WM_LBUTTONUP, 0, px, fy); settle();
+                ok = w.ctl.get() != v0;
+                w.ctl.set(v0); settle();
+                wheelMsg(px, py, n0 < 0.5f ? 120 : -120); settle();
+                wheelOk = w.ctl.get() != v0;
+                w.ctl.set(v0);
+                what = std::string("click on the slot, wheel ") + (wheelOk ? "moved" : "DID NOT MOVE");
+                break;
+            }
+            case U::Kind::Switch:
+            case U::Kind::Selector: {
+                msg(WM_LBUTTONDOWN, MK_LBUTTON, px, py); settle();
+                msg(WM_LBUTTONUP, 0, px, py); settle();
+                ok = w.ctl.get() != v0;
+                what = std::string(w.kind == U::Kind::Switch ? "click toggles" : "click steps") + (ok ? "" : " - NOTHING HAPPENED");
+                w.ctl.set(v0);
+                break;
+            }
+            default: {   // buttons, the song bar, name strips: the action they send
+                msg(WM_LBUTTONDOWN, MK_LBUTTON, px, py); settle();
+                msg(WM_LBUTTONUP, 0, px, py); settle();
+                const U::Act want = w.kind == U::Kind::Seek ? U::Act::Seek : w.kind == U::Kind::Custom ? U::Act::LoadSlot : w.act;
+                for (const auto& e : actions) if (e.act == want && (w.kind == U::Kind::Seek || e.arg == U::widgetArg(w))) ok = true;
+                what = ok ? "click sends its action" : "click sent NOTHING";
+                break;
+            }
+            }
+            // undo what the press did to the screen (page, panels) before the next control
+            a.st.meterTab = saved.meterTab; a.st.bigFirst = saved.bigFirst; a.st.toolTarget = saved.toolTarget; a.st.meterLibSlot = saved.meterLibSlot;
+            screen.setPage(pg);
+            ++tested;
+            const bool good = ok && wheelOk;
+            if (!good) ++failed;
+            std::string name = !w.tip.empty() ? w.tip : w.ctl.valid() ? std::string(w.ctl.info->name) : w.label;
+            if (name.size() > 70) name = name.substr(0, 67) + "...";
+            char line[400];
+            std::snprintf(line, sizeof line, "%-4s %-9s %-26s %-13s %-70s %s\n", good ? "OK" : "FAIL", U::pageName(pg), variant.c_str(), kindName(w.kind), name.c_str(), what.c_str());
+            report += line;
+        }
+    };
+    for (U::PageId pg : U::kTabOrder) {
+        switch (pg) {
+        case U::PageId::StepEq:
+            for (int m : {ConsoleRig::EqSpecial, ConsoleRig::EqStandard}) { a.rig.setEqModel(m); pass(pg, m ? "model SPECIAL EDITION" : "model STANDARD"); }
+            a.rig.setEqModel(ConsoleRig::EqSpecial);
+            break;
+        case U::PageId::Meter:
+            a.rig.meter().set(meter_ids::Layout, 6);
+            for (int v = 0; v < 3; ++v)
+                for (int t = 0; t < 5; ++t) {
+                    a.rig.meter().set(meter_ids::View, static_cast<float>(v));
+                    a.st.meterTab = t;
+                    a.st.meterLibSlot = t == 4 ? MeterBridge::factoryPresetCount() : 0;
+                    pass(pg, std::string("view ") + (v == 0 ? "RADAR" : v == 1 ? "RTA" : "SCOPE") + ", EDIT tab " + std::to_string(t + 1));
+                }
+            a.st.meterTab = 0; a.st.meterLibSlot = 0;
+            break;
+        case U::PageId::Tools:
+            for (int t = ToolSlot::Off; t < ToolSlot::kTypeCount; ++t) {
+                a.st.toolTarget = 0;
+                a.rig.channelTool(0).setType(t);
+                pass(pg, std::string("channel 1 tool ") + ToolSlot::typeKey(t));
+            }
+            a.rig.channelTool(0).setType(ToolSlot::Off);
+            break;
+        default: pass(pg, "-"); break;
+        }
+    }
+    a.rig.loadText(rigBefore);
+    a.rig.meter().applySettingsText(meterBefore);
+    char tail[200];
+    std::snprintf(tail, sizeof tail, "\n%d controls pressed, %d did not respond -> %s\n", tested, failed, failed ? "FAIL" : "PASS");
+    report += tail;
+    (void)writeFile(reportPath, report);
+    return failed ? 5 : 0;
+}
+
 HWND findRunning() {
     HWND hit = nullptr;
     ::EnumWindows([](HWND h, LPARAM lp) -> BOOL {
@@ -670,57 +838,62 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     int frame = 0;
     float savedZoom = a.st.zoom;
     auto fmtZoom = [](float z) { char b[32]; std::snprintf(b, sizeof b, "%.3f", static_cast<double>(z)); return std::string(b); };
+    // every window event goes through here (the main loop and the click test)
+    auto dispatch = [&](const ui::InputEvent& e) {
+        switch (e.type) {
+        case ui::InputEvent::Type::MouseDown: screen.mouseDown(e.x, e.y, e.doubleClick, e.fine); break;
+        case ui::InputEvent::Type::RightDown: screen.rightDown(e.x, e.y); break;
+        case ui::InputEvent::Type::MouseMove: screen.mouseMove(e.x, e.y, e.fine); break;
+        case ui::InputEvent::Type::MouseUp: screen.mouseUp(e.x, e.y); break;
+        case ui::InputEvent::Type::Wheel: screen.wheel(e.x, e.y, e.wheel, e.shift, e.ctrl, e.shift, e.wheelX); break;
+        case ui::InputEvent::Type::MiddleDown: screen.middleDown(e.x, e.y); break;
+        case ui::InputEvent::Type::MiddleUp: screen.middleUp(e.x, e.y); break;
+        case ui::InputEvent::Type::Drop: {
+            if (e.files.size() == 1 && e.files[0].extension() == hc::console::kSessionExtension) { a.openSession(e.files[0]); break; }
+            // onto a channel's name strip: from that channel; elsewhere: the first empty channel
+            int first = -1;
+            const float x = screen.canvas().toDesignX(e.x), y = screen.canvas().toDesignY(e.y);
+            for (const auto& w : screen.currentPage().widgets)
+                if (w.kind == U::Kind::Custom && w.custom == U::CustomId::StemName && w.r.contains(x, y)) first = w.customArg;
+            if (first >= hc::console::ConsoleRig::kChannels) { a.loadSlot(first, e.files.front()); break; }
+            if (first < 0) for (int k = 0; k < hc::console::ConsoleRig::kChannels && first < 0; ++k) if (a.files[static_cast<std::size_t>(k)].empty() && a.loading[static_cast<std::size_t>(k)].empty()) first = k;
+            a.loadMany(std::max(first, 0), e.files);
+            break;
+        }
+        case ui::InputEvent::Type::Key:
+            if (e.key == VK_F11) {
+                window.setFullscreen(!window.fullscreen());
+                a.settings.set("fullscreen", window.fullscreen() ? "1" : "0");
+                break;
+            }
+            if (e.key == VK_ESCAPE && window.fullscreen()) { window.setFullscreen(false); a.settings.set("fullscreen", "0"); break; }
+            if (screen.key(e.key, e.ctrl)) break;
+            if (e.ctrl) {
+                if (e.key == 'S') actions.push_back({U::Act::SaveSession});
+                else if (e.key == 'O') actions.push_back({U::Act::OpenSession});
+                else if (e.key == 'N') actions.push_back({U::Act::NewSession});
+                else if (e.key == 'E') actions.push_back({U::Act::Export});
+                break;
+            }
+            if (e.key == VK_SPACE) actions.push_back({U::Act::Play});
+            else if (e.key == VK_HOME) actions.push_back({U::Act::Rewind});
+            else if (e.key == VK_END) actions.push_back({U::Act::Stop});
+            else if (e.key == 'L') actions.push_back({U::Act::Loop});
+            else if (e.key >= '1' && e.key < '1' + U::kPageCount) screen.setPage(U::kTabOrder[static_cast<std::size_t>(e.key - '1')]);
+            break;
+        case ui::InputEvent::Type::OpenFile:
+            if (!e.files.empty()) a.openSession(e.files.front());
+            break;
+        default: break;
+        }
+    };
+
+    if (!opts.clickTest.empty()) return runClickTest(window, screen, a, actions, dispatch, opts.clickTest);
+
     while (window.pump()) {
         const int fbW = window.pixelWidth(), fbH = window.pixelHeight();
         if (fbW > 0 && fbH > 0 && !window.minimized() && !screen.resize(fbW, fbH, &err)) { fatal("GPU error: " + err); break; }
-        for (const auto& e : window.takeEvents()) {
-            switch (e.type) {
-            case ui::InputEvent::Type::MouseDown: screen.mouseDown(e.x, e.y, e.doubleClick, e.fine); break;
-            case ui::InputEvent::Type::RightDown: screen.rightDown(e.x, e.y); break;
-            case ui::InputEvent::Type::MouseMove: screen.mouseMove(e.x, e.y, e.fine); break;
-            case ui::InputEvent::Type::MouseUp: screen.mouseUp(e.x, e.y); break;
-            case ui::InputEvent::Type::Wheel: screen.wheel(e.x, e.y, e.wheel, e.shift, e.ctrl, e.shift, e.wheelX); break;
-            case ui::InputEvent::Type::MiddleDown: screen.middleDown(e.x, e.y); break;
-            case ui::InputEvent::Type::MiddleUp: screen.middleUp(e.x, e.y); break;
-            case ui::InputEvent::Type::Drop: {
-                if (e.files.size() == 1 && e.files[0].extension() == hc::console::kSessionExtension) { a.openSession(e.files[0]); break; }
-                // onto a channel's name strip: from that channel; elsewhere: the first empty channel
-                int first = -1;
-                const float x = screen.canvas().toDesignX(e.x), y = screen.canvas().toDesignY(e.y);
-                for (const auto& w : screen.currentPage().widgets)
-                    if (w.kind == U::Kind::Custom && w.custom == U::CustomId::StemName && w.r.contains(x, y)) first = w.customArg;
-                if (first >= hc::console::ConsoleRig::kChannels) { a.loadSlot(first, e.files.front()); break; }
-                if (first < 0) for (int k = 0; k < hc::console::ConsoleRig::kChannels && first < 0; ++k) if (a.files[static_cast<std::size_t>(k)].empty() && a.loading[static_cast<std::size_t>(k)].empty()) first = k;
-                a.loadMany(std::max(first, 0), e.files);
-                break;
-            }
-            case ui::InputEvent::Type::Key:
-                if (e.key == VK_F11) {
-                    window.setFullscreen(!window.fullscreen());
-                    a.settings.set("fullscreen", window.fullscreen() ? "1" : "0");
-                    break;
-                }
-                if (e.key == VK_ESCAPE && window.fullscreen()) { window.setFullscreen(false); a.settings.set("fullscreen", "0"); break; }
-                if (screen.key(e.key, e.ctrl)) break;
-                if (e.ctrl) {
-                    if (e.key == 'S') actions.push_back({U::Act::SaveSession});
-                    else if (e.key == 'O') actions.push_back({U::Act::OpenSession});
-                    else if (e.key == 'N') actions.push_back({U::Act::NewSession});
-                    else if (e.key == 'E') actions.push_back({U::Act::Export});
-                    break;
-                }
-                if (e.key == VK_SPACE) actions.push_back({U::Act::Play});
-                else if (e.key == VK_HOME) actions.push_back({U::Act::Rewind});
-                else if (e.key == VK_END) actions.push_back({U::Act::Stop});
-                else if (e.key == 'L') actions.push_back({U::Act::Loop});
-                else if (e.key >= '1' && e.key < '1' + U::kPageCount) screen.setPage(U::kTabOrder[static_cast<std::size_t>(e.key - '1')]);
-                break;
-            case ui::InputEvent::Type::OpenFile:
-                if (!e.files.empty()) a.openSession(e.files.front());
-                break;
-            default: break;
-            }
-        }
+        for (const auto& e : window.takeEvents()) dispatch(e);
         for (const auto& e : actions) a.handle(e, screen);
         actions.clear();
 

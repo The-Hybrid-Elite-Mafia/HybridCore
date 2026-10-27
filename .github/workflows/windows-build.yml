@@ -178,6 +178,12 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           tools\ci\run-and-report.ps1 -Title "console: app opens a session from the command line" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\run-console-smoke.ps1','-Exe','build\rig-asio\console\app\Release\HEMDigitalConsole.exe','-Shot','console-shots\app_session.png','-StemsDir','tests\data','-Page','4'
 
+      - name: Every control pressed with real mouse messages (the installed-style app)
+        env:
+          GALLIUM_DRIVER: llvmpipe
+        run: |
+          tools\ci\run-and-report.ps1 -Title "console: click test" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\run-console-click-test.ps1','-Exe','build\rig-asio\console\app\Release\HEMDigitalConsole.exe','-Report','console-shots\control-check.txt'
+
       - name: Publish screenshots to the console-screenshots branch
         if: always()
         env:

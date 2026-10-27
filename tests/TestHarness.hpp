@@ -72,6 +72,7 @@ void testConsoleMeter();
 void testConsoleTools();
 void testConsoleRig();
 void testConsoleUi();
+void testConsoleReadings();
 void testConsolePlayer();
 void benchmarkConsole();
 

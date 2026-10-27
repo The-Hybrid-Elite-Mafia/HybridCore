@@ -12,6 +12,7 @@ $tmp = Join-Path ([IO.Path]::GetTempPath()) 'hc-shots'
 Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $tmp | Out-Null
 foreach ($p in $pngs) { Copy-Item $p.FullName $tmp }
+Get-ChildItem $Folder -Filter '*.txt' | ForEach-Object { Copy-Item $_.FullName $tmp }   # reports (control check)
 "Screenshots from commit $env:GITHUB_SHA (run $env:GITHUB_RUN_NUMBER), rendered with Mesa llvmpipe (software OpenGL, no GPU)." |
     Out-File (Join-Path $tmp 'README.md') -Encoding utf8
 

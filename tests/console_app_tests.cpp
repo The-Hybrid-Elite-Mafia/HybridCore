@@ -228,6 +228,99 @@ void testConsoleUi() {
     }
 }
 
+// Every meter, lamp and reading on every page: what it shows in silence and with a hot 13-stem mix through a rig with every
+// detector set to react. Meters (LED rows and bars) must move; lamps and readouts are listed with their state.
+void testConsoleReadings() {
+    std::printf("[console readings] every meter, lamp and reading, silent vs playing\n");
+    namespace T = twinbus_ids; namespace K = colour_ids; namespace M = meter_ids; namespace R = reso_ids;
+    auto setup = [](ConsoleRig& rig) {
+        rig.prepare(48000.0, 512);
+        auto& d = rig.desk();
+        for (int c = 0; c < ConsoleRig::kChannels; ++c) { d.setChannel(c, StudioDesk::CompIn, 1); d.setChannel(c, StudioDesk::CompThreshold, -20); }
+        d.setChannel(0, StudioDesk::Pfl, 1);
+        d.setMaster(StudioDesk::MainInsert, 1); d.setMaster(StudioDesk::BusCompIn, 1); d.setMaster(StudioDesk::BusCompThreshold, -20);
+        for (int sd = 0; sd < 2; ++sd) {
+            rig.twinBus().set(T::id(sd, T::Threshold), 20);
+            rig.twinBus().set(T::id(sd, T::LfOn), 1); rig.twinBus().set(T::id(sd, T::HfOn), 1);
+            rig.twinBus().set(T::id(sd, T::LfRange), 22); rig.twinBus().set(T::id(sd, T::HfRange), 22);
+            rig.twinBus().set(T::id(sd, T::LfCompExp), 0); rig.twinBus().set(T::id(sd, T::HfCompExp), 0);
+        }
+        rig.twinBus().set(T::Mode, 2);   // dual mono: both sides' meters live
+        rig.colour().set(K::DriveIn, 1); rig.colour().set(K::Drive, 11); rig.colour().set(K::HfcIn, 1); rig.colour().set(K::HfcThreshold, -10);
+        rig.meter().set(M::PeakAlert, 1); rig.meter().set(M::Target, 0); rig.meter().set(M::LoudAlert, 1);   // -12 dBTP, target -36, +1 LU
+        for (int c = 0; c < 3; ++c) { rig.channelTool(c).setType(1 + c); d.setChannel(c, StudioDesk::Insert, 1); }
+        for (int b = 0; b < 2; ++b) {   // both RESO bands on the 997 Hz tone of the test mix
+            auto& reso = rig.channelTool(0).tool(ToolSlot::Reso);
+            reso.set(b * R::kPerBand + R::On, 1); reso.set(b * R::kPerBand + R::Freq, 997); reso.set(b * R::kPerBand + R::Threshold, 0); reso.set(b * R::kPerBand + R::Depth, 12);
+        }
+    };
+    auto quiet = std::make_unique<ConsoleRig>(), hot = std::make_unique<ConsoleRig>();
+    setup(*quiet); setup(*hot);
+    const std::size_t n = 48000 * 4;
+    std::vector<float> st(n), zero(n, 0.0f), oL(n), oR(n), mL(n), mR(n);
+    std::uint32_t seed = 7;
+    for (std::size_t i = 0; i < n; ++i) {
+        seed = seed * 1664525u + 1013904223u;
+        const double noise = (static_cast<double>(seed >> 8) / 16777216.0 - 0.5) * 0.4;
+        st[i] = static_cast<float>(0.45 * std::sin(2 * 3.14159265358979 * 997.0 * static_cast<double>(i) / 48000.0) + 0.25 * std::sin(2 * 3.14159265358979 * 61.0 * static_cast<double>(i) / 48000.0) + noise);
+    }
+    auto run = [&](ConsoleRig& rig, const std::vector<float>& src) {
+        ConsoleRig::Io io;
+        for (int c = 0; c < ConsoleRig::kChannels; ++c) { io.stemL[static_cast<std::size_t>(c)] = src.data(); io.stemR[static_cast<std::size_t>(c)] = src.data(); }
+        io.mainL = mL.data(); io.mainR = mR.data(); io.monL = oL.data(); io.monR = oR.data();
+        for (std::size_t i = 0; i < n; i += 512) {
+            ConsoleRig::Io b = io;
+            for (int c = 0; c < ConsoleRig::kChannels; ++c) { b.stemL[static_cast<std::size_t>(c)] += i; b.stemR[static_cast<std::size_t>(c)] += i; }
+            b.mainL += i; b.mainR += i; b.monL += i; b.monR += i;
+            rig.process(b, static_cast<std::uint32_t>(std::min<std::size_t>(512, n - i)));
+        }
+    };
+    run(*quiet, zero);
+    run(*hot, st);
+    U::AppState appQ, appH;
+    const auto pq = U::buildPages(*quiet, appQ);
+    const auto ph = U::buildPages(*hot, appH);
+    int meters = 0, metersMoved = 0, lamps = 0, lampsLit = 0, readouts = 0;
+    std::string still;
+    for (std::size_t p = 0; p < ph.size(); ++p) {
+        for (std::size_t i = 0; i < ph[p].widgets.size(); ++i) {
+            const auto& w = ph[p].widgets[i];
+            const auto& wq = pq[p].widgets[i];
+            const std::string name = !w.tip.empty() ? w.tip : w.label;
+            if (w.kind == U::Kind::Leds || w.kind == U::Kind::LedBar) {
+                ++meters;
+                const float a = wq.value ? wq.value() : 0, b = w.value ? w.value() : 0;
+                if (a != b) ++metersMoved; else still += "    " + std::string(U::pageName(ph[p].id)) + ": " + name.substr(0, 60) + "\n";
+            } else if (w.kind == U::Kind::Lamp) {
+                ++lamps;
+                const bool lit = w.value && w.value() > 0.5f;
+                lampsLit += lit ? 1 : 0;
+                std::printf("    lamp %-9s %-44s %s\n", U::pageName(ph[p].id), (w.label.empty() ? name : w.label).substr(0, 44).c_str(), lit ? "LIT with the hot mix" : "off (needs an overload / its condition)");
+            } else if (w.kind == U::Kind::Readout) {
+                ++readouts;
+            }
+        }
+    }
+    std::printf("  LED meters and bars: %d, moved with audio: %d%s", meters, metersMoved, still.empty() ? "\n" : ", these did not:\n");
+    if (!still.empty()) std::printf("%s", still.c_str());
+    std::printf("  lamps: %d, lit with the hot mix: %d; text readouts: %d (time, delay, channel names: all live text)\n", lamps, lampsLit, readouts);
+    CHECK(meters > 0 && metersMoved == meters);
+    // the drawn meters: the numbers they draw
+    auto& mb = hot->meter();
+    const bool meterLive = mb.momentaryLufs() > -100 && mb.shortTermLufs() > -100 && mb.integratedLufs() > -100 && mb.truePeakDbtp(0) > -100 &&
+                           mb.bandDb(17) > -100 && mb.historyCount() > 0 && mb.scopeWritten() > 0 && mb.ppmDb(0) > -100 && mb.sliding10Lufs() > -100;
+    const float gr1 = hot->twinBus().meter(T::MeterGr1), gr2 = hot->twinBus().meter(T::MeterGr2);
+    const float resoGr = hot->channelTool(0).tool(ToolSlot::Reso).meter(R::MeterGr1);
+    const float corr = hot->channelTool(1).tool(ToolSlot::Shuffle).meter(shuffle_ids::MeterCorrelation);
+    const float delay = hot->channelTool(2).tool(ToolSlot::Echo).meter(echo_ids::MeterDelayMs);
+    std::printf("  meter numbers: M %.1f S %.1f I %.1f LUFS, TP %.1f dBTP, 1 kHz band %.1f dB, octave %.1f dB, radar points %llu, scope frames %llu, peak meter %.1f dBFS, sliding %.1f\n",
+                mb.momentaryLufs(), mb.shortTermLufs(), mb.integratedLufs(), mb.truePeakDbtp(0), mb.bandDb(17), mb.octaveDb(5),
+                static_cast<unsigned long long>(mb.historyCount()), static_cast<unsigned long long>(mb.scopeWritten()), mb.ppmDb(0), mb.sliding10Lufs());
+    std::printf("  drawn meters: loudness / RTA / radar / scope / peak meter numbers live %s; twin bus GR needles %.1f / %.1f dB; RESO cut %.1f dB; SHUFFLE correlation %.2f; ECHO delay %.0f ms\n",
+                meterLive ? "yes" : "NO", static_cast<double>(gr1), static_cast<double>(gr2), static_cast<double>(resoGr), static_cast<double>(corr), static_cast<double>(delay));
+    CHECK(meterLive && gr1 < -0.5f && gr2 < -0.5f && delay > 1.0f && corr > 0.5f);
+}
+
 void testConsolePlayer() {
     std::printf("[console player] transport, stem hand-off, LISTEN, export, session file\n");
     auto rig = std::make_unique<ConsoleRig>();

@@ -244,6 +244,7 @@ int main(int argc, char** argv) {
     testConsoleTools();
     testConsoleRig();
     testConsoleUi();
+    testConsoleReadings();
     testConsolePlayer();
     testUiImage();
     testUiLayout();

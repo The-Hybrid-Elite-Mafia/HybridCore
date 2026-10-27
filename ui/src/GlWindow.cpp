@@ -96,15 +96,20 @@ struct GlWindow::Impl {
             e.doubleClick = (msg == WM_LBUTTONDBLCLK);
             events.push_back(e);
             return 0;
-        case WM_LBUTTONUP:
-            if (mouseDown) ::ReleaseCapture();
+        case WM_LBUTTONUP: {
+            // mouseDown goes false BEFORE ReleaseCapture: ReleaseCapture sends WM_CAPTURECHANGED at once, which must not
+            // see a press in progress (it used to queue an extra MouseUp at 0,0 first, so a click never reached the
+            // control it was on: every push button that fires on release did nothing).
+            const bool wasDown = mouseDown;
             mouseDown = false;
+            if (wasDown) ::ReleaseCapture();
             e.type = InputEvent::Type::MouseUp;
             e.x = static_cast<float>(GET_X_LPARAM(lp) + dragDx);
             e.y = static_cast<float>(GET_Y_LPARAM(lp) + dragDy);
             dragDx = dragDy = 0;
             events.push_back(e);
             return 0;
+        }
         case WM_MOUSEMOVE:
             e.type = InputEvent::Type::MouseMove;
             e.x = static_cast<float>(GET_X_LPARAM(lp) + dragDx);
@@ -184,7 +189,15 @@ struct GlWindow::Impl {
             return 0;
         }
         case WM_CAPTURECHANGED:
-            if (mouseDown) { mouseDown = false; events.push_back({InputEvent::Type::MouseUp}); }
+            // the press was taken away (another window, a dialog): end it far off any control, so nothing fires
+            if (mouseDown) {
+                mouseDown = false;
+                dragDx = dragDy = 0;
+                InputEvent up;
+                up.type = InputEvent::Type::MouseUp;
+                up.x = up.y = -100000.0f;
+                events.push_back(up);
+            }
             return 0;
         default:
             return ::DefWindowProcW(h, msg, wp, lp);
