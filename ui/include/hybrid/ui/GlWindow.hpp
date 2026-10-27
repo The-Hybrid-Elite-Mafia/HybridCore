@@ -14,14 +14,16 @@
 namespace hc::ui {
 
 struct InputEvent {
-    enum class Type : std::uint8_t { MouseDown, MouseUp, MouseMove, Wheel, Resize, Close, RightDown, Drop, Key, OpenFile };
+    enum class Type : std::uint8_t { MouseDown, MouseUp, MouseMove, Wheel, Resize, Close, RightDown, Drop, Key, OpenFile, MiddleDown, MiddleUp };
     Type  type        = Type::MouseMove;
     float x           = 0.0f;   // client pixels
     float y           = 0.0f;
     float wheel       = 0.0f;   // notches (+ = away from user)
+    float wheelX      = 0.0f;   // horizontal notches (tilt wheel / touchpad, + = right)
     bool  doubleClick = false;
     bool  fine        = false;  // Shift or Ctrl held
-    bool  ctrl        = false;  // Ctrl held (Key)
+    bool  ctrl        = false;  // Ctrl held (Key, Wheel)
+    bool  shift       = false;  // Shift held (Key, Wheel)
     std::uint32_t key = 0;      // Key: Windows virtual-key code
     std::vector<std::filesystem::path> files;   // Drop: files dragged in from Explorer; OpenFile: path sent by a second instance
 };
@@ -56,6 +58,9 @@ public:
     void swap() noexcept;
     void setVsync(bool on) noexcept;
     void setTitle(const std::wstring& title) noexcept;
+    // Borderless full screen on the window's monitor (F11 in the apps); false restores the previous window.
+    void setFullscreen(bool on) noexcept;
+    [[nodiscard]] bool fullscreen() const noexcept;
     // Window class of every GlWindow (used to find a running instance).
     [[nodiscard]] static const wchar_t* className() noexcept;
     // WM_COPYDATA tag: the payload is a UTF-16 file path to open (InputEvent::Type::OpenFile).

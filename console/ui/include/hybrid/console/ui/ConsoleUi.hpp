@@ -33,6 +33,11 @@ inline constexpr float kWidth = 3840.0f, kHeight = 2160.0f;
 inline constexpr int kStemSlots = ConsoleRig::kChannels + 2;   // 13 channels + EXT 1 + EXT 2 returns
 inline constexpr int kExt1Slot = ConsoleRig::kChannels, kExt2Slot = ConsoleRig::kChannels + 1;
 inline constexpr int kColourToolTarget = ConsoleRig::kChannels;   // TOOLS page: 0..12 = channel, 13 = colour stage insert
+inline constexpr int kBigChannels = 5;                             // BIG DESK page: channels on screen at a time
+// View zoom (1 = the whole faceplate fits the window). The largest zoom is also limited so the plate is never shown
+// above 1 window pixel per design unit (its routed texture stops there).
+inline constexpr float kZoomMin = 1.0f, kZoomMax = 3.0f;
+inline constexpr float kMinTextPx = 13.0f;   // no text is drawn smaller than this many screen pixels
 
 namespace colours {
 inline const Rgba violet = rgb8(0x9B5CFF);   // HEM: frame neon, section captions, lit switches
@@ -66,12 +71,15 @@ struct AppState {
     int listen = 0;                            // 0 MONITOR, 1 CUE 1, 2 CUE 2 (what the output device plays)
     int toolTarget = 0;                        // TOOLS page: which slot is shown
     int resetStage = 0;                        // RESET button: 0 idle, 1 asking "SURE?", 2 offering UNDO
+    float zoom = 1.0f;                         // view zoom (kZoomMin..kZoomMax), saved in the settings
+    int bigFirst = 0;                          // BIG DESK: first channel shown (0 .. kChannels - kBigChannels)
 };
 
 // Everything the screen asks the app to do.
 enum class Act : std::uint8_t {
     None, Page, LoadStems, LoadSlot, ClearSlot, Play, Stop, Rewind, Loop, Seek, Export, PrintStems,
     NewSession, OpenSession, SaveSession, Device, Listen, ToolTarget, EditTool, Tap, ResetMeter, ResetAll,
+    BigNav,     // BIG DESK: arg = channels to move (+/-), or 100 + channel to show that channel
 };
 struct ActionEvent {
     Act act = Act::None;
@@ -79,9 +87,15 @@ struct ActionEvent {
     float value = 0.0f;
 };
 
-enum class PageId : std::uint8_t { Desk, StepEq, TwinBus, Colour, Meter, Tools, kCount };
+// (DeskBig is last so saved page numbers of older versions still mean the same page.)
+enum class PageId : std::uint8_t { Desk, StepEq, TwinBus, Colour, Meter, Tools, DeskBig, kCount };
 inline constexpr int kPageCount = static_cast<int>(PageId::kCount);
 [[nodiscard]] const char* pageName(PageId p) noexcept;
+// The pages in the order of the tabs (and of the keys 1..7).
+inline constexpr std::array<PageId, kPageCount> kTabOrder{PageId::Desk, PageId::DeskBig, PageId::StepEq, PageId::TwinBus,
+                                                          PageId::Colour, PageId::Meter, PageId::Tools};
+// First channel the BIG DESK shows after moving by `delta` (or jumping to show `channel` when jump >= 0).
+[[nodiscard]] int bigDeskFirst(int first, int delta, int jumpTo = -1) noexcept;
 
 // One control binding: the control's description plus its getter / setter (plain values).
 struct Ctl {
@@ -116,6 +130,7 @@ struct Widget {
     Rgba colour = colours::lime;    // arc / lens / LED colour
     Act act = Act::None;            // Button / Seek
     int arg = 0;
+    std::function<int()> argFn;             // when set: the arg (Button) / customArg (Custom) right now (BIG DESK strips)
     std::function<float()> value;           // Leds / LedBar / Lamp / Seek (0..1)
     std::function<float()> value2;          // LedBar: peak-hold marker (optional)
     std::function<std::string()> text;      // Readout / Button caption (when set) / Selector text override
@@ -155,7 +170,7 @@ struct Page {
 };
 
 // The six pages for this rig. `app` must outlive the pages (the widgets read it).
-[[nodiscard]] std::vector<Page> buildPages(ConsoleRig& rig, const AppState& app);
+[[nodiscard]] std::vector<Page> buildPages(ConsoleRig& rig, AppState& app);
 
 // The plate a page is routed from (pockets for every control, bays, neon channels, screws).
 [[nodiscard]] hc::ui::PanelLayout platePockets(const Page& page);
@@ -170,6 +185,7 @@ void widgetSetNorm(const Widget& w, float n);
 [[nodiscard]] std::string widgetValueText(const Widget& w);   // "+4.5 dB", "1.5 kHz", "ON"
 [[nodiscard]] bool widgetVisible(const Widget& w);
 [[nodiscard]] bool widgetEnabled(const Widget& w);
+[[nodiscard]] int widgetArg(const Widget& w);   // argFn() if set, else arg (Button) / customArg (Custom)
 
 // ---- interaction -------------------------------------------------------------------------------
 class Controller {
@@ -181,7 +197,7 @@ public:
     void rightDown(float x, float y);
     void mouseMove(float x, float y, bool fine);
     void mouseUp(float x, float y);
-    void wheel(float x, float y, float notches, bool fine);
+    bool wheel(float x, float y, float notches, bool fine);   // false: no control under the mouse
     [[nodiscard]] int hover() const noexcept { return hover_; }    // widget index or -1
     [[nodiscard]] int active() const noexcept { return active_; }  // pressed / dragged widget or -1
     [[nodiscard]] int hit(float x, float y) const noexcept;

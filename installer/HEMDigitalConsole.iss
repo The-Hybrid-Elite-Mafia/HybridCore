@@ -1,14 +1,14 @@
 ; =============================================================================
 ;  HEM Digital Console — Windows installer (Inno Setup 6)
-;  Built by CI:  ISCC /DAppVersion=x.y.z /DBinDir=<build dir> HEMDigitalConsole.iss
-;  Public installer: WASAPI only, no ASIO code.
+;  Built by CI:  ISCC /DAppVersion=x.y.z /DBinDir=<build dir> /DAsioLicense=<SDK LICENSE.txt> HEMDigitalConsole.iss
+;  Licence: GPLv3 or later. Sound: ASIO (Steinberg's ASIO SDK under its GPLv3 option) or WASAPI.
 ;  AppId is permanent: never change it, or upgrades will install side-by-side.
 ; =============================================================================
 #ifndef AppVersion
   #define AppVersion "0.0.0-dev"
 #endif
 #ifndef BinDir
-  #define BinDir "..\build\rig-public"
+  #define BinDir "..\build\rig-asio"
 #endif
 
 [Setup]
@@ -48,7 +48,11 @@ Source: "..\assets\*";                                             DestDir: "{ap
 Source: "..\assets\*";                                             DestDir: "{app}\bin\assets"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\assets\fonts\OFL.txt";                                  DestDir: "{app}\licenses"; DestName: "Poppins-OFL.txt"; Flags: ignoreversion
 Source: "CONSOLE-HOW-TO-TEST.txt";                                  DestDir: "{app}"; DestName: "HOW-TO-TEST.txt"; Flags: ignoreversion
-Source: "THIRD-PARTY-NOTICES.txt";                                  DestDir: "{app}"; Flags: ignoreversion
+Source: "CONSOLE-THIRD-PARTY-NOTICES.txt";                          DestDir: "{app}"; DestName: "THIRD-PARTY-NOTICES.txt"; Flags: ignoreversion
+Source: "..\LICENSE";                                              DestDir: "{app}"; DestName: "LICENSE.txt"; Flags: ignoreversion
+#ifdef AsioLicense
+Source: "{#AsioLicense}";                                          DestDir: "{app}\licenses"; DestName: "Steinberg-ASIO-SDK-LICENSE.txt"; Flags: ignoreversion
+#endif
 Source: "..\external\dr_libs\LICENSE";                             DestDir: "{app}\licenses"; DestName: "dr_libs-LICENSE.txt"; Flags: ignoreversion
 Source: "..\external\stb\LICENSE";                                  DestDir: "{app}\licenses"; DestName: "stb-LICENSE.txt"; Flags: ignoreversion
 

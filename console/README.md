@@ -188,3 +188,9 @@ one transport, LISTEN (MONITOR, CUE 1 or CUE 2 to the output device), EXPORT (MA
 removed), PRINT STEMS (every channel's DIRECT OUT to its own WAV), sessions (`.hemc`: stems with absolute and relative
 paths + every control), autosave of everything on exit, RESET (twice) with UNDO.
 Screens: `hem_console_snapshot` renders every page off-screen (CI publishes them to the `console-screenshots` branch).
+Views: seven tabs (DESK, BIG DESK, STEP EQ, TWIN BUS, COLOUR, METER, TOOLS). BIG DESK shows `kBigChannels` (5) strips
+bound to whichever channels are on screen. ZOOM 1x..3x (never above 1 window pixel per design unit), Ctrl + wheel
+around the mouse, saved in `settings.ini`; text is baked at no less than `kMinTextPx` (13) screen pixels.
+Sound: ASIO (Steinberg ASIO SDK under its GPLv3 option, fetched and SHA-512 checked by `tools/fetch-asio-sdk.ps1`, never
+committed) with WASAPI exclusive as the fallback; build with `--preset rig-asio`. The installer ships LICENSE (GPLv3),
+the SDK's licence and THIRD-PARTY-NOTICES; every console release carries its source zip.

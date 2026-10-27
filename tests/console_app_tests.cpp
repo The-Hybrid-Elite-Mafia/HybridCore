@@ -168,6 +168,37 @@ void testConsoleUi() {
     const auto L = U::platePockets(desk);
     std::printf("  desk plate: %zu CNC pockets, %zu neon channels\n", L.pockets.size(), L.grooves.size());
     CHECK(L.pockets.size() > 400);
+
+    // BIG DESK: five strips, every channel control on each, bound to whichever channel the strip shows
+    {
+        const auto& big = pages[static_cast<std::size_t>(U::PageId::DeskBig)];
+        std::set<const fx::ParamInfo*> onBig;
+        for (const auto& w : big.widgets) if (w.ctl.info) onBig.insert(w.ctl.info);
+        int perChannel = 0;
+        for (const auto& pi : StudioDesk::channelParams()) if (onBig.count(&pi)) ++perChannel;
+        int hfKnobs = 0;
+        for (const auto& w : big.widgets) if (w.ctl.info == &StudioDesk::channelParams()[StudioDesk::HfGain]) ++hfKnobs;
+        const bool nav = U::bigDeskFirst(0, -5) == 0 && U::bigDeskFirst(0, 5) == 5 && U::bigDeskFirst(5, 5) == 8 && U::bigDeskFirst(0, 0, 12) == 8 &&
+                         U::bigDeskFirst(0, 0, 2) == 0 && U::bigDeskFirst(8, 0, 1) == 0 && U::bigDeskFirst(3, 1) == 4;
+        std::vector<U::ActionEvent> ev;
+        U::Controller cb([&](const U::ActionEvent& e) { ev.push_back(e); });
+        cb.setPage(&big);
+        app.bigFirst = U::bigDeskFirst(app.bigFirst, 0, 10);   // as if channel 11's number was clicked
+        const auto* hf2 = find(big, &StudioDesk::channelParams()[StudioDesk::HfGain], 1);   // the second strip
+        const float before = rig->desk().channel(9, StudioDesk::HfGain);
+        cb.mouseDown(hf2->r.cx(), hf2->r.cy(), false, false);
+        cb.mouseMove(hf2->r.cx(), hf2->r.cy() - U::Controller::kDragUnitsForFullRange * 0.25f, false);
+        cb.mouseUp(hf2->r.cx(), hf2->r.cy());
+        const float after = rig->desk().channel(app.bigFirst + 1, StudioDesk::HfGain);
+        const U::Widget* name2 = nullptr;
+        for (const auto& w : big.widgets) if (w.kind == U::Kind::Custom && w.custom == U::CustomId::StemName && !name2 && w.r.x > 700) name2 = &w;
+        cb.mouseDown(name2->r.cx(), name2->r.cy(), false, false);
+        std::printf("  big desk: %d of %zu channel controls on each of %d strips; showing channels %d-%d, strip 2's HF knob moved channel %d: %+.2f -> %+.2f dB; its name strip loads slot %d; paging %s\n",
+                    perChannel, StudioDesk::channelParams().size(), hfKnobs, app.bigFirst + 1, app.bigFirst + U::kBigChannels, app.bigFirst + 2,
+                    static_cast<double>(before), static_cast<double>(after), ev.empty() ? -1 : ev.back().arg, nav ? "ok" : "WRONG");
+        CHECK(perChannel == static_cast<int>(StudioDesk::channelParams().size()) && hfKnobs == U::kBigChannels && nav);
+        CHECK(app.bigFirst == 8 && std::fabs(after - 7.5f) < 0.01f && !ev.empty() && ev.back().act == U::Act::LoadSlot && ev.back().arg == 9);
+    }
 }
 
 void testConsolePlayer() {

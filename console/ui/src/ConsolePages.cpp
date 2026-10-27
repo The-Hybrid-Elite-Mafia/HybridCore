@@ -29,6 +29,9 @@ struct OrderNames {
 };
 const OrderNames kOrderN;
 const ParamInfo kRackOrderInfo{"rack_order", "Rack Order", "", 0, ConsoleRig::kOrderCount - 1, 0, Taper::Choice, kOrderN.p.data()};
+constexpr float kZoomSteps[] = {1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.5f, 3.0f};
+const char* const kZoomN[] = {"FIT", "125 %", "150 %", "175 %", "200 %", "250 %", "300 %"};
+const ParamInfo kZoomInfo{"zoom", "Zoom", "", 0, 6, 0, Taper::Choice, kZoomN};
 
 // ---- bindings ------------------------------------------------------------------------------------
 Ctl deskCh(ConsoleRig& rig, int ch, int p) {
@@ -47,6 +50,21 @@ Ctl unitIn(ConsoleRig& rig, int u) {
 }
 Ctl rackOrder(ConsoleRig& rig) {
     return {&kRackOrderInfo, [&rig] { return static_cast<float>(rig.rackOrder()); }, [&rig](float v) { rig.setRackOrder(static_cast<int>(std::lround(v))); }};
+}
+// BIG DESK: a control of whichever channel sits in strip `slot` right now.
+Ctl deskBig(ConsoleRig& rig, const AppState& app, int slot, int p) {
+    return {&StudioDesk::channelParams()[static_cast<std::size_t>(p)],
+            [&rig, &app, slot, p] { return rig.desk().channel(app.bigFirst + slot, p); },
+            [&rig, &app, slot, p](float v) { rig.desk().setChannel(app.bigFirst + slot, p, v); }};
+}
+Ctl zoomCtl(AppState& app) {
+    return {&kZoomInfo,
+            [&app] {
+                int best = 0;
+                for (int i = 1; i < 7; ++i) if (std::fabs(kZoomSteps[i] - app.zoom) < std::fabs(kZoomSteps[best] - app.zoom)) best = i;
+                return static_cast<float>(best);
+            },
+            [&app](float v) { app.zoom = kZoomSteps[std::clamp(static_cast<int>(std::lround(v)), 0, 6)]; }};
 }
 Ctl toolType(ToolSlot& slot) {
     return {&kToolTypeInfo, [&slot] { return static_cast<float>(slot.type()); }, [&slot](float v) { slot.setType(static_cast<int>(std::lround(v))); }};
@@ -136,19 +154,22 @@ const std::vector<Rgba> kMainLedCols{C::green, C::green, C::green, C::green, C::
 const std::vector<Rgba> kGrLedCols{C::amber, C::amber, C::amber, C::amber, C::red};
 
 // ---- common bars on every page --------------------------------------------------------------------
-void topBar(B& b, ConsoleRig& rig, const AppState& app, PageId id) {
+void topBar(B& b, ConsoleRig& rig, AppState& app, PageId id) {
     b.p.neon.push_back({30, 152, kWidth - 30, 152});
     b.engrave("HEM DIGITAL CONSOLE", 200, 106, 0, false, C::text);
-    float x = 1010;
-    for (int i = 0; i < kPageCount; ++i) {
-        Widget& w = b.button({x, 38, 280, 84}, pageName(static_cast<PageId>(i)), Act::Page, i, C::violet);
-        w.tip = std::string("Show the ") + pageName(static_cast<PageId>(i)) + " faceplate";
-        (void)id;
-        x += 292;
+    float x = 900;
+    for (PageId t : kTabOrder) {
+        Widget& w = b.button({x, 38, 220, 84}, pageName(t), Act::Page, static_cast<int>(t), C::violet);
+        w.tip = t == PageId::DeskBig ? std::string("The desk, five channels at a time, big") : std::string("Show the ") + pageName(t) + " faceplate";
+        x += 228;
     }
-    Widget& ord = b.sel({x + 16, 38, 520, 84}, "RACK", rackOrder(rig));
+    (void)id;
+    Widget& ord = b.sel({x + 8, 38, 460, 84}, "", rackOrder(rig));
     ord.tip = "Order of the three rack units behind the desk's MAIN INSERT";
-    b.readout({x + 556, 38, kWidth - 30 - (x + 556), 84}, [&app] {
+    Widget& zm = b.sel({x + 484, 38, 280, 84}, "", zoomCtl(app));
+    zm.text = [&app] { return app.zoom <= 1.001f ? std::string("ZOOM  FIT") : fmt("ZOOM  %.0f %%", 100.0 * app.zoom); };
+    zm.tip = "ZOOM: everything bigger (also Ctrl + mouse wheel; Ctrl + 0 = fit). Drag the plate or use the wheel to move around";
+    b.readout({x + 780, 38, kWidth - 30 - (x + 780), 84}, [&app] {
         std::string s = fmt("DSP %.1f %%", 100.0 * app.dspLoad);
         if (!app.status.empty()) s += "  " + app.status;
         return s;
@@ -169,7 +190,7 @@ void bottomBar(B& b, const AppState& app) {
     Widget& loop = b.button(next(140), "LOOP", Act::Loop, 0, C::amber);
     loop.value = [&app] { return app.loop ? 1.0f : 0.0f; };
     b.readout(next(330), [&app] { return timeText(app.position) + " / " + timeText(app.length); });
-    Widget& seek = b.add([&] { Widget w; w.kind = Kind::Seek; w.r = next(760); w.act = Act::Seek; return w; }());
+    Widget& seek = b.add([&] { Widget w; w.kind = Kind::Seek; w.r = next(690); w.act = Act::Seek; return w; }());
     seek.value = [&app] { return app.length > 0 ? static_cast<float>(app.position / app.length) : 0.0f; };
     seek.tip = "Song position: click or drag to jump";
     Widget& listen = b.button(next(330), "LISTEN", Act::Listen, 0, C::cyan);
@@ -183,7 +204,7 @@ void bottomBar(B& b, const AppState& app) {
     b.button(next(130), "OPEN", Act::OpenSession);
     Widget& save = b.button(next(130), "SAVE", Act::SaveSession);
     save.value = [&app] { return app.dirty ? 1.0f : 0.0f; };
-    Widget& reset = b.button(next(140), "RESET", Act::ResetAll, 0, C::red);
+    Widget& reset = b.button(next(170), "RESET", Act::ResetAll, 0, C::red);
     reset.tip = "Every control back to its starting position (press twice; UNDO for 15 s after)";
     reset.text = [&app] { return std::string(app.resetStage == 1 ? "SURE?" : app.resetStage == 2 ? "UNDO" : "RESET"); };
     reset.value = [&app] { return app.resetStage != 0 ? 1.0f : 0.0f; };
@@ -199,7 +220,7 @@ void deskPage(B& b, ConsoleRig& rig, const AppState& app) {
     constexpr float kTop = 165, kPitch = 202, kW = 194;
     for (int ch = 0; ch < ConsoleRig::kChannels; ++ch) {
         const float x = 30 + kPitch * static_cast<float>(ch);
-        const float c0 = x + 50, c1 = x + 144;
+        const float c0 = x + 50, c1 = x + 143;
         b.section({x, kTop, kW, 1830}, "");
         b.engrave(std::to_string(ch + 1), x + kW * 0.5f, 205, 1, false, C::violet);
         // TOOL slot (where the reference desk has its microphone preamp)
@@ -208,38 +229,38 @@ void deskPage(B& b, ConsoleRig& rig, const AppState& app) {
         b.button({x + 144, 216, 44, 48}, "ED", Act::EditTool, ch).tip = "Open this channel's tool on the TOOLS page";
         // input
         b.knob(sq(c0, 344, 76), "TRIM", deskCh(rig, ch, D::Trim), false);
-        b.sw(box(c1, 308, 84, 36), "MONO", deskCh(rig, ch, D::Mono), C::amber);
-        b.sw(box(c1, 352, 84, 36), "\xC3\x98", deskCh(rig, ch, D::Polarity), C::amber);   // Ø
-        b.sw(box(c1, 396, 84, 36), "HPF", deskCh(rig, ch, D::Hpf), C::amber);
+        b.sw(box(c1, 308, 94, 36), "MONO", deskCh(rig, ch, D::Mono), C::amber);
+        b.sw(box(c1, 352, 94, 36), "\xC3\x98", deskCh(rig, ch, D::Polarity), C::amber);   // Ø
+        b.sw(box(c1, 396, 94, 36), "HPF", deskCh(rig, ch, D::Hpf), C::amber);
         // cue sends
         b.knob(sq(c0, 489, 66), "CUE 1", deskCh(rig, ch, D::Cue1Level), false, C::cyan);
         b.knob(sq(c1, 489, 66), "PAN", deskCh(rig, ch, D::Cue1Pan), true, C::cyan);
         b.sw(box(c0, 546, 84, 32), "ON", deskCh(rig, ch, D::Cue1On), C::cyan);
-        b.sw(box(c1, 546, 84, 32), "POST", deskCh(rig, ch, D::Cue1Post), C::cyan);
+        b.sw(box(c1, 546, 94, 32), "POST", deskCh(rig, ch, D::Cue1Post), C::cyan);
         b.knob(sq(c0, 633, 66), "CUE 2", deskCh(rig, ch, D::Cue2Level), false, C::cyan);
         b.knob(sq(c1, 633, 66), "PAN", deskCh(rig, ch, D::Cue2Pan), true, C::cyan);
         b.sw(box(c0, 690, 84, 32), "ON", deskCh(rig, ch, D::Cue2On), C::cyan);
-        b.sw(box(c1, 690, 84, 32), "POST", deskCh(rig, ch, D::Cue2Post), C::cyan);
+        b.sw(box(c1, 690, 94, 32), "POST", deskCh(rig, ch, D::Cue2Post), C::cyan);
         // EQ
         Widget& hf = b.knob(sq(c0, 786, 76), "HF", deskCh(rig, ch, D::HfGain), true);
         hf.enabled = [&rig, ch] { return rig.desk().channel(ch, D::EqIn) > 0.5f; };
-        b.sw(box(c1, 786, 84, 36), "BELL", deskCh(rig, ch, D::HfBell), C::lime);
+        b.sw(box(c1, 786, 94, 36), "BELL", deskCh(rig, ch, D::HfBell), C::lime);
         Widget& mf = b.knob(sq(c0, 894, 76), "MF", deskCh(rig, ch, D::MfGain), true);
         mf.enabled = hf.enabled;
-        b.sw(box(c1, 894, 84, 36), "EQ IN", deskCh(rig, ch, D::EqIn), C::lime);
+        b.sw(box(c1, 894, 94, 36), "EQ IN", deskCh(rig, ch, D::EqIn), C::lime);
         Widget& lf = b.knob(sq(c0, 1002, 76), "LF", deskCh(rig, ch, D::LfGain), true);
         lf.enabled = hf.enabled;
-        b.sw(box(c1, 1002, 84, 36), "BELL", deskCh(rig, ch, D::LfBell), C::lime);
+        b.sw(box(c1, 1002, 94, 36), "BELL", deskCh(rig, ch, D::LfBell), C::lime);
         // compressor
         Widget& thr = b.knob(sq(c0, 1110, 76), "COMP", deskCh(rig, ch, D::CompThreshold), false, C::amber);
         thr.enabled = [&rig, ch] { return rig.desk().channel(ch, D::CompIn) > 0.5f; };
-        b.sw(box(c1, 1092, 84, 36), "IN", deskCh(rig, ch, D::CompIn), C::amber);
+        b.sw(box(c1, 1092, 94, 36), "IN", deskCh(rig, ch, D::CompIn), C::amber);
         b.leds(box(c1, 1136, 76, 18), 3, false, [&rig, ch] { return static_cast<float>(D::channelCompLeds(rig.desk().channelCompGrDb(ch))); },
                {C::amber, C::amber, C::red}).tip = "Compressor gain reduction: 3, 6, 10 dB";
         // output
         b.knob(sq(c0, 1218, 76), "PAN", deskCh(rig, ch, D::Pan), true);
-        b.sw(box(c1, 1198, 84, 36), "INS", deskCh(rig, ch, D::Insert), C::violet).tip = "INSERT: run this channel's TOOL";
-        b.sw(box(c1, 1240, 84, 36), "D.POST", deskCh(rig, ch, D::DirectPostFader), C::violet).tip = "Direct out (PRINT STEMS) after the fader";
+        b.sw(box(c1, 1198, 94, 36), "INS", deskCh(rig, ch, D::Insert), C::violet).tip = "INSERT: run this channel's TOOL";
+        b.sw(box(c1, 1240, 94, 36), "D.POST", deskCh(rig, ch, D::DirectPostFader), C::violet).tip = "Direct out (PRINT STEMS) after the fader";
         b.sw({x + 8, 1272, 86, 38}, "BUS B", deskCh(rig, ch, D::MuteBusB), C::red).tip = "MUTE / BUS B: off the main mix, onto Bus B";
         b.sw({x + 100, 1272, 86, 38}, "PFL", deskCh(rig, ch, D::Pfl), C::amber);
         // fader + meter
@@ -262,7 +283,7 @@ void deskPage(B& b, ConsoleRig& rig, const AppState& app) {
     const float mx = 2672;
     // bus compressor
     b.section({mx, kTop, 374, 560}, "BUS COMPRESSOR");
-    Widget& bthr = b.knob(sq(mx + 100, 340, 110), "THRESHOLD", deskM(rig, D::BusCompThreshold), false, C::amber);
+    Widget& bthr = b.knob(sq(mx + 100, 340, 110), "THRESH", deskM(rig, D::BusCompThreshold), false, C::amber);
     bthr.enabled = [&rig] { return rig.desk().master(D::BusCompIn) > 0.5f; };
     Widget& bmk = b.knob(sq(mx + 274, 340, 110), "MAKE UP", deskM(rig, D::BusCompMakeup), false, C::amber);
     bmk.enabled = bthr.enabled;
@@ -290,10 +311,10 @@ void deskPage(B& b, ConsoleRig& rig, const AppState& app) {
     b.sw({mx + 196, 1316, 156, 46}, "MUTE", deskM(rig, D::BusBMute), C::red);
     // rack units (behind MAIN INSERT)
     b.section({mx, 1436, 374, 210}, "RACK IN");
-    b.sw({mx + 14, 1496, 112, 54}, "EQ", unitIn(rig, ConsoleRig::UnitStepEq), C::violet).tip = "STEP EQ in the rack";
-    b.sw({mx + 131, 1496, 112, 54}, "BUS", unitIn(rig, ConsoleRig::UnitTwinBus), C::violet).tip = "TWIN BUS in the rack";
-    b.sw({mx + 248, 1496, 112, 54}, "COLOUR", unitIn(rig, ConsoleRig::UnitColour), C::violet).tip = "COLOUR STAGE in the rack";
-    b.lamp({mx + 30, 1584, 28, 28}, "RACK LIVE", [&rig] { return rig.desk().master(D::MainInsert) > 0.5f ? 1.0f : 0.0f; }, C::violet);
+    b.sw({mx + 14, 1490, 168, 52}, "EQ", unitIn(rig, ConsoleRig::UnitStepEq), C::violet).tip = "STEP EQ in the rack";
+    b.sw({mx + 192, 1490, 168, 52}, "BUS", unitIn(rig, ConsoleRig::UnitTwinBus), C::violet).tip = "TWIN BUS in the rack";
+    b.sw({mx + 14, 1556, 168, 52}, "COLOUR", unitIn(rig, ConsoleRig::UnitColour), C::violet).tip = "COLOUR STAGE in the rack";
+    b.lamp({mx + 206, 1568, 28, 28}, "LIVE", [&rig] { return rig.desk().master(D::MainInsert) > 0.5f ? 1.0f : 0.0f; }, C::violet);
 
     // cues + monitor
     const float cx = 3060;
@@ -631,14 +652,117 @@ void toolsPage(B& b, ConsoleRig& rig, const AppState& app) {
     }
 }
 
+// ---- BIG DESK: five channel strips at a time, every control bigger; arrows / the numbers move across all 13 ----------
+void bigDeskPage(B& b, ConsoleRig& rig, AppState& app) {
+    using D = StudioDesk;
+    constexpr int kN = kBigChannels;
+    // navigation row
+    Widget& prev = b.button({30, 168, 220, 80}, "<  BACK", Act::BigNav, -kN, C::violet);
+    prev.tip = "Show the channels to the left (or the Left arrow key)";
+    for (int k = 0; k < ConsoleRig::kChannels; ++k) {
+        Widget& w = b.button({270 + 104.0f * static_cast<float>(k), 168, 94, 80}, std::to_string(k + 1), Act::BigNav, 100 + k, C::lime);
+        w.value = [&app, k] { return k >= app.bigFirst && k < app.bigFirst + kN ? 1.0f : 0.0f; };
+        w.tip = "Show channel " + std::to_string(k + 1);
+    }
+    Widget& nxt = b.button({270 + 104.0f * ConsoleRig::kChannels + 10, 168, 220, 80}, "NEXT  >", Act::BigNav, kN, C::violet);
+    nxt.tip = "Show the channels to the right (or the Right arrow key)";
+    b.engrave("5 CHANNELS AT A TIME  -  ALL 13: THE DESK TAB", 3480, 222, 2, true, C::dim);
+
+    constexpr float kTop = 262, kPitch = 692, kW = 676;
+    for (int s = 0; s < kN; ++s) {
+        const float x = 30 + kPitch * static_cast<float>(s);
+        auto P = [&](int p) { return deskBig(rig, app, s, p); };
+        auto chOf = [&app, s] { return app.bigFirst + s; };
+        b.section({x, kTop, kW, 2000 - kTop}, "");
+        // header: channel number, TOOL slot, edit
+        b.readout({x + 12, kTop + 12, 150, 84}, [&app, s] { return "CH " + std::to_string(app.bigFirst + s + 1); }, C::violet);
+        Widget& tool = b.sel({x + 174, kTop + 12, 300, 84}, "TOOL", {&kToolTypeInfo,
+            [&rig, chOf] { return static_cast<float>(rig.channelTool(chOf()).type()); },
+            [&rig, chOf](float v) { rig.channelTool(chOf()).setType(static_cast<int>(std::lround(v))); }});
+        tool.tip = "TOOL behind this channel's INSERT switch";
+        Widget& ed = b.button({x + 486, kTop + 12, 178, 84}, "EDIT TOOL", Act::EditTool, 0);
+        ed.argFn = chOf;
+        ed.tip = "Open this channel's tool on the TOOLS page";
+
+        const float c0 = x + 95, c1 = x + 250, c2 = x + 400;   // knob columns
+        constexpr float kK = 120;                                 // knob size
+        auto swAt = [&](float cx, float y, const char* t, int p, Rgba col) -> Widget& { return b.sw({cx - 68, y, 136, 56}, t, P(p), col); };
+        // input
+        b.knob(sq(c0, 470, kK), "TRIM", P(D::Trim));
+        swAt(c1, 412, "MONO", D::Mono, C::amber);
+        swAt(c2, 412, "\xC3\x98", D::Polarity, C::amber);
+        swAt(c1, 482, "HPF", D::Hpf, C::amber);
+        // cue sends
+        b.knob(sq(c0, 660, kK), "CUE 1", P(D::Cue1Level), false, C::cyan);
+        b.knob(sq(c1, 660, kK), "PAN", P(D::Cue1Pan), true, C::cyan);
+        swAt(c2, 602, "ON", D::Cue1On, C::cyan);
+        swAt(c2, 668, "POST", D::Cue1Post, C::cyan);
+        b.knob(sq(c0, 850, kK), "CUE 2", P(D::Cue2Level), false, C::cyan);
+        b.knob(sq(c1, 850, kK), "PAN", P(D::Cue2Pan), true, C::cyan);
+        swAt(c2, 792, "ON", D::Cue2On, C::cyan);
+        swAt(c2, 858, "POST", D::Cue2Post, C::cyan);
+        // EQ
+        auto eqOn = [&rig, chOf] { return rig.desk().channel(chOf(), D::EqIn) > 0.5f; };
+        b.knob(sq(c0, 1050, kK), "HF", P(D::HfGain), true).enabled = eqOn;
+        b.knob(sq(c1, 1050, kK), "MF", P(D::MfGain), true).enabled = eqOn;
+        b.knob(sq(c2, 1050, kK), "LF", P(D::LfGain), true).enabled = eqOn;
+        swAt(c0, 1132, "BELL", D::HfBell, C::lime);
+        swAt(c1, 1132, "EQ IN", D::EqIn, C::lime);
+        swAt(c2, 1132, "BELL", D::LfBell, C::lime);
+        // compressor
+        b.knob(sq(c0, 1320, kK), "COMP", P(D::CompThreshold), false, C::amber).enabled = [&rig, chOf] { return rig.desk().channel(chOf(), D::CompIn) > 0.5f; };
+        swAt(c1, 1292, "IN", D::CompIn, C::amber);
+        b.leds({c2 - 66, 1304, 132, 32}, 3, false, [&rig, chOf] { return static_cast<float>(D::channelCompLeds(rig.desk().channelCompGrDb(chOf()))); },
+               {C::amber, C::amber, C::red}).tip = "Compressor gain reduction: 3, 6, 10 dB";
+        // output
+        b.knob(sq(c0, 1530, kK), "PAN", P(D::Pan), true);
+        swAt(c1, 1472, "INS", D::Insert, C::violet).tip = "INSERT: run this channel's TOOL";
+        swAt(c1, 1542, "D.POST", D::DirectPostFader, C::violet).tip = "Direct out (PRINT STEMS) after the fader";
+        swAt(c2, 1472, "BUS B", D::MuteBusB, C::red).tip = "MUTE / BUS B: off the main mix, onto Bus B";
+        swAt(c2, 1542, "PFL", D::Pfl, C::amber);
+        // fader + meter
+        const float fx = x + 545;
+        constexpr float kFy = 400, kFh = 1420;
+        b.fader({fx - 16, kFy, 32, kFh}, "", P(D::Fader));
+        for (float db : {10.0f, 0.0f, -10.0f, -20.0f, -30.0f, -40.0f, -60.0f}) {
+            const float y = kFy + kFh * (1.0f - faderTravel(db));
+            b.engrave(db > 0 ? "+10" : std::to_string(static_cast<int>(db)), x + 482, y + 10, 1, true);
+        }
+        for (int side = 0; side < 2; ++side)
+            b.leds({x + 600 + 32.0f * static_cast<float>(side), kFy + 4, 26, kFh - 8}, 8, true,
+                   [&rig, chOf, side] { return static_cast<float>(D::channelMeterLeds(rig.desk().channelPeakDbu(chOf(), side))); }, kChannelLedCols)
+                .tip = "Channel meter (dBu): -21, -15, -6, 0, +6, +12, +18, +24";
+        Widget& name = b.custom({x + 12, 1868, kW - 24, 116}, CustomId::StemName, 0);
+        name.argFn = chOf;
+        name.tip = "Click: load a file into this channel. Right-click: empty it";
+    }
+
+    // master column: what you need while working on channels
+    const float mx = 30 + kPitch * kN;
+    b.section({mx, kTop, kWidth - 30 - mx, 2000 - kTop}, "MAIN");
+    b.knob(sq(mx + 160, 440, 150), "MONITOR", deskM(rig, D::MonitorLevel), false, C::lime);
+    b.sw({mx + 20, 560, 130, 60}, "DIM", deskM(rig, D::Dim), C::amber);
+    b.sw({mx + 168, 560, 130, 60}, "CUT", deskM(rig, D::Cut), C::red);
+    for (int side = 0; side < 2; ++side)
+        b.leds({mx + 40 + 36.0f * static_cast<float>(side), 700, 28, 1120}, 12, true,
+               [&rig, side] { return static_cast<float>(D::mainMeterLeds(rig.desk().mainMeterDbu(side))); }, kMainLedCols)
+            .tip = "Main meter (dBu, follows the monitor source)";
+    b.fader({mx + 214, 700, 32, 1120}, "MAIN", deskM(rig, D::MainFader));
+    for (float db : {10.0f, 0.0f, -10.0f, -20.0f, -40.0f}) {
+        const float y = 700 + 1120 * (1.0f - faderTravel(db));
+        b.engrave(db > 0 ? "+10" : std::to_string(static_cast<int>(db)), mx + 150, y + 10, 1, true);
+    }
+    b.engrave("MAIN FADER", mx + 157, 1900, 1, true, C::text);
+}
+
 } // namespace
 
 const char* pageName(PageId p) noexcept {
-    static const char* const n[] = {"DESK", "STEP EQ", "TWIN BUS", "COLOUR", "METER", "TOOLS"};
+    static const char* const n[] = {"DESK", "STEP EQ", "TWIN BUS", "COLOUR", "METER", "TOOLS", "BIG DESK"};
     return n[std::clamp(static_cast<int>(p), 0, kPageCount - 1)];
 }
 
-std::vector<Page> buildPages(ConsoleRig& rig, const AppState& app) {
+std::vector<Page> buildPages(ConsoleRig& rig, AppState& app) {
     std::vector<Page> pages(static_cast<std::size_t>(kPageCount));
     for (int i = 0; i < kPageCount; ++i) {
         Page& p = pages[static_cast<std::size_t>(i)];
@@ -651,6 +775,7 @@ std::vector<Page> buildPages(ConsoleRig& rig, const AppState& app) {
         case PageId::Colour: colourPage(b, rig, app); break;
         case PageId::Meter: meterPage(b, rig); break;
         case PageId::Tools: toolsPage(b, rig, app); break;
+        case PageId::DeskBig: bigDeskPage(b, rig, app); break;
         default: break;
         }
         topBar(b, rig, app, p.id);
@@ -697,6 +822,16 @@ std::string widgetValueText(const Widget& w) {
 }
 bool widgetVisible(const Widget& w) { return !w.visible || w.visible(); }
 bool widgetEnabled(const Widget& w) { return !w.enabled || w.enabled(); }
+int widgetArg(const Widget& w) { return w.argFn ? w.argFn() : w.kind == Kind::Custom ? w.customArg : w.arg; }
+int bigDeskFirst(int first, int delta, int jumpTo) noexcept {
+    constexpr int kLast = ConsoleRig::kChannels - kBigChannels;
+    if (jumpTo >= 0) {
+        jumpTo = std::clamp(jumpTo, 0, ConsoleRig::kChannels - 1);
+        if (jumpTo >= first && jumpTo < first + kBigChannels) return std::clamp(first, 0, kLast);   // already on screen
+        return std::clamp(jumpTo - kBigChannels / 2, 0, kLast);
+    }
+    return std::clamp(first + delta, 0, kLast);
+}
 
 // ---- the plate --------------------------------------------------------------------------------------
 hc::ui::PanelLayout platePockets(const Page& page) {

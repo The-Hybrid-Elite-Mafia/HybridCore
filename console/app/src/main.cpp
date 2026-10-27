@@ -193,7 +193,9 @@ struct Options {
     double exitAfter = 0;
     fs::path screenshot, session;
     bool offline = false;
+    bool maximized = false;   // test runs: open maximized like a normal start (to check the real screen size)
     int page = -1;
+    float zoom = 0;           // > 0: start at this zoom
 };
 Options parseOptions() {
     Options o;
@@ -205,6 +207,8 @@ Options parseOptions() {
         else if (k == L"--screenshot" && i + 1 < argc) o.screenshot = argv[++i];
         else if (k == L"--device" && i + 1 < argc) o.offline = std::wstring(argv[++i]) == L"offline";
         else if (k == L"--page" && i + 1 < argc) o.page = static_cast<int>(std::wcstol(argv[++i], nullptr, 10));
+        else if (k == L"--zoom" && i + 1 < argc) o.zoom = static_cast<float>(std::wcstod(argv[++i], nullptr));
+        else if (k == L"--maximized") o.maximized = true;
         else if (!k.empty() && k[0] != L'-') o.session = k;
     }
     if (argv) ::LocalFree(argv);
@@ -573,9 +577,14 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     std::string err;
     if (!window.create(L"HEM Digital Console", 1389, 868, true, &err)) { fatal("Could not start the GPU display: " + err + "\nUpdate your graphics driver (OpenGL 3.3 is required)."); return 3; }
     a.hwnd = static_cast<HWND>(window.nativeHandle());
-    if (opts.exitAfter <= 0.0) ::ShowWindow(a.hwnd, SW_MAXIMIZE);
+    if (opts.exitAfter <= 0.0 || opts.maximized) {
+        ::ShowWindow(a.hwnd, SW_MAXIMIZE);   // the console always opens filling the screen
+        if (opts.exitAfter <= 0.0 && a.settings.get("fullscreen", "0") == "1") window.setFullscreen(true);
+    }
 
     std::vector<U::ActionEvent> actions;
+    // view zoom: as it was last time (or --zoom)
+    a.st.zoom = std::clamp(opts.zoom > 0.0f ? opts.zoom : static_cast<float>(std::atof(a.settings.get("zoom", "1").c_str())), U::kZoomMin, U::kZoomMax);
     U::ConsoleScreen screen(a.rig, a.st, [&actions](const U::ActionEvent& e) { actions.push_back(e); });
     const fs::path assets = exeDir() / "assets";
     if (!screen.init(assets, kMsaa, &err)) { fatal("The console could not load its art: " + err + "\nReinstall the HEM Digital Console (assets: " + u8(assets) + ")."); return 3; }
@@ -614,6 +623,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     fs::path shownSession = L"?";
     bool shownDirty = false;
     int frame = 0;
+    float savedZoom = a.st.zoom;
+    auto fmtZoom = [](float z) { char b[32]; std::snprintf(b, sizeof b, "%.3f", static_cast<double>(z)); return std::string(b); };
     while (window.pump()) {
         const int fbW = window.pixelWidth(), fbH = window.pixelHeight();
         if (fbW > 0 && fbH > 0 && !window.minimized() && !screen.resize(fbW, fbH, &err)) { fatal("GPU error: " + err); break; }
@@ -623,7 +634,9 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             case ui::InputEvent::Type::RightDown: screen.rightDown(e.x, e.y); break;
             case ui::InputEvent::Type::MouseMove: screen.mouseMove(e.x, e.y, e.fine); break;
             case ui::InputEvent::Type::MouseUp: screen.mouseUp(e.x, e.y); break;
-            case ui::InputEvent::Type::Wheel: screen.wheel(e.x, e.y, e.wheel, e.fine); break;
+            case ui::InputEvent::Type::Wheel: screen.wheel(e.x, e.y, e.wheel, e.shift, e.ctrl, e.shift, e.wheelX); break;
+            case ui::InputEvent::Type::MiddleDown: screen.middleDown(e.x, e.y); break;
+            case ui::InputEvent::Type::MiddleUp: screen.middleUp(e.x, e.y); break;
             case ui::InputEvent::Type::Drop: {
                 if (e.files.size() == 1 && e.files[0].extension() == hc::console::kSessionExtension) { a.openSession(e.files[0]); break; }
                 // onto a channel's name strip: from that channel; elsewhere: the first empty channel
@@ -637,6 +650,13 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                 break;
             }
             case ui::InputEvent::Type::Key:
+                if (e.key == VK_F11) {
+                    window.setFullscreen(!window.fullscreen());
+                    a.settings.set("fullscreen", window.fullscreen() ? "1" : "0");
+                    break;
+                }
+                if (e.key == VK_ESCAPE && window.fullscreen()) { window.setFullscreen(false); a.settings.set("fullscreen", "0"); break; }
+                if (screen.key(e.key, e.ctrl)) break;
                 if (e.ctrl) {
                     if (e.key == 'S') actions.push_back({U::Act::SaveSession});
                     else if (e.key == 'O') actions.push_back({U::Act::OpenSession});
@@ -648,7 +668,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                 else if (e.key == VK_HOME) actions.push_back({U::Act::Rewind});
                 else if (e.key == VK_END) actions.push_back({U::Act::Stop});
                 else if (e.key == 'L') actions.push_back({U::Act::Loop});
-                else if (e.key >= '1' && e.key <= '6') screen.setPage(static_cast<U::PageId>(e.key - '1'));
+                else if (e.key >= '1' && e.key < '1' + U::kPageCount) screen.setPage(U::kTabOrder[static_cast<std::size_t>(e.key - '1')]);
                 break;
             case ui::InputEvent::Type::OpenFile:
                 if (!e.files.empty()) a.openSession(e.files.front());
@@ -681,6 +701,11 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                             (a.session.empty() ? std::wstring(L"untitled") : a.session.stem().wstring()) + (a.st.dirty ? L" *" : L""));
         }
         if (Clock::now() - lastAutosave > std::chrono::seconds(60)) { a.autosave(); lastAutosave = Clock::now(); }
+        if (std::fabs(screen.zoom() - savedZoom) > 1e-3f) {   // remembered between sessions
+            savedZoom = screen.zoom();
+            a.settings.set("zoom", fmtZoom(savedZoom));
+            a.settings.save();
+        }
 
         if (window.minimized()) { ::Sleep(50); continue; }
         screen.render(0);

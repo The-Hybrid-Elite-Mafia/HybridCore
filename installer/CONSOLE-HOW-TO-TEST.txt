@@ -14,12 +14,14 @@ HEM DIGITAL CONSOLE - HOW TO TEST
 
 3. PLAY
    PLAY / PAUSE, STOP, |< (back to the start), LOOP. Click or drag the long bar to jump in the song.
-   Keyboard: SPACE play/pause, HOME start, END stop, L loop, 1-6 the pages.
+   Keyboard: SPACE play/pause, HOME start, END stop, L loop, 1-7 the pages, F11 full screen (ESC leaves it).
 
 4. THE PAGES (tabs at the top)
    DESK       the 13-channel desk: TRIM, MONO, PHASE, HPF, two cue sends, 3-band EQ with the two BELL switches,
               the one-knob compressor, PAN, INSERT, BUS B, PFL, faders and meters. Right side: bus compressor,
               EXT returns, Bus B, the monitor section, the main meter and the main fader.
+   BIG DESK   the same desk, 5 channels at a time with bigger knobs. BACK / NEXT, the numbers 1-13, the Left / Right
+              arrow keys or the mouse wheel on bare plate move across all 13 channels.
    STEP EQ    the 2-channel 4-band stepped mastering EQ.
    TWIN BUS   the 2-channel bus compressor with the dynamic EQ.
    COLOUR     drive, tone EQ, HF compressor, stereo image, transformer.
@@ -32,8 +34,14 @@ HEM DIGITAL CONSOLE - HOW TO TEST
    The STEP EQ, TWIN BUS and COLOUR STAGE sit on the desk's MAIN INSERT. Light MAIN INSERT (desk, right side)
    to hear them. RACK at the top picks their order. RACK IN (desk) or RACK IN on each page takes a unit out.
 
+5b. ZOOM (everything bigger)
+   ZOOM at the top: FIT, 125 % ... 300 %. Or hold CTRL and turn the mouse wheel (zooms where the mouse is);
+   CTRL + plus / minus, CTRL + 0 = fit. While zoomed in: drag the bare plate, or use the mouse wheel away from the
+   controls (SHIFT + wheel = sideways), or hold the middle mouse button and drag. The zoom is remembered.
+   The console always opens maximized.
+
 6. KNOBS
-   Drag up / down. Hold SHIFT or CTRL for fine moves. Mouse wheel works too.
+   Drag up / down. Hold SHIFT or CTRL for fine moves. Mouse wheel works too (SHIFT + wheel = fine).
    Double-click (or right-click) a knob or fader: back to its start position.
    Hover any control to see its name and value.
 

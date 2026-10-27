@@ -16,6 +16,7 @@
 #include "hybrid/ui/Renderer.hpp"
 
 #include <array>
+#include <cstdint>
 #include <filesystem>
 #include <functional>
 #include <future>
@@ -49,7 +50,20 @@ public:
     void rightDown(float px, float py);
     void mouseMove(float px, float py, bool fine);
     void mouseUp(float px, float py);
-    void wheel(float px, float py, float notches, bool fine);
+    // Wheel: over a control it moves the control; Ctrl + wheel zooms around the mouse; elsewhere (zoomed in) it
+    // scrolls the view (Shift + wheel or a sideways wheel: across).
+    void wheel(float px, float py, float notches, bool fine, bool ctrl = false, bool shift = false, float notchesX = 0.0f);
+    // Middle-button drag moves the view (as does a left drag on bare plate while zoomed in).
+    void middleDown(float px, float py);
+    void middleUp(float px, float py);
+    // Keys the screen handles itself: Ctrl + plus / minus / 0 (zoom), Left / Right on the BIG DESK page.
+    // True if the key was used.
+    bool key(std::uint32_t virtualKey, bool ctrl);
+    // View zoom (1 = fit). Kept in AppState::zoom (the app saves it); anchored at a window pixel.
+    void setZoom(float zoom, float anchorPx, float anchorPy);
+    [[nodiscard]] float zoom() const noexcept { return zoomApplied_; }
+    // Moves the view by window pixels (no effect at zoom 1).
+    void scrollBy(float dxPx, float dyPx);
 
     void render(unsigned int targetFbo);
     void renderToCapture();
@@ -70,6 +84,8 @@ private:
         double ms = 0;
     };
     void routePlates();
+    void layoutCanvas();
+    void drawScrollbars();
     bool ensurePlate();
     void drawStatic();
     void drawFrame();
@@ -94,6 +110,11 @@ private:
     int uploadedPage_ = -1;
     bool staticDirty_ = true, haveCanvas_ = false, ready_ = false;
     double plateMs_ = 0, frameMs_ = 0;
+    int fbW_ = 0, fbH_ = 0;
+    float zoomApplied_ = 1.0f;
+    float viewX_ = 0, viewY_ = 0;            // design point at the window's top-left while zoomed in
+    bool panning_ = false, leftPan_ = false;
+    float panLastX_ = 0, panLastY_ = 0;
     struct ViewState;
     std::unique_ptr<ViewState> view_;
 };

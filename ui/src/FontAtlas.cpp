@@ -71,13 +71,13 @@ std::optional<FontSet> FontSet::load(const std::filesystem::path& dir, std::stri
     return f;
 }
 
-FontAtlas::FontAtlas(const FontAtlas& o) : fonts_(o.fonts_), styles_(o.styles_), pixels_(o.pixels_), scale_(o.scale_), size_(o.size_), valid_(o.valid_) {
+FontAtlas::FontAtlas(const FontAtlas& o) : fonts_(o.fonts_), styles_(o.styles_), pixels_(o.pixels_), scale_(o.scale_), minPx_(o.minPx_), size_(o.size_), valid_(o.valid_) {
     initInfos();
 }
 
 FontAtlas& FontAtlas::operator=(const FontAtlas& o) {
     if (this != &o) {
-        fonts_ = o.fonts_; styles_ = o.styles_; pixels_ = o.pixels_; scale_ = o.scale_; size_ = o.size_; valid_ = o.valid_;
+        fonts_ = o.fonts_; styles_ = o.styles_; pixels_ = o.pixels_; scale_ = o.scale_; minPx_ = o.minPx_; size_ = o.size_; valid_ = o.valid_;
         initInfos();
     }
     return *this;
@@ -93,11 +93,12 @@ bool FontAtlas::initInfos() {
     return true;
 }
 
-bool FontAtlas::bake(const FontSet& fonts, float canvasScale) {
+bool FontAtlas::bake(const FontSet& fonts, float canvasScale, float minPixels) {
     valid_ = false;
     if (!(canvasScale > 0.0f)) return false;
     fonts_ = fonts;
     scale_ = canvasScale;
+    minPx_ = std::max(6.0f, minPixels);
     if (!initInfos()) return false;
     for (std::uint32_t size : {512u, 1024u, 2048u, 4096u})
         if (bakeAt(size)) { valid_ = true; return true; }
@@ -114,7 +115,7 @@ bool FontAtlas::bakeAt(std::uint32_t atlas) {
     bool ok = true;
     for (std::size_t s = 0; s < kTextStyleCount && ok; ++s) {
         const TextStyleSpec& spec = kTextStyles[s];
-        const float px = std::max(6.0f, spec.em * scale_);
+        const float px = s == static_cast<std::size_t>(TextStyle::Micro) ? std::max(9.0f, spec.em * scale_) : std::max(minPx_, spec.em * scale_);
         stbtt_PackSetOversampling(&pc, px < 24.0f ? 2 : 1, 1);
         const std::uint32_t count = spec.latin1 ? kLatin1Count : kAsciiCount;
         packed[s].assign(count, stbtt_packedchar{});

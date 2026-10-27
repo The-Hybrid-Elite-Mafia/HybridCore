@@ -142,37 +142,41 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Configure (no ASIO - safe to share)
+      - name: Steinberg ASIO SDK (from Steinberg, SHA-512 checked; used under its GPLv3 option, never committed)
         run: |
-          tools\ci\run-and-report.ps1 -Title "console: configure" -Exe cmake -ArgList '--preset','rig-public'
+          tools\ci\run-and-report.ps1 -Title "console: asio sdk" -Exe pwsh -ArgList '-NoProfile','-File','tools\fetch-asio-sdk.ps1'
+
+      - name: Configure (ASIO + WASAPI)
+        run: |
+          tools\ci\run-and-report.ps1 -Title "console: configure" -Exe cmake -ArgList '--preset','rig-asio'
 
       - name: Build the console app, snapshot tool, tests
         run: |
-          tools\ci\run-and-report.ps1 -Title "console: build" -Exe cmake -ArgList '--build','--preset','rig-public-release','--target','HEMDigitalConsole','hem_console_snapshot','hc_tests','hc_device_probe' -WarningSummary
+          tools\ci\run-and-report.ps1 -Title "console: build" -Exe cmake -ArgList '--build','--preset','rig-asio-release','--target','HEMDigitalConsole','hem_console_snapshot','hc_tests','hc_device_probe' -WarningSummary
 
       - name: Unit tests (whole suite)
         run: |
-          tools\ci\publish-console-report.ps1 -Exe build\rig-public\tests\Release\hc_tests.exe
+          tools\ci\publish-console-report.ps1 -Exe build\rig-asio\tests\Release\hc_tests.exe
 
       - name: Software OpenGL (Mesa llvmpipe, CI only, not shipped)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tools\ci\run-and-report.ps1 -Title "console: fetch mesa" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\fetch-mesa.ps1','-TargetDirs','build\rig-public\console\app\Release'
+          tools\ci\run-and-report.ps1 -Title "console: fetch mesa" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\fetch-mesa.ps1','-TargetDirs','build\rig-asio\console\app\Release'
 
-      - name: Every faceplate, live rig, 3840x2160 + 1389x868
+      - name: Every faceplate, live rig, 3840x2160 + 1920x1080 + 1389x868
         env:
           GALLIUM_DRIVER: llvmpipe
         run: |
-          tools\ci\run-and-report.ps1 -Title "console: snapshots" -Exe .\build\rig-public\console\app\Release\hem_console_snapshot.exe -ArgList '--out','console-shots','--sizes','3840x2160,1389x868','--seconds','6'
+          tools\ci\run-and-report.ps1 -Title "console: snapshots" -Exe .\build\rig-asio\console\app\Release\hem_console_snapshot.exe -ArgList '--out','console-shots','--sizes','3840x2160,1920x1080,1389x868','--seconds','6'
 
       - name: Start the real app and capture its window
         env:
           GALLIUM_DRIVER: llvmpipe
         run: |
-          tools\ci\run-and-report.ps1 -Title "console: app smoke run" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\run-console-smoke.ps1','-Exe','build\rig-public\console\app\Release\HEMDigitalConsole.exe','-Shot','console-shots\app_window.png'
+          tools\ci\run-and-report.ps1 -Title "console: app smoke run" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\run-console-smoke.ps1','-Exe','build\rig-asio\console\app\Release\HEMDigitalConsole.exe','-Shot','console-shots\app_window.png'
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          tools\ci\run-and-report.ps1 -Title "console: app opens a session from the command line" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\run-console-smoke.ps1','-Exe','build\rig-public\console\app\Release\HEMDigitalConsole.exe','-Shot','console-shots\app_session.png','-StemsDir','tests\data','-Page','4'
+          tools\ci\run-and-report.ps1 -Title "console: app opens a session from the command line" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\run-console-smoke.ps1','-Exe','build\rig-asio\console\app\Release\HEMDigitalConsole.exe','-Shot','console-shots\app_session.png','-StemsDir','tests\data','-Page','4'
 
       - name: Publish screenshots to the console-screenshots branch
         if: always()
@@ -193,6 +197,10 @@ jobs:
           GALLIUM_DRIVER: llvmpipe
         run: |
           tools\ci\run-and-report.ps1 -Title "console: installer verify" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\verify-console-installer.ps1','-Installer',"$env:HEM_CONSOLE_INSTALLER"
+
+      - name: Source code of this build, as the GPL asks (with the ASIO SDK as built)
+        run: |
+          tools\ci\run-and-report.ps1 -Title "console: source zip" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\make-console-source-zip.ps1'
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v5

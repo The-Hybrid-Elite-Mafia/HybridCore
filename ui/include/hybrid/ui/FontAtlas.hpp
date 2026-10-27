@@ -33,8 +33,9 @@ enum class TextStyle : std::uint8_t {
     Status,       // bottom bar
     Display,      // big neon digits in the glass display
     DisplayCap,   // captions in the glass display
+    Micro,        // last resort when a word does not fit a control even at the minimum size (never below 9 px)
 };
-inline constexpr std::size_t kTextStyleCount = 12;
+inline constexpr std::size_t kTextStyleCount = 13;
 
 struct TextStyleSpec {
     Face  face;
@@ -54,6 +55,7 @@ inline constexpr std::array<TextStyleSpec, kTextStyleCount> kTextStyles{{
     {Face::Medium, 32.0f, true},      // Status
     {Face::Bold, 96.0f, false},       // Display
     {Face::SemiBold, 26.0f, false},   // DisplayCap
+    {Face::SemiBold, 20.0f, true},    // Micro
 }};
 
 struct FontSet {
@@ -75,7 +77,9 @@ public:
 
     // Bakes every style at em × canvasScale pixels into the smallest square atlas (512..4096)
     // that fits. Returns false if a font can't be parsed or nothing fits.
-    bool bake(const FontSet& fonts, float canvasScale);
+    // minPixels: no style is baked smaller than this many screen pixels (small windows keep readable text;
+    // the text then takes more design units, and measure() reports that, so fitting code still works).
+    bool bake(const FontSet& fonts, float canvasScale, float minPixels = 6.0f);
 
     [[nodiscard]] float measure(TextStyle style, std::string_view utf8) const;   // design units
     [[nodiscard]] float capHeight(TextStyle style) const noexcept;                // design units
@@ -108,6 +112,7 @@ private:
     std::array<StyleData, kTextStyleCount>         styles_;
     std::vector<std::uint8_t>                      pixels_;
     float         scale_ = 1.0f;
+    float         minPx_ = 6.0f;
     std::uint32_t size_  = 0;
     bool          valid_ = false;
 };

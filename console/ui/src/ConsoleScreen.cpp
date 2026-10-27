@@ -30,7 +30,7 @@ std::string fmt(const char* f, double v) {
 }
 std::string lufsText(double v) { return v <= -143.0 ? std::string("--") : fmt("%.1f", v); }
 
-constexpr TextStyle kLadder[] = {TextStyle::Caption, TextStyle::Value, TextStyle::Label, TextStyle::Title, TextStyle::Tab,
+constexpr TextStyle kLadder[] = {TextStyle::Micro, TextStyle::Caption, TextStyle::Value, TextStyle::Label, TextStyle::Title, TextStyle::Tab,
                                  TextStyle::Panel,   TextStyle::Heading, TextStyle::Display};
 // The largest style no larger than `base` that fits `width`.
 TextStyle fitStyle(const Renderer& r, TextStyle base, std::string_view text, float width) {
@@ -89,25 +89,73 @@ void ConsoleScreen::shutdown() noexcept {
 
 bool ConsoleScreen::resize(int w, int h, std::string* error) {
     if (!ready_ || w <= 0 || h <= 0) return false;
+    if (w != fbW_ || h != fbH_) {
+        fbW_ = w; fbH_ = h;
+        if (!renderer_.setTargetSize(w, h, error)) return false;
+    }
+    if (std::fabs(app_.zoom - zoomApplied_) > 1e-4f) {   // the ZOOM selector (or the app) changed it: keep the centre
+        const float cx = haveCanvas_ ? canvas_.toDesignX(static_cast<float>(w) * 0.5f) : kWidth * 0.5f;
+        const float cy = haveCanvas_ ? canvas_.toDesignY(static_cast<float>(h) * 0.5f) : kHeight * 0.5f;
+        const float fit = std::min(static_cast<float>(w) / kWidth, static_cast<float>(h) / kHeight);
+        const float maxZ = std::max(kZoomMin, std::min(kZoomMax, 1.0f / fit));
+        zoomApplied_ = std::clamp(app_.zoom, kZoomMin, maxZ);
+        app_.zoom = zoomApplied_;
+        const float sc = fit * zoomApplied_;
+        viewX_ = cx - static_cast<float>(w) * 0.5f / sc;
+        viewY_ = cy - static_cast<float>(h) * 0.5f / sc;
+    }
+    layoutCanvas();
+    if (std::fabs(fontScale_ - canvas_.scale) > 1e-4f) {
+        if (!font_.bake(fonts_, canvas_.scale, kMinTextPx)) { if (error) *error = "could not bake the Poppins atlas"; return false; }
+        if (!renderer_.setFont(font_, error)) return false;
+        fontScale_ = canvas_.scale;
+        staticDirty_ = true;
+    }
+    const float bucket = plateBucket(canvas_.scale);
+    if (bucket != plateBucket_) { plateBucket_ = bucket; routePlates(); }
+    return true;
+}
+
+// Canvas from the window size, the zoom and the view position (letterboxed and centred when everything fits).
+void ConsoleScreen::layoutCanvas() {
+    const float w = static_cast<float>(fbW_), h = static_cast<float>(fbH_);
+    const float fit = std::min(w / kWidth, h / kHeight);
+    const float maxZ = std::max(kZoomMin, std::min(kZoomMax, 1.0f / fit));
+    zoomApplied_ = std::clamp(zoomApplied_, kZoomMin, maxZ);
+    app_.zoom = zoomApplied_;
     Canvas c;
-    c.scale = std::min(static_cast<float>(w) / kWidth, static_cast<float>(h) / kHeight);
-    c.offsetX = std::round((static_cast<float>(w) - kWidth * c.scale) * 0.5f);
-    c.offsetY = std::round((static_cast<float>(h) - kHeight * c.scale) * 0.5f);
-    c.pixelW = static_cast<float>(w);
-    c.pixelH = static_cast<float>(h);
-    if (haveCanvas_ && c == canvas_) return true;
+    c.scale = fit * zoomApplied_;
+    if (kWidth * c.scale <= w + 0.5f) { viewX_ = 0; c.offsetX = std::round((w - kWidth * c.scale) * 0.5f); }
+    else { viewX_ = std::clamp(viewX_, 0.0f, kWidth - w / c.scale); c.offsetX = std::round(-viewX_ * c.scale); }
+    if (kHeight * c.scale <= h + 0.5f) { viewY_ = 0; c.offsetY = std::round((h - kHeight * c.scale) * 0.5f); }
+    else { viewY_ = std::clamp(viewY_, 0.0f, kHeight - h / c.scale); c.offsetY = std::round(-viewY_ * c.scale); }
+    c.pixelW = w;
+    c.pixelH = h;
+    if (haveCanvas_ && c == canvas_) return;
     canvas_ = c;
     haveCanvas_ = true;
-    if (!renderer_.setTargetSize(w, h, error)) return false;
-    if (std::fabs(fontScale_ - c.scale) > 1e-4f) {
-        if (!font_.bake(fonts_, c.scale)) { if (error) *error = "could not bake the Poppins atlas"; return false; }
-        if (!renderer_.setFont(font_, error)) return false;
-        fontScale_ = c.scale;
-    }
-    const float bucket = plateBucket(c.scale);
-    if (bucket != plateBucket_) { plateBucket_ = bucket; routePlates(); }
     staticDirty_ = true;
-    return true;
+}
+
+void ConsoleScreen::setZoom(float z, float ax, float ay) {
+    if (fbW_ <= 0 || !haveCanvas_) { app_.zoom = z; return; }
+    const float dx = canvas_.toDesignX(ax), dy = canvas_.toDesignY(ay);
+    const float fit = std::min(static_cast<float>(fbW_) / kWidth, static_cast<float>(fbH_) / kHeight);
+    const float maxZ = std::max(kZoomMin, std::min(kZoomMax, 1.0f / fit));
+    zoomApplied_ = std::clamp(z, kZoomMin, maxZ);
+    app_.zoom = zoomApplied_;
+    const float sc = fit * zoomApplied_;
+    viewX_ = dx - ax / sc;
+    viewY_ = dy - ay / sc;
+    std::string err;
+    (void)resize(fbW_, fbH_, &err);
+}
+
+void ConsoleScreen::scrollBy(float dxPx, float dyPx) {
+    if (!haveCanvas_) return;
+    viewX_ += dxPx / canvas_.scale;
+    viewY_ += dyPx / canvas_.scale;
+    layoutCanvas();
 }
 
 void ConsoleScreen::routePlates() {
@@ -157,6 +205,7 @@ void ConsoleScreen::setPage(PageId p) {
 
 void ConsoleScreen::handle(const ActionEvent& e) {
     if (e.act == Act::Page) setPage(static_cast<PageId>(std::clamp(e.arg, 0, kPageCount - 1)));
+    if (e.act == Act::BigNav) app_.bigFirst = e.arg >= 100 ? bigDeskFirst(app_.bigFirst, 0, e.arg - 100) : bigDeskFirst(app_.bigFirst, e.arg);
     if (e.act == Act::EditTool) {
         app_.toolTarget = e.arg;
         setPage(PageId::Tools);
@@ -164,11 +213,59 @@ void ConsoleScreen::handle(const ActionEvent& e) {
     if (onAction_) onAction_(e);
 }
 
-void ConsoleScreen::mouseDown(float px, float py, bool dbl, bool fine) { controller_.mouseDown(toX(px), toY(py), dbl, fine); }
+void ConsoleScreen::mouseDown(float px, float py, bool dbl, bool fine) {
+    const bool zoomed = canvas_.scale * kWidth > static_cast<float>(fbW_) + 0.5f || canvas_.scale * kHeight > static_cast<float>(fbH_) + 0.5f;
+    if (zoomed && controller_.hit(toX(px), toY(py)) < 0) {   // bare plate: grab it and move the view
+        panning_ = leftPan_ = true;
+        panLastX_ = px; panLastY_ = py;
+        return;
+    }
+    controller_.mouseDown(toX(px), toY(py), dbl, fine);
+}
 void ConsoleScreen::rightDown(float px, float py) { controller_.rightDown(toX(px), toY(py)); }
-void ConsoleScreen::mouseMove(float px, float py, bool fine) { controller_.mouseMove(toX(px), toY(py), fine); }
-void ConsoleScreen::mouseUp(float px, float py) { controller_.mouseUp(toX(px), toY(py)); }
-void ConsoleScreen::wheel(float px, float py, float n, bool fine) { controller_.wheel(toX(px), toY(py), n, fine); }
+void ConsoleScreen::mouseMove(float px, float py, bool fine) {
+    if (panning_) {
+        scrollBy(panLastX_ - px, panLastY_ - py);
+        panLastX_ = px; panLastY_ = py;
+        return;
+    }
+    controller_.mouseMove(toX(px), toY(py), fine);
+}
+void ConsoleScreen::mouseUp(float px, float py) {
+    if (panning_ && leftPan_) { panning_ = leftPan_ = false; return; }
+    controller_.mouseUp(toX(px), toY(py));
+}
+void ConsoleScreen::middleDown(float px, float py) { panning_ = true; leftPan_ = false; panLastX_ = px; panLastY_ = py; }
+void ConsoleScreen::middleUp(float, float) { if (!leftPan_) panning_ = false; }
+void ConsoleScreen::wheel(float px, float py, float n, bool fine, bool ctrl, bool shift, float nx) {
+    if (ctrl && n != 0.0f) { setZoom(zoomApplied_ * std::pow(1.1f, n), px, py); return; }
+    const float stepPx = 0.12f * static_cast<float>(std::max(fbW_, fbH_));
+    if (nx != 0.0f) { scrollBy(nx * stepPx, 0); return; }
+    if (n == 0.0f) return;
+    if (controller_.wheel(toX(px), toY(py), n, fine)) return;
+    const bool zoomed = canvas_.scale * kWidth > static_cast<float>(fbW_) + 0.5f || canvas_.scale * kHeight > static_cast<float>(fbH_) + 0.5f;
+    if (zoomed) {
+        if (shift) scrollBy(-n * stepPx, 0);
+        else scrollBy(0, -n * stepPx);
+    } else if (page_ == PageId::DeskBig) {
+        app_.bigFirst = bigDeskFirst(app_.bigFirst, n > 0 ? -1 : 1);   // the wheel on bare plate moves along the desk
+    }
+}
+bool ConsoleScreen::key(std::uint32_t vk, bool ctrl) {
+    constexpr std::uint32_t kLeft = 0x25, kRight = 0x27, kPlus = 0xBB, kMinus = 0xBD, kAdd = 0x6B, kSub = 0x6D, kNum0 = 0x60;
+    const float cx = static_cast<float>(fbW_) * 0.5f, cy = static_cast<float>(fbH_) * 0.5f;
+    if (ctrl) {
+        if (vk == kPlus || vk == kAdd) { setZoom(zoomApplied_ * 1.25f, cx, cy); return true; }
+        if (vk == kMinus || vk == kSub) { setZoom(zoomApplied_ / 1.25f, cx, cy); return true; }
+        if (vk == '0' || vk == kNum0) { setZoom(1.0f, cx, cy); return true; }
+        return false;
+    }
+    if (page_ == PageId::DeskBig && (vk == kLeft || vk == kRight)) {
+        app_.bigFirst = bigDeskFirst(app_.bigFirst, vk == kLeft ? -1 : 1);
+        return true;
+    }
+    return false;
+}
 
 // =====================================================================================================
 //  STATIC LAYER: plate, section titles, engraving, captions
@@ -280,16 +377,17 @@ struct Draw {
         if (!ascii(text) && base == TextStyle::Caption) base = TextStyle::Value;   // Ø needs a Latin-1 face
         TextStyle st = fitStyle(r, base, text, maxW);
         if (!ascii(text) && st == TextStyle::Caption) st = TextStyle::Value;
+        const std::string shown = shorten(r, st, text, maxW);
         const Rect in = pressed ? b.offset(1.5f, 1.5f) : b;
         if (lit) {
             r.glow(in.inset(4), 10, 12.0f, colour.withAlpha(0.40f), true);
             r.fillRound(in.inset(2), 10, colour.withAlpha(0.92f), Blend::Over, true);
             r.fillRound({in.x + 8, in.y + 5, in.w - 16, in.h * 0.35f}, 8, {1, 1, 1, 0.16f}, Blend::Add);
-            r.text(st, text, in.cx(), in.cy() + r.capHeight(st) * 0.5f, rgb8(0x0A0812), Align::Center, TextFx::Plain);
+            r.text(st, shown, in.cx(), in.cy() + r.capHeight(st) * 0.5f, rgb8(0x0A0812), Align::Center, TextFx::Plain);
         } else {
             r.fillRound(in.inset(2), 10, kGlass, Blend::Over);
             r.fillRound({in.x + 4, in.y + 3, in.w - 8, 3}, 1.5f, colour.withAlpha(hot ? 0.85f : 0.40f), Blend::Over, true);
-            r.text(st, text, in.cx(), in.cy() + r.capHeight(st) * 0.5f, dim ? C::dim : hot ? C::text : rgb8(0xC8C4D8), Align::Center, TextFx::Shadowed);
+            r.text(st, shown, in.cx(), in.cy() + r.capHeight(st) * 0.5f, dim ? C::dim : hot ? C::text : rgb8(0xC8C4D8), Align::Center, TextFx::Shadowed);
         }
     }
 
@@ -410,8 +508,8 @@ void ConsoleScreen::drawFrame() {
         }
         case Kind::Fader: d.fader(w, hot); break;
         case Kind::Selector: {
-            const std::string v = widgetValueText(w);
-            const std::string s = w.r.w >= 300 ? w.label + "   " + v : v;
+            const std::string v = w.text ? w.text() : widgetValueText(w);
+            const std::string s = w.r.w >= 300 && !w.label.empty() && !w.text ? w.label + "   " + v : v;
             r.fillRound(w.r.inset(2), 12, kGlass, Blend::Over);
             if (hot) r.fillRound({w.r.x + 4, w.r.y + 3, w.r.w - 8, 3}, 1.5f, C::violet.withAlpha(0.85f), Blend::Over, true);
             const bool arrows = w.r.w >= 160;   // small windows (desk TOOL) give the room to the text
@@ -441,7 +539,8 @@ void ConsoleScreen::drawFrame() {
         case Kind::Custom: {
             switch (w.custom) {
             case CustomId::StemName: {
-                const auto& st = app_.stems[static_cast<std::size_t>(std::clamp(w.customArg, 0, kStemSlots - 1))];
+                const int slot = widgetArg(w);
+                const auto& st = app_.stems[static_cast<std::size_t>(std::clamp(slot, 0, kStemSlots - 1))];
                 r.fillRound(w.r.inset(2), 10, kGlass, Blend::Over);
                 if (hot) r.fillRound({w.r.x + 4, w.r.y + 3, w.r.w - 8, 3}, 1.5f, C::violet.withAlpha(0.85f), Blend::Over, true);
                 const float lh = w.r.h * 0.5f;
@@ -450,8 +549,8 @@ void ConsoleScreen::drawFrame() {
                     const Rect pb{w.r.x + 12, w.r.y + lh + 8, (w.r.w - 24) * std::clamp(st.progress, 0.0f, 1.0f), 10};
                     r.fillRound(pb, 5, C::amber, Blend::Over, true);
                 } else if (st.name.empty()) {
-                    const char* t = w.customArg == kExt1Slot ? "EXT 1: LOAD" : w.customArg == kExt2Slot ? "EXT 2: LOAD" : "LOAD";
-                    r.text(TextStyle::Caption, st.error.empty() ? t : "CAN'T LOAD", w.r.cx(), w.r.cy() + 9, st.error.empty() ? C::dim : C::red, Align::Center, TextFx::Shadowed);
+                    const char* t = slot == kExt1Slot ? "EXT 1: LOAD" : slot == kExt2Slot ? "EXT 2: LOAD" : "LOAD";
+                    r.text(TextStyle::Caption, shorten(r, TextStyle::Caption, st.error.empty() ? t : "CAN'T LOAD", w.r.w - 16), w.r.cx(), w.r.cy() + 9, st.error.empty() ? C::dim : C::red, Align::Center, TextFx::Shadowed);
                 } else {
                     const std::string n = shorten(r, TextStyle::Caption, st.name, w.r.w - 16);
                     r.text(TextStyle::Caption, n, w.r.cx(), w.r.y + lh * 0.5f + 12, C::text, Align::Center, TextFx::Shadowed);
@@ -653,6 +752,8 @@ void ConsoleScreen::drawFrame() {
         }
     }
 
+    drawScrollbars();
+
     // value bubble for the control under the mouse
     const int show = active >= 0 ? active : hover;
     if (show >= 0 && show < static_cast<int>(pg.widgets.size())) {
@@ -670,6 +771,26 @@ void ConsoleScreen::drawFrame() {
             r.fillRound({x + 6, y + 4, tw - 12, 3}, 1.5f, C::violet, Blend::Over, true);
             r.text(st, s, x + tw * 0.5f, y + th * 0.5f + r.capHeight(st) * 0.5f, C::text, Align::Center, TextFx::Plain);
         }
+    }
+}
+
+// Zoomed in: thin bars on the window edges show which part of the faceplate is on screen.
+void ConsoleScreen::drawScrollbars() {
+    Renderer& r = renderer_;
+    const float s = canvas_.scale, W = static_cast<float>(fbW_), H = static_cast<float>(fbH_);
+    const float th = 7.0f / s, pad = 4.0f / s;
+    const float left = canvas_.toDesignX(0), right = canvas_.toDesignX(W), top = canvas_.toDesignY(0), bottom = canvas_.toDesignY(H);
+    if (kWidth * s > W + 0.5f) {
+        const float y = bottom - th - pad;
+        r.fillRound({left + pad, y, right - left - 2 * pad, th}, th * 0.5f, rgb8(0x000000, 0.55f), Blend::Over);
+        const float a = left + pad + (right - left - 2 * pad) * (left / kWidth), len = (right - left - 2 * pad) * ((right - left) / kWidth);
+        r.fillRound({a, y, len, th}, th * 0.5f, C::violet.withAlpha(0.85f), Blend::Over, true);
+    }
+    if (kHeight * s > H + 0.5f) {
+        const float x = right - th - pad;
+        r.fillRound({x, top + pad, th, bottom - top - 2 * pad}, th * 0.5f, rgb8(0x000000, 0.55f), Blend::Over);
+        const float a = top + pad + (bottom - top - 2 * pad) * (top / kHeight), len = (bottom - top - 2 * pad) * ((bottom - top) / kHeight);
+        r.fillRound({x, a, th, len}, th * 0.5f, C::violet.withAlpha(0.85f), Blend::Over, true);
     }
 }
 

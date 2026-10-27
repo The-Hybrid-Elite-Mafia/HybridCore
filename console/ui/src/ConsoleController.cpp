@@ -79,7 +79,7 @@ void Controller::mouseDown(float x, float y, bool doubleClick, bool fine) {
         if (emit_) emit_({Act::Seek, 0, std::clamp((x - w.r.x) / w.r.w, 0.0f, 1.0f)});
         break;
     case Kind::Custom:
-        if (w.custom == CustomId::StemName && emit_) emit_({Act::LoadSlot, w.customArg, 0});
+        if (w.custom == CustomId::StemName && emit_) emit_({Act::LoadSlot, widgetArg(w), 0});
         active_ = -1;
         break;
     default: break;
@@ -91,7 +91,7 @@ void Controller::rightDown(float x, float y) {
     if (i < 0) return;
     const Widget& w = page_->widgets[static_cast<std::size_t>(i)];
     if (w.kind == Kind::Selector) step(w, -1);
-    else if (w.kind == Kind::Custom && w.custom == CustomId::StemName && emit_) emit_({Act::ClearSlot, w.customArg, 0});
+    else if (w.kind == Kind::Custom && w.custom == CustomId::StemName && emit_) emit_({Act::ClearSlot, widgetArg(w), 0});
     else if ((w.kind == Kind::Knob || w.kind == Kind::Stepped || w.kind == Kind::Fader) && w.ctl.valid()) w.ctl.set(w.ctl.info->def);
 }
 
@@ -128,23 +128,24 @@ void Controller::mouseMove(float x, float y, bool fine) {
 void Controller::mouseUp(float x, float y) {
     if (active_ >= 0) {
         const Widget& w = page_->widgets[static_cast<std::size_t>(active_)];
-        if (w.kind == Kind::Button && hit(x, y) == active_ && emit_) emit_({w.act, w.arg, 0});
+        if (w.kind == Kind::Button && hit(x, y) == active_ && emit_) emit_({w.act, widgetArg(w), 0});
     }
     active_ = -1;
     hover_ = hit(x, y);
 }
 
-void Controller::wheel(float x, float y, float notches, bool fine) {
+bool Controller::wheel(float x, float y, float notches, bool fine) {
     const int i = hit(x, y);
-    if (i < 0) return;
+    if (i < 0) return false;
     const Widget& w = page_->widgets[static_cast<std::size_t>(i)];
-    if (!w.ctl.valid()) return;
+    if (!w.ctl.valid()) return true;
     const int dir = notches > 0 ? 1 : -1;
     if (w.kind == Kind::Stepped || w.kind == Kind::Selector || w.ctl.info->taper == fx::Taper::Choice) {
         for (int k = 0; k < static_cast<int>(std::max(1.0f, std::fabs(notches))); ++k) step(w, dir);
     } else if (w.kind == Kind::Knob || w.kind == Kind::Fader) {
         widgetSetNorm(w, widgetNorm(w) + notches * (fine ? 0.005f : 0.025f));
     }
+    return true;
 }
 
 } // namespace hc::console::ui

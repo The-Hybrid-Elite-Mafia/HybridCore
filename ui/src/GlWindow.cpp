@@ -37,6 +37,9 @@ struct GlWindow::Impl {
     std::vector<InputEvent> events;
     gl::PFN_wglSwapIntervalEXT swapInterval = nullptr;
     bool                    child = false;
+    bool                    full = false;
+    WINDOWPLACEMENT         placement{sizeof(WINDOWPLACEMENT)};
+    LONG_PTR                savedStyle = 0;
     std::function<void()>   onTimer;
     HDC                     prevDc = nullptr;
     HGLRC                   prevRc = nullptr;
@@ -57,6 +60,8 @@ struct GlWindow::Impl {
     LRESULT handle(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         InputEvent e;
         e.fine = fineKeys();
+        e.ctrl = (::GetKeyState(VK_CONTROL) & 0x8000) != 0;
+        e.shift = (::GetKeyState(VK_SHIFT) & 0x8000) != 0;
         switch (msg) {
         case WM_CLOSE:
             closed = true;
@@ -117,10 +122,33 @@ struct GlWindow::Impl {
             events.push_back(e);
             return 0;
         }
+        case WM_MOUSEHWHEEL: {
+            POINT pt{GET_X_LPARAM(lp), GET_Y_LPARAM(lp)};
+            ::ScreenToClient(h, &pt);
+            e.type   = InputEvent::Type::Wheel;
+            e.x      = static_cast<float>(pt.x);
+            e.y      = static_cast<float>(pt.y);
+            e.wheelX = static_cast<float>(GET_WHEEL_DELTA_WPARAM(wp)) / WHEEL_DELTA;
+            events.push_back(e);
+            return 0;
+        }
+        case WM_MBUTTONDOWN:
+            ::SetCapture(h);
+            e.type = InputEvent::Type::MiddleDown;
+            e.x = static_cast<float>(GET_X_LPARAM(lp));
+            e.y = static_cast<float>(GET_Y_LPARAM(lp));
+            events.push_back(e);
+            return 0;
+        case WM_MBUTTONUP:
+            if (!mouseDown) ::ReleaseCapture();
+            e.type = InputEvent::Type::MiddleUp;
+            e.x = static_cast<float>(GET_X_LPARAM(lp));
+            e.y = static_cast<float>(GET_Y_LPARAM(lp));
+            events.push_back(e);
+            return 0;
         case WM_KEYDOWN:
             e.type = InputEvent::Type::Key;
             e.key  = static_cast<std::uint32_t>(wp);
-            e.ctrl = (::GetKeyState(VK_CONTROL) & 0x8000) != 0;
             events.push_back(e);
             return 0;
         case WM_RBUTTONDOWN:
@@ -386,6 +414,27 @@ void GlWindow::swap() noexcept { if (impl_->hdc) ::SwapBuffers(impl_->hdc); }
 void GlWindow::setVsync(bool on) noexcept { if (impl_->swapInterval) impl_->swapInterval(on ? 1 : 0); }
 const wchar_t* GlWindow::className() noexcept { return kClassName; }
 void GlWindow::setTitle(const std::wstring& t) noexcept { if (impl_->hwnd) ::SetWindowTextW(impl_->hwnd, t.c_str()); }
+
+void GlWindow::setFullscreen(bool on) noexcept {
+    Impl& d = *impl_;
+    if (!d.hwnd || d.child || on == d.full) return;
+    if (on) {
+        MONITORINFO mi{};
+        mi.cbSize = sizeof(mi);
+        if (!::GetWindowPlacement(d.hwnd, &d.placement) || !::GetMonitorInfoW(::MonitorFromWindow(d.hwnd, MONITOR_DEFAULTTONEAREST), &mi)) return;
+        d.savedStyle = ::GetWindowLongPtrW(d.hwnd, GWL_STYLE);
+        ::SetWindowLongPtrW(d.hwnd, GWL_STYLE, (d.savedStyle & ~static_cast<LONG_PTR>(WS_OVERLAPPEDWINDOW)) | WS_POPUP | WS_VISIBLE);
+        const RECT& r = mi.rcMonitor;
+        ::SetWindowPos(d.hwnd, HWND_TOP, r.left, r.top, r.right - r.left, r.bottom - r.top, SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+    } else {
+        ::SetWindowLongPtrW(d.hwnd, GWL_STYLE, d.savedStyle);
+        ::SetWindowPlacement(d.hwnd, &d.placement);
+        ::SetWindowPos(d.hwnd, nullptr, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+    }
+    d.full = on;
+    d.events.push_back({InputEvent::Type::Resize});
+}
+bool GlWindow::fullscreen() const noexcept { return impl_->full; }
 
 int GlWindow::pixelWidth() const noexcept {
     RECT r{};
