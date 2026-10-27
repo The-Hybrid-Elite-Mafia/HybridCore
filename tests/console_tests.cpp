@@ -11,6 +11,7 @@
 #include "hybrid/console/FrontTools.hpp"
 #include "hybrid/console/MeterBridge.hpp"
 #include "hybrid/console/StepEq.hpp"
+#include "hybrid/console/StepEqSe.hpp"
 #include "hybrid/console/StudioDesk.hpp"
 #include "hybrid/console/TwinBus.hpp"
 
@@ -24,6 +25,7 @@
 #include <memory>
 #include <numbers>
 #include <string>
+#include <tuple>
 #include <vector>
 
 namespace hc::test {
@@ -472,6 +474,146 @@ void testConsoleStepEq() {
         AllocScope scope;
         for (int it = 0; it < 200; ++it) { eq->set(I::id(it & 1, I::HiGain), static_cast<float>(it % 11)); eq->process(l.data(), r.data(), 256); }
         std::printf("  step EQ audio path, 200 blocks, knobs moving: %llu heap allocations\n", static_cast<unsigned long long>(scope.count()));
+        CHECK(scope.count() == 0);
+    }
+}
+
+// =================================================================================================
+void testConsoleStepEqSe() {
+    std::printf("[console: HEM STEP EQ SE (special-edition model)]\n");
+    namespace I = stepeqse_ids;
+    namespace Sp = spec::stepeqse;
+    auto eq = makeStepEqSe();
+    eq->prepare(kFs, 512);
+    Proc p = [&](float* l, float* r, std::uint32_t n) { eq->process(l, r, n); };
+    auto setBand = [&](int ch, int fp, int fi, int gp, int gi) { eq->setDefaults(); eq->set(I::id(ch, fp), static_cast<float>(fi)); eq->set(I::id(ch, gp), static_cast<float>(gi)); eq->reset(); };
+    // every band, every one of the 8 frequencies, +12 dB: measured at the marked frequency (40 kHz: at 20 kHz vs the analogue curve)
+    struct B { const char* name; int fp, gp; const float* hz; };
+    const B bands[] = {{"LO", I::LoFreq, I::LoGain, Sp::kLoHz.data()}, {"LO-MID", I::LoMidFreq, I::LoMidGain, Sp::kLoMidHz.data()},
+                       {"HI-MID", I::HiMidFreq, I::HiMidGain, Sp::kHiMidHz.data()}, {"HI", I::HiFreq, I::HiGain, Sp::kHiHz.data()}};
+    for (int bi = 0; bi < 4; ++bi) {
+        const auto& b = bands[bi];
+        std::string line;
+        for (int f = 0; f < 8; ++f) {
+            setBand(0, b.fp, f, b.gp, 20);
+            const double at = std::min(static_cast<double>(b.hz[f]), 20000.0);
+            const double g = gainDb(p, at), want = stepEqSeAnalogDb(bi, f, 20, false, at);
+            char t[64]; std::snprintf(t, sizeof t, " %g:%+.2f", static_cast<double>(b.hz[f]), g); line += t;
+            if (b.hz[f] > 20000.0f) { std::snprintf(t, sizeof t, "(@20k, analogue %+.2f)", want); line += t; }
+            CHECK(std::fabs(g - want) < 0.3);
+        }
+        std::printf("  %-6s +12 dB at each marked freq (Hz:dB):%s\n", b.name, line.c_str());
+    }
+    // all 21 steps at 3 kHz
+    {
+        std::string line;
+        double worst = 0;
+        for (int gi = 0; gi < 21; ++gi) {
+            setBand(0, I::HiMidFreq, 2, I::HiMidGain, gi);
+            const double g = gainDb(p, 3000);
+            char t[24]; std::snprintf(t, sizeof t, " %+.2f", g); line += t;
+            worst = std::max(worst, std::fabs(g - Sp::kGainDb[static_cast<std::size_t>(gi)]));
+        }
+        std::printf("  21 gain steps at 3 kHz (spec -12 -9 -6 -5 -4 -3 -2 -1.5 -1 -.5 0 +.5 +1 +1.5 +2 +3 +4 +5 +6 +9 +12):%s; worst error %.3f dB\n", line.c_str(), worst);
+        CHECK(worst < 0.1);
+    }
+    // the digital designs against the analogue curves, every band / freq / gain / shelf, 20 Hz .. 20 kHz
+    for (double fs : {44100.0, 48000.0, 96000.0}) {
+        double worst = 0; int fitted = 0, total = 0;
+        for (int b = 0; b < 4; ++b) for (int f = 0; f < 8; ++f) for (int g = 0; g < 21; ++g) for (int sh = 0; sh < 2; ++sh) {
+            if (sh && b != 0 && b != 3) continue;
+            const auto d = stepEqSeDesign(fs, b, f, g, sh != 0);
+            worst = std::max(worst, d.maxErrDb); fitted += d.fitted ? 1 : 0; ++total;
+        }
+        std::printf("  designs at %.1f kHz: %d curves, %d re-fitted near / above half the sample rate, worst difference from the analogue curve %.3f dB\n",
+                    fs / 1000.0, total, fitted, worst);
+        CHECK(worst < 0.3);
+    }
+    // 40 kHz "air" on the HI band at 48 kHz (centre above half the sample rate)
+    {
+        setBand(0, I::HiFreq, 7, I::HiGain, 20);
+        std::string line;
+        for (double hz : {2500.0, 5000.0, 10000.0, 15000.0, 20000.0}) {
+            char t[64]; std::snprintf(t, sizeof t, " %.0f:%+.2f(%+.2f)", hz, gainDb(p, hz), stepEqSeAnalogDb(3, 7, 20, false, hz)); line += t;
+        }
+        std::printf("  HI 40 kHz +12 dB at 48 kHz, measured (analogue):%s\n", line.c_str());
+    }
+    // reciprocity: +9 then -9 = flat (HI 40 kHz too)
+    {
+        auto eq2 = makeStepEqSe();
+        eq2->prepare(kFs, 512);
+        double mx = 0;
+        for (auto [fp, gp, fi] : {std::tuple{I::LoMidFreq, I::LoMidGain, 6}, std::tuple{I::HiFreq, I::HiGain, 7}, std::tuple{I::LoFreq, I::LoGain, 0}}) {
+            setBand(0, fp, fi, gp, 19);
+            eq2->setDefaults(); eq2->set(I::id(0, fp), static_cast<float>(fi)); eq2->set(I::id(0, gp), 1); eq2->reset();
+            Proc both = [&](float* l, float* r, std::uint32_t n) { eq->process(l, r, n); eq2->process(l, r, n); };
+            for (double hz : {40.0, 200.0, 700.0, 3000.0, 10000.0, 18000.0}) mx = std::max(mx, std::fabs(gainDb(both, hz)));
+        }
+        std::printf("  reciprocity: +9 then -9 (LO-MID 700 Hz, HI 40 kHz, LO 20 Hz) -> max deviation %.4f dB\n", mx);
+        CHECK(mx < 0.02);
+    }
+    // HPF: -3 dB at the knob, 12 dB/octave below; HP-FILT off = no filter
+    {
+        std::string line;
+        for (float hz : {40.0f, 100.0f, 600.0f}) {
+            eq->setDefaults(); eq->set(I::id(0, I::HpfOn), 1); eq->set(I::id(0, I::HpfHz), hz); eq->reset();
+            const double at = gainDb(p, hz), half = gainDb(p, hz / 2), quarter = gainDb(p, hz / 4), up = gainDb(p, hz * 8);
+            char t[160]; std::snprintf(t, sizeof t, " %.0f Hz: at %+.2f, /2 %+.2f, /4 %+.2f (slope %.1f dB/oct), x8 %+.2f;", hz, at, half, quarter, half - quarter, up); line += t;
+            CHECK(std::fabs(at + 3.01) < 0.1 && std::fabs((half - quarter) - 12.0) < 1.0 && std::fabs(up) < 0.1);
+        }
+        eq->set(I::id(0, I::HpfOn), 0);
+        const double off = gainDb(p, 30);
+        std::printf("  HPF%s HP-FILT off at 30 Hz %+.3f dB\n", line.c_str(), off);
+        CHECK(std::fabs(off) < 0.01);
+    }
+    // M/S: flat is a straight wire; channel 1 = mid, channel 2 = side
+    {
+        auto through = [&](double hz, bool antiPhase) {
+            Buf l = sine(hz, 0.6, -20), r = l;
+            if (antiPhase) for (auto& v : r) v = -v;
+            const Buf in = l;
+            runBlocks(*eq, l, r);
+            return std::pair{rmsDb(l, l.size() / 2, l.size()) - rmsDb(in, in.size() / 2, in.size()), rmsDb(r, r.size() / 2, r.size()) - rmsDb(in, in.size() / 2, in.size())};
+        };
+        eq->setDefaults(); eq->set(I::MidSide, 1); eq->reset();
+        Buf l = sine(1000, 0.1, -20), r = sine(1700, 0.1, -26);
+        const Buf l0 = l, r0 = r;
+        runBlocks(*eq, l, r);
+        float dev = 0;
+        for (std::size_t i = 0; i < l.size(); ++i) dev = std::max({dev, std::fabs(l[i] - l0[i]), std::fabs(r[i] - r0[i])});
+        eq->set(I::id(1, I::HiMidGain), 20); eq->reset();   // side +12 at 3 kHz
+        const auto monoSideBoost = through(3000, false), antiSideBoost = through(3000, true);
+        eq->set(I::id(1, I::HiMidGain), 10); eq->set(I::id(0, I::HiMidGain), 20); eq->reset();   // mid +12
+        const auto monoMidBoost = through(3000, false), antiMidBoost = through(3000, true);
+        std::printf("  M/S: flat through max deviation %.2e; SIDE +12 @3k: mono in %+.2f dB, anti-phase in %+.2f dB; MID +12 @3k: mono in %+.2f dB, anti-phase in %+.2f dB\n",
+                    static_cast<double>(dev), monoSideBoost.first, antiSideBoost.first, monoMidBoost.first, antiMidBoost.first);
+        CHECK(dev < 1e-6f && std::fabs(monoSideBoost.first) < 0.05 && std::fabs(antiSideBoost.first - 12) < 0.3 &&
+              std::fabs(monoMidBoost.first - 12) < 0.3 && std::fabs(antiMidBoost.first) < 0.05);
+    }
+    // BYPASS and IN are exact; channel 2 is independent
+    {
+        setBand(0, I::HiMidFreq, 2, I::HiMidGain, 20);
+        Buf l = sine(3000, 0.05, -20), r = l, l0 = l;
+        eq->set(I::Bypass, 1); eq->process(l.data(), r.data(), static_cast<std::uint32_t>(l.size()));
+        const bool bypassExact = l == l0;
+        eq->set(I::Bypass, 0); eq->set(I::id(0, I::In), 0); l = l0; eq->process(l.data(), r.data(), static_cast<std::uint32_t>(l.size()));
+        const bool inExact = l == l0;
+        eq->set(I::id(0, I::In), 1);
+        const double right = gainDb(p, 3000, kFs, -20, 1);
+        std::printf("  BYPASS bit-exact %s, IN off bit-exact %s, channel 2 untouched by channel 1 (+12): %+.3f dB\n", bypassExact ? "yes" : "NO", inExact ? "yes" : "NO", right);
+        CHECK(bypassExact && inExact && std::fabs(right) < 0.01);
+    }
+    // zero allocation, knobs moving, M/S on
+    {
+        Buf l = sine(1000, 0.01, -10), r = l;
+        eq->set(I::MidSide, 1); eq->set(I::id(0, I::HpfOn), 1);
+        AllocScope scope;
+        for (int it = 0; it < 200; ++it) {
+            eq->set(I::id(it & 1, I::HiGain), static_cast<float>(it % 21));
+            eq->set(I::id(0, I::HpfHz), 40.0f + static_cast<float>(it));
+            eq->process(l.data(), r.data(), 256);
+        }
+        std::printf("  step EQ SE audio path, 200 blocks, knobs moving, M/S + HPF on: %llu heap allocations\n", static_cast<unsigned long long>(scope.count()));
         CHECK(scope.count() == 0);
     }
 }
@@ -1258,6 +1400,7 @@ void testConsoleRig() {
     // each order really changes the order: EQ +12 dB at 1 kHz into the colour stage's output trim -6 vs the other way is the same
     // gain, so check order with the twin bus compressing: EQ before the bus is compressed more than EQ after it
     rig->setDefaults(); rig->reset();
+    rig->setEqModel(ConsoleRig::EqStandard);   // the standard STEP EQ model in the EQ slot for this check
     rig->desk().setMaster(StudioDesk::MainInsert, 1);
     namespace T = twinbus_ids; namespace E = stepeq_ids;
     for (int s = 0; s < 2; ++s) { rig->twinBus().set(T::id(s, T::Threshold), 0); rig->twinBus().set(T::id(s, T::Ratio), 6); }
@@ -1323,6 +1466,39 @@ void testConsoleRig() {
     std::printf("  saved state: %d lines, %d applied on load, identical after reload %s; junk lines applied: %d; desk.ch05.hf reads %.2f\n",
                 lines, applied, same ? "yes" : "NO", junk, static_cast<double>(v));
     CHECK(applied == lines && same && junk == 0 && got && v == 7.5f);
+
+    // STEP EQ model in the rack's EQ slot: SPECIAL EDITION (default) or STANDARD, each with its own settings
+    {
+        auto rm = std::make_unique<ConsoleRig>();
+        rm->prepare(kFs, 512);
+        rm->desk().setMaster(StudioDesk::MainInsert, 1);
+        rm->setUnitIn(ConsoleRig::UnitTwinBus, false); rm->setUnitIn(ConsoleRig::UnitColour, false);   // only the EQ slot in the path
+        rm->stepEqSe().set(stepeqse_ids::id(0, stepeqse_ids::HiMidGain), 20);   // SE: ch 1 +12 dB at 3 kHz
+        rm->stepEqSe().set(stepeqse_ids::id(1, stepeqse_ids::HiMidGain), 20);
+        const Buf tone3k = sine(3000, 1.0, -30);
+        Buf oL(tone3k.size()), oR(tone3k.size());
+        auto level = [&] {
+            rm->reset();
+            ConsoleRig::Io io;
+            io.stemL[0] = tone3k.data(); io.stemR[0] = tone3k.data(); io.mainL = oL.data(); io.mainR = oR.data();
+            rm->process(io, static_cast<std::uint32_t>(tone3k.size()));
+            return rmsDb(oL, oL.size() / 2, oL.size());
+        };
+        const int defModel = rm->eqModel();
+        const double se = level();
+        rm->setEqModel(ConsoleRig::EqStandard);
+        const double st = level();
+        const std::string txt = rm->saveText();
+        auto r3 = std::make_unique<ConsoleRig>();
+        r3->loadText(txt);
+        auto r4 = std::make_unique<ConsoleRig>();
+        r4->loadText("stepeq.hi_g1=8\n");   // a session from before the SE model: keeps the standard model
+        std::printf("  STEP EQ model: default %s; 3 kHz through the rack with the SE at +12: %+.2f dB vs the STANDARD (flat) %+.2f dB; "
+                    "model saved and restored %s; an older session opens on STANDARD %s\n",
+                    defModel == ConsoleRig::EqSpecial ? "SPECIAL EDITION" : "STANDARD", se - st, 0.0,
+                    r3->eqModel() == ConsoleRig::EqStandard ? "yes" : "NO", r4->eqModel() == ConsoleRig::EqStandard ? "yes" : "NO");
+        CHECK(defModel == ConsoleRig::EqSpecial && std::fabs(se - st - 12.0) < 0.3 && r3->eqModel() == ConsoleRig::EqStandard && r4->eqModel() == ConsoleRig::EqStandard);
+    }
 
     // zero allocation with everything switched on
     rig->setDefaults(); rig->prepare(kFs, 512);

@@ -72,23 +72,27 @@ void testConsoleUi() {
         for (const auto& pi : ps) { if (bound.count(&pi)) ++n; else missingOut.push_back(pi.id); }
         return n;
     };
-    std::vector<std::string> missDesk, missMaster, missEq, missTb, missCol, missReso, missSh, missEcho;
+    std::vector<std::string> missDesk, missMaster, missEq, missSe, missTb, missCol, missReso, missSh, missEcho;
     const int nDesk = covered(StudioDesk::channelParams(), missDesk), nMaster = covered(StudioDesk::masterParams(), missMaster);
-    const int nEq = covered(rig->stepEq().params(), missEq), nTb = covered(rig->twinBus().params(), missTb), nCol = covered(rig->colour().params(), missCol);
+    const int nEq = covered(rig->stepEq().params(), missEq), nSe = covered(rig->stepEqSe().params(), missSe), nTb = covered(rig->twinBus().params(), missTb), nCol = covered(rig->colour().params(), missCol);
     const int nReso = covered(rig->channelTool(0).tool(ToolSlot::Reso).params(), missReso);
     const int nSh = covered(rig->channelTool(0).tool(ToolSlot::Shuffle).params(), missSh);
     const int nEcho = covered(rig->channelTool(0).tool(ToolSlot::Echo).params(), missEcho);
     std::printf("  %d widgets on %d pages, %d bound to controls; all inside the 3840x2160 canvas %s\n", widgets, U::kPageCount, controls, inside ? "yes" : "NO");
+    std::printf("  step EQ SE on screen: %d/%zu\n", nSe, rig->stepEqSe().params().size());
     std::printf("  on screen: desk channel %d/%zu, desk master %d/%zu, step EQ %d/%zu, twin bus %d/%zu, colour %d/%zu, reso %d/%zu, shuffle %d/%zu, echo %d/%zu\n",
                 nDesk, StudioDesk::channelParams().size(), nMaster, StudioDesk::masterParams().size(), nEq, rig->stepEq().params().size(),
                 nTb, rig->twinBus().params().size(), nCol, rig->colour().params().size(), nReso, rig->channelTool(0).tool(ToolSlot::Reso).params().size(),
                 nSh, rig->channelTool(0).tool(ToolSlot::Shuffle).params().size(), nEcho, rig->channelTool(0).tool(ToolSlot::Echo).params().size());
     CHECK(inside && valid);
-    CHECK(missDesk.empty() && missMaster.empty() && missEq.empty() && missTb.empty() && missCol.empty() && missReso.empty() && missSh.empty() && missEcho.empty());
+    CHECK(missDesk.empty() && missMaster.empty() && missEq.empty() && missSe.empty() && missTb.empty() && missCol.empty() && missReso.empty() && missSh.empty() && missEcho.empty());
 
     // every clickable control is hit-tested back to itself at its centre (nothing hides another)
     int unreachable = 0, clickable = 0;
+    for (int model : {ConsoleRig::EqSpecial, ConsoleRig::EqStandard}) {   // both STEP EQ models' panels
+    rig->setEqModel(model);
     for (const auto& p : pages) {
+        if (model == ConsoleRig::EqStandard && p.id != U::PageId::StepEq) continue;
         U::Controller c([](const U::ActionEvent&) {});
         c.setPage(&p);
         for (std::size_t i = 0; i < p.widgets.size(); ++i) {
@@ -100,6 +104,8 @@ void testConsoleUi() {
             if (c.hit(w.r.cx(), w.r.cy()) != static_cast<int>(i)) ++unreachable;
         }
     }
+    }
+    rig->setEqModel(ConsoleRig::EqSpecial);
     std::printf("  %d clickable controls (visible now), unreachable at their centre: %d\n", clickable, unreachable);
     CHECK(unreachable == 0);
 
@@ -128,7 +134,8 @@ void testConsoleUi() {
     std::printf("  mouse: HF knob dragged a quarter of the travel up -> %+.2f dB (expected +7.50), double-click -> %+.2f; BELL click -> %.0f; fader clicked at the -10 mark -> %.2f dB\n",
                 static_cast<double>(hfAfterDrag), static_cast<double>(hfAfterDouble), static_cast<double>(bellOn), static_cast<double>(faderDb));
     CHECK(std::fabs(hfAfterDrag - 7.5f) < 0.01f && hfAfterDouble == 0.0f && bellOn == 1.0f && std::fabs(faderDb + 10.0f) < 0.05f);
-    // stepped knob: one wheel notch = one detent
+    // stepped knob: one wheel notch = one detent (the standard model's page)
+    rig->setEqModel(ConsoleRig::EqStandard);
     const auto& eqp = pages[static_cast<std::size_t>(U::PageId::StepEq)];
     U::Controller ce([](const U::ActionEvent&) {});
     ce.setPage(&eqp);

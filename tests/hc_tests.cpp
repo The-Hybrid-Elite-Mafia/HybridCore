@@ -237,6 +237,7 @@ int main(int argc, char** argv) {
     testSynth();
     testConsoleDesk();
     testConsoleStepEq();
+    testConsoleStepEqSe();
     testConsoleTwinBus();
     testConsoleColour();
     testConsoleMeter();

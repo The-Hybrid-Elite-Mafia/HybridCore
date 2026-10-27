@@ -3,6 +3,7 @@
 
 #include "hybrid/console/ColourStage.hpp"
 #include "hybrid/console/StepEq.hpp"
+#include "hybrid/console/StepEqSe.hpp"
 #include "hybrid/console/TwinBus.hpp"
 
 #include <algorithm>
@@ -29,6 +30,8 @@ struct OrderNames {
 };
 const OrderNames kOrderN;
 const ParamInfo kRackOrderInfo{"rack_order", "Rack Order", "", 0, ConsoleRig::kOrderCount - 1, 0, Taper::Choice, kOrderN.p.data()};
+const char* const kEqModelN[] = {"STANDARD", "SPECIAL EDITION"};
+const ParamInfo kEqModelInfo{"eq_model", "Step EQ Model", "", 0, 1, 1, Taper::Choice, kEqModelN};
 constexpr float kZoomSteps[] = {1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.5f, 3.0f};
 const char* const kZoomN[] = {"FIT", "125 %", "150 %", "175 %", "200 %", "250 %", "300 %"};
 const ParamInfo kZoomInfo{"zoom", "Zoom", "", 0, 6, 0, Taper::Choice, kZoomN};
@@ -366,30 +369,62 @@ void deskPage(B& b, ConsoleRig& rig, const AppState& app) {
 // ---- STEP EQ ----------------------------------------------------------------------------------------
 void stepEqPage(B& b, ConsoleRig& rig) {
     namespace E = stepeq_ids;
+    namespace X = stepeqse_ids;
     fx::Effect& eq = rig.stepEq();
+    fx::Effect& se = rig.stepEqSe();
+    auto isStd = [&rig] { return rig.eqModel() == ConsoleRig::EqStandard; };
+    auto isSe = [&rig] { return rig.eqModel() == ConsoleRig::EqSpecial; };
     b.engrave("HEM STEP EQ", 60, 250, 0, false, C::lime);
     b.engrave("2-CHANNEL 4-BAND STEPPED EQ", 60, 300, 0, true, C::dim);
+    Widget& model = b.sel({1000, 196, 760, 84}, "MODEL", {&kEqModelInfo, [&rig] { return static_cast<float>(rig.eqModel()); },
+                                                         [&rig](float v) { rig.setEqModel(static_cast<int>(std::lround(v))); }});
+    model.tip = "Which model sits in the rack: STANDARD (7 steps, RANGE) or SPECIAL EDITION (21 steps per band, HPF, M/S). Each keeps its own settings";
+    Widget& ms = b.sw({2540, 196, 320, 84}, "M/S", fxp(se, X::MidSide), C::cyan);
+    ms.visible = isSe;
+    ms.tip = "M/S: channel 1 EQs the MID, channel 2 the SIDE, recombined at the output";
     b.sw({2900, 196, 300, 84}, "RACK IN", unitIn(rig, ConsoleRig::UnitStepEq), C::violet);
-    b.sw({3240, 196, 300, 84}, "BYPASS", fxp(eq, E::Bypass), C::red);
+    Widget& byS = b.sw({3240, 196, 300, 84}, "BYPASS", fxp(eq, E::Bypass), C::red);
+    byS.visible = isStd;
+    Widget& byE = b.sw({3240, 196, 300, 84}, "BYPASS", fxp(se, X::Bypass), C::red);
+    byE.visible = isSe;
     const char* bandName[] = {"LO", "LO-MID", "HI-MID", "HI"};
     const int gainId[] = {E::LoGain, E::LoMidGain, E::HiMidGain, E::HiGain};
     const int freqId[] = {E::LoFreq, E::LoMidFreq, E::HiMidFreq, E::HiFreq};
+    const int gainSe[] = {X::LoGain, X::LoMidGain, X::HiMidGain, X::HiGain};
+    const int freqSe[] = {X::LoFreq, X::LoMidFreq, X::HiMidFreq, X::HiFreq};
     for (int c = 0; c < 2; ++c) {
-        const float X = 40 + 1890.0f * static_cast<float>(c);
-        b.section({X, 340, 1870, 1640}, c == 0 ? "CHANNEL 1" : "CHANNEL 2");
+        const float X0 = 40 + 1890.0f * static_cast<float>(c);
+        b.section({X0, 340, 1870, 1640}, c == 0 ? "CHANNEL 1" : "CHANNEL 2");
+        Widget& msCap = b.readout({X0 + 330, 352, 420, 56}, [c] { return std::string(c == 0 ? "= MID" : "= SIDE"); }, C::cyan);
+        msCap.visible = [&rig, &se] { return rig.eqModel() == ConsoleRig::EqSpecial && se.get(stepeqse_ids::MidSide) > 0.5f; };
         for (int band = 0; band < 4; ++band) {
-            const float cx = X + 250 + 405.0f * static_cast<float>(band);
+            const float cx = X0 + 250 + 405.0f * static_cast<float>(band);
+            // standard model
             auto en = [&eq, c] { return eq.get(E::id(c, E::In)) > 0.5f && eq.get(E::Bypass) < 0.5f; };
             Widget& g = b.stepped(sq(cx, 730, 250), bandName[band], fxp(eq, E::id(c, gainId[band])));
-            g.tip = std::string(bandName[band]) + " GAIN"; g.enabled = en; g.bipolar = true;
+            g.tip = std::string(bandName[band]) + " GAIN"; g.enabled = en; g.bipolar = true; g.visible = isStd;
             Widget& f = b.stepped(sq(cx, 1270, 210), "FREQ", fxp(eq, E::id(c, freqId[band])), C::cyan);
-            f.tip = std::string(bandName[band]) + " FREQUENCY"; f.enabled = en;
-            if (band == 0) b.sw(box(cx, 1700, 200, 70), "SHELF", fxp(eq, E::id(c, E::LoShelf)), C::lime);
-            if (band == 3) b.sw(box(cx, 1700, 200, 70), "SHELF", fxp(eq, E::id(c, E::HiShelf)), C::lime);
+            f.tip = std::string(bandName[band]) + " FREQUENCY"; f.enabled = en; f.visible = isStd;
+            if (band == 0) b.sw(box(cx, 1700, 200, 70), "SHELF", fxp(eq, E::id(c, E::LoShelf)), C::lime).visible = isStd;
+            if (band == 3) b.sw(box(cx, 1700, 200, 70), "SHELF", fxp(eq, E::id(c, E::HiShelf)), C::lime).visible = isStd;
+            // special edition
+            auto enSe = [&se, c] { return se.get(X::id(c, X::In)) > 0.5f && se.get(X::Bypass) < 0.5f; };
+            Widget& gs = b.stepped(sq(cx, 730, 250), bandName[band], fxp(se, X::id(c, gainSe[band])));
+            gs.tip = std::string(bandName[band]) + " GAIN (21 steps)"; gs.enabled = enSe; gs.bipolar = true; gs.visible = isSe;
+            Widget& fs = b.stepped(sq(cx, 1270, 210), "FREQ", fxp(se, X::id(c, freqSe[band])), C::cyan);
+            fs.tip = std::string(bandName[band]) + " FREQUENCY"; fs.enabled = enSe; fs.visible = isSe;
+            if (band == 0) b.sw(box(cx, 1700, 200, 70), "SHELF", fxp(se, X::id(c, X::LoShelf)), C::lime).visible = isSe;
+            if (band == 3) b.sw(box(cx, 1700, 200, 70), "SHELF", fxp(se, X::id(c, X::HiShelf)), C::lime).visible = isSe;
         }
-        const float kx = X + 1750;
-        b.sw(box(kx, 560, 170, 70), "IN", fxp(eq, E::id(c, E::In)), C::lime);
-        b.stepped(sq(kx, 1000, 150), "RANGE", fxp(eq, E::id(c, E::Range)), C::amber);
+        const float kx = X0 + 1750;
+        b.sw(box(kx, 560, 170, 70), "IN", fxp(eq, E::id(c, E::In)), C::lime).visible = isStd;
+        b.stepped(sq(kx, 1000, 150), "RANGE", fxp(eq, E::id(c, E::Range)), C::amber).visible = isStd;
+        b.sw(box(kx, 560, 170, 70), "IN", fxp(se, X::id(c, X::In)), C::lime).visible = isSe;
+        Widget& hk = b.knob(sq(kx, 1000, 150), "HPF", fxp(se, X::id(c, X::HpfHz)), false, C::amber);
+        hk.visible = isSe;
+        hk.enabled = [&se, c] { return se.get(X::id(c, X::HpfOn)) > 0.5f && se.get(X::id(c, X::In)) > 0.5f; };
+        hk.tip = "HIGH-PASS FILTER frequency (40 .. 600 Hz, 12 dB/oct)";
+        b.sw(box(kx, 1200, 170, 70), "HP-FILT", fxp(se, X::id(c, X::HpfOn)), C::amber).visible = isSe;
     }
 }
 

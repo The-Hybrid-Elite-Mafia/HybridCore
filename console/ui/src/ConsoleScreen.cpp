@@ -52,6 +52,27 @@ float plateBucket(float scale) {
     return std::min(1.0f, 4096.0f / kWidth);
 }
 
+// Detented knobs big enough get their step names printed around them.
+bool hasStepRing(const Widget& w) { return w.kind == Kind::Stepped && w.r.w >= 180 && w.ctl.valid() && w.ctl.info->choices; }
+void drawStepRing(Renderer& r, const Widget& w) {
+    // every step up to 11 steps; more: the ends, the middle and the round numbers (-6 -3 -1 +1 +3 +6 ...)
+    const int n = static_cast<int>(w.ctl.info->max + 0.5f);
+    for (int k = 0; k <= n; ++k) {
+        std::string t = w.ctl.info->choices[k];
+        for (const char* suf : {" dB", " Hz"}) if (t.size() > 3 && t.ends_with(suf)) t.resize(t.size() - 3);
+        if (t.size() > 4 && t.ends_with(" kHz")) t = t.substr(0, t.size() - 4) + "k";
+        if (n > 10 && k != 0 && k != n && k != n / 2) {
+            static const char* const major[] = {"-6", "-3", "-1", "+1", "+3", "+6"};
+            bool show = false;
+            for (const char* m : major) if (t == m) show = true;
+            if (!show) continue;
+        }
+        const float a = kKnobMin + (kKnobMax - kKnobMin) * static_cast<float>(k) / static_cast<float>(std::max(1, n));
+        const float R = w.r.w * 0.5f * 1.40f;
+        r.text(TextStyle::Caption, t, w.r.cx() + std::sin(a) * R, w.r.cy() - std::cos(a) * R + 9, C::dim, Align::Center, TextFx::Shadowed);
+    }
+}
+
 } // namespace
 
 // Per-frame display state (meter ballistics).
@@ -300,20 +321,9 @@ void ConsoleScreen::drawStatic() {
         if (w.label.empty() || w.visible) continue;   // hidden-able widgets (TOOLS page) caption themselves live
         if (w.kind == Kind::Knob || w.kind == Kind::Stepped) {
             const TextStyle st = w.r.w < 100 ? TextStyle::Caption : w.r.w < 170 ? TextStyle::Value : TextStyle::Label;
-            const bool ring = w.kind == Kind::Stepped && w.r.w >= 180 && w.ctl.valid() && w.ctl.info->choices;
-            r.text(st, w.label, w.r.cx(), w.r.y - (ring ? 52.0f : w.r.w < 100 ? 10.0f : 18.0f), C::text, Align::Center, TextFx::Shadowed);
-            if (ring) {   // the step names printed around a detented knob (every one up to 11 steps, else the ends and middle)
-                const int n = static_cast<int>(w.ctl.info->max + 0.5f);
-                for (int k = 0; k <= n; ++k) {
-                    if (n > 10 && k != 0 && k != n && k != n / 2) continue;
-                    std::string t = w.ctl.info->choices[k];
-                    for (const char* suf : {" dB", " Hz"}) if (t.size() > 3 && t.ends_with(suf)) t.resize(t.size() - 3);
-                    if (t.size() > 4 && t.ends_with(" kHz")) t = t.substr(0, t.size() - 4) + "k";
-                    const float a = kKnobMin + (kKnobMax - kKnobMin) * static_cast<float>(k) / static_cast<float>(std::max(1, n));
-                    const float R = w.r.w * 0.5f * 1.30f;
-                    r.text(TextStyle::Caption, t, w.r.cx() + std::sin(a) * R, w.r.cy() - std::cos(a) * R + 9, C::dim, Align::Center, TextFx::Shadowed);
-                }
-            }
+            const bool ring = hasStepRing(w);
+            r.text(st, w.label, w.r.cx(), w.r.y - (ring ? 84.0f : w.r.w < 100 ? 10.0f : 18.0f), C::text, Align::Center, TextFx::Shadowed);
+            if (ring) drawStepRing(r, w);
         } else if (w.kind == Kind::Lamp) {
             r.text(TextStyle::Caption, w.label, w.r.right() + 16, w.r.cy() + r.capHeight(TextStyle::Caption) * 0.5f, C::text, Align::Left, TextFx::Shadowed);
         } else if (w.kind == Kind::Selector && w.r.w < 300) {
@@ -487,8 +497,11 @@ void ConsoleScreen::drawFrame() {
         const bool hot = static_cast<int>(i) == hover || static_cast<int>(i) == active;
         const bool pressed = static_cast<int>(i) == active;
         // live captions for widgets that come and go (TOOLS page)
-        if (w.visible && !w.label.empty() && (w.kind == Kind::Knob || w.kind == Kind::Stepped))
-            r.text(w.r.w < 170 ? TextStyle::Value : TextStyle::Label, w.label, w.r.cx(), w.r.y - 18, C::text, Align::Center, TextFx::Shadowed);
+        if (w.visible && !w.label.empty() && (w.kind == Kind::Knob || w.kind == Kind::Stepped)) {
+            const bool ring = hasStepRing(w);
+            r.text(w.r.w < 170 ? TextStyle::Value : TextStyle::Label, w.label, w.r.cx(), w.r.y - (ring ? 84.0f : 18.0f), C::text, Align::Center, TextFx::Shadowed);
+            if (ring) drawStepRing(r, w);
+        }
         if (w.visible && !w.label.empty() && w.kind == Kind::Selector && w.r.w < 300)
             r.text(TextStyle::Caption, w.label, w.r.cx(), w.r.y - 10, C::dim, Align::Center, TextFx::Shadowed);
         if (w.visible && !w.label.empty() && w.kind == Kind::LedBar)

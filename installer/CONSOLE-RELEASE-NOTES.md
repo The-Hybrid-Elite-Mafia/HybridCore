@@ -13,7 +13,10 @@ source code of this build is attached below (HEMDigitalConsole-<version>-source.
 
 New in 0.2.0: ZOOM (top bar, or CTRL + mouse wheel; remembered), the BIG DESK page (5 channels at a time, bigger
 knobs, move across all 13), F11 full screen, text never drawn smaller than 13 screen pixels (except words that
-cannot fit a control at all on a small window - the BIG DESK page or ZOOM shows them big), ASIO.
+cannot fit a control at all on a small window - the BIG DESK page or ZOOM shows them big), ASIO, and the STEP EQ
+SPECIAL EDITION model (MODEL on the STEP EQ page; it is the default): 8 frequencies per band (20 Hz LO, 40 kHz HI),
+21 boost / cut steps on every band (0.5 dB steps near zero), a 40-600 Hz high-pass filter per channel and M/S.
+The standard model is still there with its own settings.
 
 Every control on every faceplate is wired to the DSP and checked by automated tests on a Windows machine (numbers in
 the test log). The sound follows the makers' manuals and published graphs ("in the spirit of" the real gear); it has

@@ -127,6 +127,33 @@ inline constexpr float kShelfQ = 0.7071f, kShelfOctaves = 1.5f;
 } // namespace stepeq
 
 // =============================================================================================
+//  STEP EQ SE (the special-edition model of the stepped mastering EQ; source EQAE-OM)
+//  "Retains all the sonic and functional characteristics of the standard production" model (EQAE-OM §1.6), so the
+//  proportional-Q law and the shelf shape are the standard model's (namespace stepeq) with the same ASSUMED numbers.
+// =============================================================================================
+namespace stepeqse {
+inline constexpr std::array<float, 8> kLoHz  {20, 30, 40, 50, 100, 200, 300, 400};                    // VERIFIED EQAE-OM §2.3.3
+inline constexpr std::array<float, 8> kLoMidHz{50, 75, 150, 180, 240, 500, 700, 1000};                // VERIFIED
+inline constexpr std::array<float, 8> kHiMidHz{800, 1500, 3000, 5000, 8000, 10000, 12500, 15000};     // VERIFIED
+inline constexpr std::array<float, 8> kHiHz  {2500, 5000, 7000, 10000, 12500, 15000, 20000, 40000};   // VERIFIED
+// 21 boost / cut steps on EVERY band (no RANGE switch on this model)                                   // VERIFIED §2.3.4
+inline constexpr std::array<float, 21> kGainDb{-12, -9, -6, -5, -4, -3, -2, -1.5f, -1, -0.5f, 0,
+                                               0.5f, 1, 1.5f, 2, 3, 4, 5, 6, 9, 12};
+inline constexpr int kGainZero = 10;
+// High-pass filter per channel: continuously variable 40..600 Hz, 12 dB/octave, switched by HP-FILT,
+// ahead of the EQ (VERIFIED §1.7, §2.3.5, A1). Filter shape beyond the slope UNKNOWN -> ASSUMED Butterworth.
+inline constexpr float kHpfMinHz = 40.0f, kHpfMaxHz = 600.0f, kHpfDefaultHz = 80.0f;   // default position ASSUMED
+inline constexpr float kHpfQ = 0.7071f;                                                // ASSUMED
+// M/S: input split into mid (channel 1) and side (channel 2), recombined at the output (VERIFIED §1.8, §2.2).
+// Matrix scaling UNKNOWN -> ASSUMED M = (L+R)/2, S = (L-R)/2, L = M+S, R = M-S (unity through when flat).
+inline constexpr float kMsEncode = 0.5f;
+// Digital design: bands whose cookbook / matched digital curve strays more than kFitToleranceDb from the analogue
+// prototype below kFitTopHz (centres near or above half the sample rate, e.g. 40 kHz at 48 kHz) are re-fitted to the
+// analogue curve on the audible band. OUR numbers.
+inline constexpr double kFitToleranceDb = 0.1, kFitTopHz = 20000.0;
+} // namespace stepeqse
+
+// =============================================================================================
 //  TWIN BUS (2-channel bus compressor + 2-band dynamic EQ)
 // =============================================================================================
 namespace twinbus {

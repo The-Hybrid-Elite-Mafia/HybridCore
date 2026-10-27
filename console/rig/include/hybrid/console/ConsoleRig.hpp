@@ -3,7 +3,7 @@
 //  HEM CONSOLE RIG — the whole rig as one signal path (hc::console::rig).
 //
 //    13 stems ─► HEM STUDIO DESK channels (each channel INSERT holds a front-end TOOL slot)
-//             ─► desk main bus ─► MAIN INSERT ─► RACK: HEM STEP EQ, HEM TWIN BUS, HEM COLOUR STAGE
+//             ─► desk main bus ─► MAIN INSERT ─► RACK: HEM STEP EQ (standard or SE model), HEM TWIN BUS, HEM COLOUR STAGE
 //                                                (any order, each with its own IN switch)
 //             ─► desk bus compressor ─► main fader ─► MAIN OUT ─► HEM METER BRIDGE
 //             └─► desk monitor section ─► MONITOR OUT (what you hear) / ALT OUT
@@ -60,7 +60,12 @@ public:
     [[nodiscard]] const StudioDesk& desk() const noexcept;
     [[nodiscard]] fx::Effect& unit(int u) noexcept;               // Unit enum
     [[nodiscard]] const fx::Effect& unit(int u) const noexcept;
-    [[nodiscard]] fx::Effect& stepEq() noexcept { return unit(UnitStepEq); }
+    [[nodiscard]] fx::Effect& stepEq() noexcept { return unit(UnitStepEq); }       // the standard model
+    [[nodiscard]] fx::Effect& stepEqSe() noexcept;                                  // the special-edition model
+    // Which STEP EQ model sits in the rack's EQ slot: 0 = STANDARD, 1 = SPECIAL EDITION (both keep their settings).
+    enum EqModel : int { EqStandard = 0, EqSpecial = 1 };
+    void setEqModel(int model) noexcept;
+    [[nodiscard]] int eqModel() const noexcept;
     [[nodiscard]] fx::Effect& twinBus() noexcept { return unit(UnitTwinBus); }
     [[nodiscard]] fx::Effect& colour() noexcept { return unit(UnitColour); }
     [[nodiscard]] MeterBridge& meter() noexcept;

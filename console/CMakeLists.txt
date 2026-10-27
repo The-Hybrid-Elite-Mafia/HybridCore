@@ -3,6 +3,7 @@
 #    hc::console_common  ConsoleSpecs.hpp (every hardware number, VERIFIED/ASSUMED/UNKNOWN) + Filters.hpp
 #    hc::console_desk    HEM STUDIO DESK  (13-channel desk, buses, monitor, bus compressor)
 #    hc::console_stepeq  HEM STEP EQ      (2-channel 4-band stepped EQ)
+#    hc::console_stepeqse HEM STEP EQ SE  (its special-edition model: 21 steps per band, HPF, M/S)
 #    hc::console_twinbus HEM TWIN BUS     (2-channel bus compressor + dynamic EQ)
 #    hc::console_colour  HEM COLOUR STAGE (stereo colour processor: drive, EQ, HF comp/crush, image, transformer)
 #    hc::console_meter   HEM METER BRIDGE (loudness, true peak, stereo image, 1/3-octave RTA, radar history, scope)
@@ -25,6 +26,11 @@ add_library(hc_console_stepeq STATIC stepeq/src/StepEq.cpp)
 add_library(hc::console_stepeq ALIAS hc_console_stepeq)
 target_include_directories(hc_console_stepeq PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/stepeq/include")
 target_link_libraries(hc_console_stepeq PUBLIC hc::console_common)
+
+add_library(hc_console_stepeqse STATIC stepeqse/src/StepEqSe.cpp)
+add_library(hc::console_stepeqse ALIAS hc_console_stepeqse)
+target_include_directories(hc_console_stepeqse PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/stepeqse/include")
+target_link_libraries(hc_console_stepeqse PUBLIC hc::console_stepeq)
 
 add_library(hc_console_twinbus STATIC twinbus/src/TwinBus.cpp)
 add_library(hc::console_twinbus ALIAS hc_console_twinbus)
@@ -49,7 +55,7 @@ target_link_libraries(hc_console_tools PUBLIC hc::console_common)
 add_library(hc_console_rig STATIC rig/src/ConsoleRig.cpp)
 add_library(hc::console_rig ALIAS hc_console_rig)
 target_include_directories(hc_console_rig PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/rig/include")
-target_link_libraries(hc_console_rig PUBLIC hc::console_desk hc::console_stepeq hc::console_twinbus hc::console_colour
+target_link_libraries(hc_console_rig PUBLIC hc::console_desk hc::console_stepeq hc::console_stepeqse hc::console_twinbus hc::console_colour
                                             hc::console_meter hc::console_tools)
 
 # The player (engine processor, offline export, session file) and the GPU screen.

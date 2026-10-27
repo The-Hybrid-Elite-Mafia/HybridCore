@@ -65,6 +65,7 @@ void testStemPlayback();
 void testTransport();
 void testConsoleDesk();
 void testConsoleStepEq();
+void testConsoleStepEqSe();
 void testConsoleTwinBus();
 void testConsoleColour();
 void testConsoleMeter();

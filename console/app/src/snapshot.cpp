@@ -11,6 +11,7 @@
 #include "hybrid/console/ColourStage.hpp"
 #include "hybrid/console/ConsolePlayer.hpp"
 #include "hybrid/console/StepEq.hpp"
+#include "hybrid/console/StepEqSe.hpp"
 #include "hybrid/console/TwinBus.hpp"
 #include "hybrid/console/ui/ConsoleScreen.hpp"
 #include "hybrid/media/StemLoader.hpp"
@@ -124,6 +125,10 @@ int wmain(int argc, wchar_t** argv) {
     d.setMaster(StudioDesk::MainInsert, 1);
     rig->stepEq().set(stepeq_ids::id(0, stepeq_ids::HiGain), 6); rig->stepEq().set(stepeq_ids::id(0, stepeq_ids::HiShelf), 1);
     rig->stepEq().set(stepeq_ids::id(1, stepeq_ids::HiGain), 6); rig->stepEq().set(stepeq_ids::id(1, stepeq_ids::HiShelf), 1);
+    for (int c = 0; c < 2; ++c) {   // the SPECIAL EDITION model (the default in the rack): +1.5 dB 40 kHz air, a little HPF
+        rig->stepEqSe().set(stepeqse_ids::id(c, stepeqse_ids::HiFreq), 7); rig->stepEqSe().set(stepeqse_ids::id(c, stepeqse_ids::HiGain), 13);
+        rig->stepEqSe().set(stepeqse_ids::id(c, stepeqse_ids::HpfOn), 1); rig->stepEqSe().set(stepeqse_ids::id(c, stepeqse_ids::HpfHz), 30.0f + 10.0f);
+    }
     rig->twinBus().set(twinbus_ids::id(0, twinbus_ids::Threshold), 8); rig->twinBus().set(twinbus_ids::id(0, twinbus_ids::LfOn), 1);
     rig->colour().set(colour_ids::DriveIn, 1); rig->colour().set(colour_ids::Transformer, 1);
     {

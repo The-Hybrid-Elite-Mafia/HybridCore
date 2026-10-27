@@ -100,6 +100,20 @@ real measured value). "Left out" = it only makes sense with a physical plug, dev
 | RANGE x1 / x.5 / x.25 | `range1`, `range2` | Built |
 | Power, XLR/TRS jacks | — | Left out: hardware |
 
+### HEM STEP EQ SE (special-edition model; the rack's EQ slot holds this or the standard model: `rack.eq_model`)
+
+| Reference panel control | Engine control (id) | Status |
+|---|---|---|
+| BYPASS (red) | `bypass` | Built (bit-exact) |
+| M/S (blue): ch 1 = mid, ch 2 = side | `ms` | Built (matrix scaling ASSUMED, unity when flat) |
+| Ch 1/2 IN (blue) | `in1`, `in2` | Built |
+| HP-FILT (blue) + HPF 40..600 Hz, 12 dB/oct | `hpf1/2`, `hpf_hz1/2` | Built (Butterworth shape ASSUMED) |
+| LO freq (8: 20 Hz .. 400 Hz), gain (21), LO SHELF | `lo_f1/2`, `lo_g1/2`, `lo_shelf1/2` | Built |
+| LO-MID freq (8: 50 Hz .. 1 kHz), gain (21) | `lm_f1/2`, `lm_g1/2` | Built |
+| HI-MID freq (8: 800 Hz .. 15 kHz), gain (21) | `hm_f1/2`, `hm_g1/2` | Built |
+| HI freq (8: 2.5 kHz .. 40 kHz), gain (21), HI SHELF | `hi_f1/2`, `hi_g1/2`, `hi_shelf1/2` | Built (bands near/above half the sample rate fitted to the analogue curve) |
+| Power, XLR jacks, voltage switch | — | Left out: hardware |
+
 ### HEM TWIN BUS (each side; side 2 = right-hand controls)
 
 | Reference panel control | Engine control (id, `1`/`2` = side) | Status |

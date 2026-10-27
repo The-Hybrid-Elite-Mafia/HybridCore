@@ -22,7 +22,8 @@ HEM DIGITAL CONSOLE - HOW TO TEST
               EXT returns, Bus B, the monitor section, the main meter and the main fader.
    BIG DESK   the same desk, 5 channels at a time with bigger knobs. BACK / NEXT, the numbers 1-13, the Left / Right
               arrow keys or the mouse wheel on bare plate move across all 13 channels.
-   STEP EQ    the 2-channel 4-band stepped mastering EQ.
+   STEP EQ    the 2-channel 4-band stepped mastering EQ. MODEL picks STANDARD or SPECIAL EDITION (21 steps on every
+              band, 20 Hz and 40 kHz bands, HP-FILT + HPF knob, M/S: channel 1 = mid, channel 2 = side).
    TWIN BUS   the 2-channel bus compressor with the dynamic EQ.
    COLOUR     drive, tone EQ, HF compressor, stereo image, transformer.
    METER      loudness (LUFS), true peak, range, spectrum, stereo, the loudness radar.

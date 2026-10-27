@@ -3,6 +3,7 @@
 
 #include "hybrid/console/ColourStage.hpp"
 #include "hybrid/console/StepEq.hpp"
+#include "hybrid/console/StepEqSe.hpp"
 #include "hybrid/console/TwinBus.hpp"
 
 #include <algorithm>
@@ -61,6 +62,14 @@ struct RackInsert final : InsertSlot {
 struct ConsoleRig::Impl {
     StudioDesk desk;
     std::array<std::unique_ptr<fx::Effect>, kUnitCount> units{makeStepEq(), makeTwinBus(), makeColourStage()};
+    std::unique_ptr<fx::Effect> stepEqSe = makeStepEqSe();
+    std::atomic<int> eqModel{ConsoleRig::EqSpecial};
+    int eqModelLive = -1;   // audio thread: the model last run (a newly chosen one starts from a clean state)
+    // The effect in rack slot u right now (the EQ slot holds one of the two STEP EQ models).
+    fx::Effect& slotEffect(int u) noexcept {
+        if (u == ConsoleRig::UnitStepEq && eqModel.load(std::memory_order_relaxed) == ConsoleRig::EqSpecial) return *stepEqSe;
+        return *units[static_cast<std::size_t>(u)];
+    }
     MeterBridge meter;
     std::array<ToolSlot, kChannels> tools;
     ToolSlot colourTool;
@@ -79,6 +88,10 @@ struct ConsoleRig::Impl {
             const auto ps = units[static_cast<std::size_t>(u)]->params();
             for (std::size_t i = 0; i < ps.size(); ++i)
                 out.push_back({std::string(kUnitKey[u]) + "." + ps[i].id, {units[static_cast<std::size_t>(u)].get(), static_cast<int>(i)}});
+        }
+        {
+            const auto ps = stepEqSe->params();
+            for (std::size_t i = 0; i < ps.size(); ++i) out.push_back({std::string("stepeqse.") + ps[i].id, {stepEqSe.get(), static_cast<int>(i)}});
         }
         auto addTools = [&](const std::string& prefix, ToolSlot& slot) {
             for (int t = ToolSlot::Reso; t < ToolSlot::kTypeCount; ++t) {
@@ -103,9 +116,14 @@ void RackInsert::process(float* l, float* r, std::uint32_t n) noexcept {
             done += k;
         }
     };
+    const int model = d->eqModel.load(std::memory_order_relaxed);
+    if (model != d->eqModelLive) {   // the EQ slot changed model: the incoming one starts clean
+        d->eqModelLive = model;
+        d->slotEffect(ConsoleRig::UnitStepEq).reset();
+    }
     for (int pos = 0; pos < 3; ++pos) {
         const int u = kOrders[order][pos];
-        fx::Effect& e = *d->units[static_cast<std::size_t>(u)];
+        fx::Effect& e = d->slotEffect(u);
         auto& dl = d->outDelay[static_cast<std::size_t>(u)];
         const std::uint32_t lat = e.latency();
         if (d->unitIn[static_cast<std::size_t>(u)].load(std::memory_order_relaxed)) {
@@ -137,6 +155,7 @@ void ConsoleRig::prepare(double fs, std::uint32_t maxBlock) {
     d.maxBlock = std::max<std::uint32_t>(1, maxBlock);
     d.desk.prepare(fs, d.maxBlock);
     for (auto& u : d.units) u->prepare(fs, std::min(d.maxBlock, fx::Effect::kMaxBlock));
+    d.stepEqSe->prepare(fs, std::min(d.maxBlock, fx::Effect::kMaxBlock));
     for (int u = 0; u < kUnitCount; ++u)
         for (auto& dl : d.outDelay[static_cast<std::size_t>(u)]) dl.prepare(std::max<std::uint32_t>(1, d.units[static_cast<std::size_t>(u)]->latency()));
     d.meter.prepare(fs, d.maxBlock);
@@ -155,6 +174,7 @@ void ConsoleRig::reset() noexcept {
     Impl& d = *d_;
     d.desk.reset();
     for (auto& u : d.units) u->reset();
+    d.stepEqSe->reset();
     for (auto& a : d.outDelay) for (auto& dl : a) dl.clear();
     d.meter.reset();
     for (auto& t : d.tools) t.reset();
@@ -193,6 +213,9 @@ void ConsoleRig::process(const Io& io, std::uint32_t frames) noexcept {
 
 StudioDesk& ConsoleRig::desk() noexcept { return d_->desk; }
 const StudioDesk& ConsoleRig::desk() const noexcept { return d_->desk; }
+fx::Effect& ConsoleRig::stepEqSe() noexcept { return *d_->stepEqSe; }
+void ConsoleRig::setEqModel(int m) noexcept { d_->eqModel.store(std::clamp(m, 0, 1), std::memory_order_relaxed); }
+int ConsoleRig::eqModel() const noexcept { return d_->eqModel.load(std::memory_order_relaxed); }
 fx::Effect& ConsoleRig::unit(int u) noexcept { return *d_->units[static_cast<std::size_t>(std::clamp(u, 0, kUnitCount - 1))]; }
 const fx::Effect& ConsoleRig::unit(int u) const noexcept { return *d_->units[static_cast<std::size_t>(std::clamp(u, 0, kUnitCount - 1))]; }
 MeterBridge& ConsoleRig::meter() noexcept { return d_->meter; }
@@ -211,7 +234,7 @@ bool ConsoleRig::unitIn(int u) const noexcept {
     return u >= 0 && u < kUnitCount && d_->unitIn[static_cast<std::size_t>(u)].load(std::memory_order_relaxed);
 }
 int ConsoleRig::rackUnitAt(int order, int pos) noexcept { return kOrders[std::clamp(order, 0, kOrderCount - 1)][std::clamp(pos, 0, 2)]; }
-const char* ConsoleRig::unitName(int u) noexcept {
+const char* ConsoleRig::unitName(int u) noexcept {   // (the EQ slot is "STEP EQ" whichever model it holds)
     static const char* const n[] = {"STEP EQ", "TWIN BUS", "COLOUR STAGE"};
     return n[std::clamp(u, 0, kUnitCount - 1)];
 }
@@ -226,7 +249,7 @@ std::string ConsoleRig::orderName(int order) {
 }
 std::uint32_t ConsoleRig::rackLatency() const noexcept {
     std::uint32_t l = 0;
-    for (const auto& u : d_->units) l += u->latency();   // in or out, the latency is the same (see RackInsert)
+    for (int u = 0; u < kUnitCount; ++u) l += d_->slotEffect(u).latency();   // in or out, the latency is the same (see RackInsert)
     return l;
 }
 
@@ -234,6 +257,8 @@ void ConsoleRig::setDefaults() noexcept {
     Impl& d = *d_;
     d.desk.setDefaults();
     for (auto& u : d.units) u->setDefaults();
+    d.stepEqSe->setDefaults();
+    d.eqModel.store(EqSpecial);
     d.order.store(0);
     for (auto& a : d.unitIn) a.store(true);
     for (auto& t : d.tools) {
@@ -255,6 +280,7 @@ std::string ConsoleRig::saveText() const {
     const auto mps = StudioDesk::masterParams();
     for (std::size_t i = 0; i < mps.size(); ++i) line(std::string("desk.") + mps[i].id, d.desk.master(static_cast<int>(i)));
     line("rack.order", static_cast<float>(rackOrder()));
+    line("rack.eq_model", static_cast<float>(eqModel()));
     for (int u = 0; u < kUnitCount; ++u) line(std::string("rack.in_") + kUnitKey[u], unitIn(u) ? 1.0f : 0.0f);
     for (int c = 0; c < kChannels; ++c) line("tool." + chKey(c) + ".type", static_cast<float>(d.tools[static_cast<std::size_t>(c)].type()));
     line("tool.colour.type", static_cast<float>(d.colourTool.type()));
@@ -280,6 +306,7 @@ bool ConsoleRig::setByKey(std::string_view key, float v) noexcept {
         return true;
     }
     if (key == "rack.order") { setRackOrder(static_cast<int>(std::lround(v))); return true; }
+    if (key == "rack.eq_model") { setEqModel(static_cast<int>(std::lround(v))); return true; }
     for (int u = 0; u < kUnitCount; ++u)
         if (key == std::string("rack.in_") + kUnitKey[u]) { setUnitIn(u, v > 0.5f); return true; }
     if (key.starts_with("tool.") && key.ends_with(".type")) {
@@ -312,6 +339,8 @@ bool ConsoleRig::getByKey(std::string_view key, float& v) const noexcept {
 }
 
 int ConsoleRig::loadText(std::string_view text) {
+    // sessions saved before the SE model existed used the standard model: keep their sound
+    if (text.find("stepeq.") != std::string_view::npos && text.find("rack.eq_model=") == std::string_view::npos) setEqModel(EqStandard);
     int applied = 0;
     std::size_t pos = 0;
     while (pos <= text.size()) {
