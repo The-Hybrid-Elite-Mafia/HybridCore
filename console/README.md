@@ -12,6 +12,11 @@ Change a guess there and nowhere else. The stem count comes from `hybrid/core/Co
 | `hc::console_stepeq` | **HEM STEP EQ** (`makeStepEq()`) | 2-channel, 4-band stepped EQ with proportional Q and RANGE |
 | `hc::console_twinbus` | **HEM TWIN BUS** (`makeTwinBus()`) | 2-channel bus compressor (4 modes, colours, negative ratios) + 2-band dynamic EQ + transient expander |
 | `hc::console_colour` | **HEM COLOUR STAGE** (`makeColourStage()`) | stereo colour processor: HPF, drive, tone EQ, HF compressor / crush, M/S image, transformer, insert, trims, bypass, meter |
+| `hc::console_tools` | **HEM RESO TAMER / SHUFFLE / TAP ECHO** (`makeResoTamer()` ...) + `ToolSlot` | front-end tools in the slots where the reference desk has its mic preamps (our own designs) |
+| `hc::console_rig` | **HEM CONSOLE RIG** (`ConsoleRig`) | the whole rig as one signal path + saved state |
+| `hc::console_player` | `ConsoleProcessor`, `renderExport`, sessions | the engine processor (15 file slots, transport, LISTEN), offline export / PRINT STEMS, `.hemc` files |
+| `hc::console_ui` | `ConsoleScreen` | the six GPU faceplates (DESK, STEP EQ, TWIN BUS, COLOUR, METER, TOOLS) |
+| `HEMDigitalConsole.exe` | the app (`console/app`) | window, devices, stems, sessions, export; installer `installer/HEMDigitalConsole.iss` |
 | `hc::console_meter` | **HEM METER BRIDGE** (`MeterBridge`) | stereo meter: loudness (momentary / short-term / integrated / range / maxima), true peak, PLR, correlation, balance, mono check, 31-band RTA, loudness history, vectorscope |
 
 Real-time rules: `process()` never allocates, locks or waits (tested). Controls are lock-free atomics
@@ -165,3 +170,21 @@ so its own buttons and display settings (presets, radar speed, scales) are not b
 | RESET | `reset()` | Built |
 | AUTO, SCOPE, cursor/frequency knob, LIB, SYS, EDIT, presets, radar settings | — | UNKNOWN: waits for the reference user manual |
 | Inputs (digital/analog/HDMI), network/USB, power | — | Left out: hardware |
+
+### Front-end tools (our own designs, no reference unit)
+
+| Tool | Controls | Status |
+|---|---|---|
+| HEM RESO TAMER | per band: ON, FREQ 40 Hz-16 kHz, WIDTH (Q 1-12), THRESHOLD 0-24 dB, DEPTH 0-18 dB, SPEED (FAST / MEDIUM / SLOW), LISTEN; meters: cut per band | Built, tested |
+| HEM SHUFFLE | SHUFFLE FREQ 100-1000 Hz, SHUFFLE 0-12 dB, MUD FREQ 100-800 Hz, MUD CUT 0-12 dB, WIDTH 0-200 %, MONO BASS, OUTPUT ±6 dB; meter: correlation | Built, tested |
+| HEM TAP ECHO | TAP, TEMPO 40-240, NOTE (FREE, 1/1 .. 1/16, dotted, triplet), TIME 1-4000 ms, FEEDBACK 0-95 %, MIX, LOW CUT, HIGH CUT, MODE (STEREO / PING-PONG / MONO) | Built, tested |
+
+Every desk channel's INSERT switch runs that channel's TOOL (OFF / RESO / SHUFFLE / ECHO); the COLOUR STAGE's INSERT has one too.
+
+## The app
+
+`HEMDigitalConsole.exe`: 13 desk channels plus EXT 1 / EXT 2 file slots (EXT 2 is also the TWIN BUS external side-chain key),
+one transport, LISTEN (MONITOR, CUE 1 or CUE 2 to the output device), EXPORT (MAIN OUT to WAV, offline, rack latency
+removed), PRINT STEMS (every channel's DIRECT OUT to its own WAV), sessions (`.hemc`: stems with absolute and relative
+paths + every control), autosave of everything on exit, RESET (twice) with UNDO.
+Screens: `hem_console_snapshot` renders every page off-screen (CI publishes them to the `console-screenshots` branch).

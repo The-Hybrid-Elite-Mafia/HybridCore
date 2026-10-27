@@ -41,7 +41,7 @@ fs::path exeDir() {
     const DWORD n = ::GetModuleFileNameW(nullptr, buf, static_cast<DWORD>(std::size(buf)));
     return fs::path(std::wstring(buf, n)).parent_path();
 }
-double meanLuma(const ui::Image& img) {
+double meanLuma(const hc::ui::Image& img) {
     double s = 0;
     for (std::size_t i = 0; i < img.rgba.size(); i += 4) s += 0.2126 * img.rgba[i] + 0.7152 * img.rgba[i + 1] + 0.0722 * img.rgba[i + 2];
     return s / static_cast<double>(std::max<std::size_t>(1, img.rgba.size() / 4));
@@ -149,7 +149,7 @@ int wmain(int argc, wchar_t** argv) {
     app.session = "CI";
 
     // ---- GPU ----
-    ui::GlWindow window;
+    hc::ui::GlWindow window;
     std::string err;
     if (!window.create(L"HEM Digital Console snapshot", 64, 64, false, &err)) { std::printf("GL window: %s\n", err.c_str()); return 2; }
     std::printf("OpenGL: %s / %s\n", reinterpret_cast<const char*>(::glGetString(GL_VERSION)), reinterpret_cast<const char*>(::glGetString(GL_RENDERER)));
@@ -164,13 +164,13 @@ int wmain(int argc, wchar_t** argv) {
             if (!screen.waitForPlate(120)) { std::printf("FAIL plate not routed: page %d\n", p); ++failures; continue; }
             const auto f0 = std::chrono::steady_clock::now();
             screen.renderToCapture();
-            const ui::Image img = screen.capture();
+            const hc::ui::Image img = screen.capture();
             const double frameMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - f0).count();
             const GLenum glErr = ::glGetError();
             char name[96];
             std::snprintf(name, sizeof name, "HEM-Console-%d-%s-%dx%d.png", p + 1, U::pageName(static_cast<U::PageId>(p)), s.w, s.h);
             for (char* c = name; *c; ++c) if (*c == ' ') *c = '_';
-            const bool ok = !img.empty() && ui::writePng(out / name, img);
+            const bool ok = !img.empty() && hc::ui::writePng(out / name, img);
             const double luma = meanLuma(img);
             std::printf("%-44s %s  mean light %.1f/255, %u draw calls, %u quads, %.1f ms (incl. readback), GL error %u\n", name, ok ? "saved" : "FAILED", luma,
                         screen.renderer().stats().drawCalls, screen.renderer().stats().quads, frameMs, static_cast<unsigned>(glErr));
@@ -191,7 +191,7 @@ int wmain(int argc, wchar_t** argv) {
                 break;
             }
         screen.renderToCapture();
-        ui::writePng(out / "HEM-Console-1-DESK-hover-1389x868.png", screen.capture());
+        hc::ui::writePng(out / "HEM-Console-1-DESK-hover-1389x868.png", screen.capture());
         std::printf("HEM-Console-1-DESK-hover-1389x868.png saved (HF knob of channel 1 under the mouse)\n");
     }
     screen.shutdown();

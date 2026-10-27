@@ -388,7 +388,7 @@ void twinBusPage(B& b, ConsoleRig& rig) {
         const char* names[] = {"THRESHOLD", "ATTACK", "RATIO", "RELEASE", "MAKE-UP", "MIX", "S/C HPF"};
         const int ids[] = {T::Threshold, T::Attack, T::Ratio, T::Release, T::Makeup, T::Mix, T::ScHpf};
         for (int k = 0; k < 7; ++k) {
-            Widget& w = b.stepped(sq(X + 125 + 232.0f * static_cast<float>(k), 545, k == 0 ? 160 : 136), names[k], P(ids[k]), k == 0 ? C::amber : C::lime);
+            Widget& w = b.stepped(sq(X + 125 + 232.0f * static_cast<float>(k), 545, k == 0 ? 160.0f : 136.0f), names[k], P(ids[k]), k == 0 ? C::amber : C::lime);
             w.enabled = rightLive;
         }
         b.sw({X + 50, 700, 150, 60}, "IN", P(T::In), C::lime);
@@ -576,7 +576,7 @@ void toolsPage(B& b, ConsoleRig& rig, const AppState& app) {
             const char* names[] = {"FREQ", "WIDTH (Q)", "THRESHOLD", "DEPTH"};
             const int ids[] = {R::Freq, R::Width, R::Threshold, R::Depth};
             for (int k = 0; k < 4; ++k) {
-                Widget& w = b.knob(sq(X + 230 + 420.0f * static_cast<float>(k), 820, k == 0 ? 280 : 240), names[k], P(ids[k]), false, k == 0 ? C::cyan : C::lime);
+                Widget& w = b.knob(sq(X + 230 + 420.0f * static_cast<float>(k), 820, k == 0 ? 280.0f : 240.0f), names[k], P(ids[k]), false, k == 0 ? C::cyan : C::lime);
                 w.visible = vis; w.enabled = on;
             }
             Widget& sp = b.sel({X + 120, 1180, 380, 80}, "SPEED", P(R::Speed));
