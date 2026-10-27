@@ -239,6 +239,7 @@ int main(int argc, char** argv) {
     testConsoleStepEq();
     testConsoleTwinBus();
     testConsoleColour();
+    testConsoleMeter();
     testUiImage();
     testUiLayout();
     testUiFaceplate();

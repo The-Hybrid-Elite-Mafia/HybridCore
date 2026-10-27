@@ -5,6 +5,7 @@
 #    hc::console_stepeq  HEM STEP EQ      (2-channel 4-band stepped EQ)
 #    hc::console_twinbus HEM TWIN BUS     (2-channel bus compressor + dynamic EQ)
 #    hc::console_colour  HEM COLOUR STAGE (stereo colour processor: drive, EQ, HF comp/crush, image, transformer)
+#    hc::console_meter   HEM METER BRIDGE (loudness, true peak, stereo image, 1/3-octave RTA, radar history, scope)
 #  None of them touch hc::fx's existing effects (HEM DESK, HEM BUS PRESS ...); they only reuse its
 #  Effect interface and small filter helpers.
 # =============================================================================
@@ -32,3 +33,8 @@ add_library(hc_console_colour STATIC colour/src/ColourStage.cpp)
 add_library(hc::console_colour ALIAS hc_console_colour)
 target_include_directories(hc_console_colour PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/colour/include")
 target_link_libraries(hc_console_colour PUBLIC hc::console_common)
+
+add_library(hc_console_meter STATIC meter/src/MeterBridge.cpp)
+add_library(hc::console_meter ALIAS hc_console_meter)
+target_include_directories(hc_console_meter PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/meter/include")
+target_link_libraries(hc_console_meter PUBLIC hc::console_common)

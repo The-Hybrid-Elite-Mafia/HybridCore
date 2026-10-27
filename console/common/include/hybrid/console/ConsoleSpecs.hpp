@@ -19,6 +19,8 @@
 //    COL-UG   p.N   reference stereo colour processor user guide V1.4.0, printed page N
 //    COL-RS         its recall sheet (COL-UG p.29, panel drawing)
 //    COL-GR   p.N   its published response / spectrum graphs (traced; fit error given)
+//    MTR-PID  p.N   reference desktop meter product information document (11 pages)
+//    BS1770 / R128 / T3341 / T3342  ITU-R BS.1770-4, EBU R128, EBU Tech 3341 and 3342 (the standards it follows)
 //
 //  Rig constants (sample rate, stem count) are NOT here: they live in hybrid/core/Config.hpp.
 //  Every engine takes its sample rate from prepare(); nothing below assumes 48 kHz.
@@ -251,5 +253,26 @@ inline constexpr float kTxLfBandHz = 150.0f, kTxHarmonicAt16Dbu = 0.0015f;   // 
 inline constexpr float kTxAllpassHz = 23000.0f;           // ASSUMED top-end phase shift (1st-order all-pass, flat level)
 inline constexpr float kTxSparkleDb = 0.25f, kTxSparkleHz = 12000.0f;   // ASSUMED "touch of sparkle" (1st-order shelf)
 } // namespace colour
+
+// =============================================================================================
+//  METER BRIDGE (stereo loudness / true-peak / stereo / RTA meter). VERIFIED (MTR-PID p.1-5): loudness radar,
+//  true-peak meter, RTA in 1/3 octaves, vectorscope, Balance-O-Meter (left/right and mid/side), correlation meter,
+//  downmix (mono) deviation, loudness statistics, compliance with BS.1770-4 / EBU R128 / ATSC A/85.
+//  The measurement maths below is the standards' (VERIFIED by the standards themselves); the display options of
+//  the reference unit (presets, radar speed, scales, averaging) are UNKNOWN until its user manual is read.
+// =============================================================================================
+namespace meter {
+inline constexpr double kMomentarySeconds = 0.4, kShortTermSeconds = 3.0, kStepSeconds = 0.1;   // VERIFIED BS1770 / R128
+inline constexpr double kAbsGateLufs = -70.0, kRelGateLu = -10.0;          // VERIFIED BS1770 (integrated)
+inline constexpr double kLraRelGateLu = -20.0, kLraLow = 0.10, kLraHigh = 0.95;   // VERIFIED T3342
+inline constexpr double kHistogramStepLu = 0.01, kHistogramTopLufs = 10.0; // our resolution (exact energies kept per bin)
+inline constexpr double kCorrelationSeconds = 0.3;   // UNKNOWN integration time -> ASSUMED
+inline constexpr double kRtaAverageSeconds = 0.3;    // UNKNOWN RTA speed -> ASSUMED
+inline constexpr double kRtaPeakHoldSeconds = 2.0;   // UNKNOWN -> ASSUMED
+inline constexpr double kRtaFilterQ = 2.78;          // ours: two cascaded band-passes give a 1/3-octave -3 dB width
+inline constexpr bool kRtaMonoSum = true;            // UNKNOWN (sum or per channel) -> ASSUMED (L+R)/2
+// Balance and mono deviation are measured on K-weighted signals over the short-term (3 s) window: ASSUMED definitions
+// (MTR-PID only says they are based on the maker's loudness technology).
+} // namespace meter
 
 } // namespace hc::console::spec

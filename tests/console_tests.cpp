@@ -7,6 +7,7 @@
 
 #include "hybrid/console/ColourStage.hpp"
 #include "hybrid/console/ConsoleSpecs.hpp"
+#include "hybrid/console/MeterBridge.hpp"
 #include "hybrid/console/StepEq.hpp"
 #include "hybrid/console/StudioDesk.hpp"
 #include "hybrid/console/TwinBus.hpp"
@@ -863,6 +864,143 @@ void testConsoleColour() {
 }
 
 // =================================================================================================
+// =============================================================================================
+//  HEM METER BRIDGE — checked against the published test signals of EBU Tech 3341 / 3342 and BS.1770-4.
+// =============================================================================================
+void testConsoleMeter() {
+    std::printf("[console meter] HEM METER BRIDGE (loudness / true peak / stereo / RTA)\n");
+    // Feed a stereo signal made of (level dBFS, seconds) segments of a sine, in 512-frame blocks.
+    struct Seg { double db, seconds; };
+    auto feed = [](MeterBridge& m, const std::vector<Seg>& segs, double fs = kFs, double hz = 1000.0, double rGain = 1.0, double rHz = 0.0) {
+        Buf l(512), r(512);
+        std::size_t t = 0;
+        for (const Seg& sg : segs) {
+            const std::size_t n = static_cast<std::size_t>(sg.seconds * fs);
+            const double a = sg.db <= -200 ? 0.0 : std::pow(10.0, sg.db / 20.0);
+            for (std::size_t done = 0; done < n;) {
+                const std::size_t k = std::min<std::size_t>(512, n - done);
+                for (std::size_t i = 0; i < k; ++i, ++t) {
+                    const double ph = 2 * std::numbers::pi * static_cast<double>(t) / fs;
+                    l[i] = static_cast<float>(a * std::sin(hz * ph));
+                    r[i] = static_cast<float>(rGain * a * std::sin((rHz > 0 ? rHz : hz) * ph));
+                }
+                m.process(l.data(), r.data(), static_cast<std::uint32_t>(k));
+                done += k;
+            }
+        }
+    };
+    auto m = std::make_unique<MeterBridge>();
+    // --- EBU Tech 3341 cases 1, 2 (stereo 1 kHz, 20 s): M, S and I must read the level within 0.1 LU ---
+    for (double fs : {48000.0, 96000.0}) {
+        for (double db : {-23.0, -33.0}) {
+            m->prepare(fs, 512);
+            feed(*m, {{db, 20.0}}, fs);
+            std::printf("  1 kHz stereo %.0f dBFS @ %.0f kHz: momentary %.2f, short-term %.2f, integrated %.2f LUFS\n",
+                        db, fs / 1000, m->momentaryLufs(), m->shortTermLufs(), m->integratedLufs());
+            CHECK(std::fabs(m->momentaryLufs() - db) < 0.1 && std::fabs(m->shortTermLufs() - db) < 0.1 && std::fabs(m->integratedLufs() - db) < 0.1);
+        }
+    }
+    // --- Tech 3341 case 3 and 4: gating must ignore the quiet parts ---
+    {
+        m->prepare(kFs, 512);
+        feed(*m, {{-36, 10}, {-23, 60}, {-36, 10}});
+        const double c3 = m->integratedLufs();
+        m->prepare(kFs, 512);
+        feed(*m, {{-72, 10}, {-36, 10}, {-23, 60}, {-36, 10}, {-72, 10}});
+        const double c4 = m->integratedLufs();
+        std::printf("  gating (Tech 3341 case 3 / case 4, expected -23.0 +/-0.1): %.2f / %.2f LUFS\n", c3, c4);
+        CHECK(std::fabs(c3 + 23) < 0.1 && std::fabs(c4 + 23) < 0.1);
+        CHECK(std::fabs(m->maxMomentaryLufs() + 23) < 0.1 && std::fabs(m->maxShortTermLufs() + 23) < 0.1);
+    }
+    // --- EBU Tech 3342 cases 1, 2: loudness range ---
+    {
+        m->prepare(kFs, 512);
+        feed(*m, {{-20, 20}, {-30, 20}});
+        const double c1 = m->loudnessRangeLu();
+        m->prepare(kFs, 512);
+        feed(*m, {{-20, 20}, {-15, 20}});
+        const double c2 = m->loudnessRangeLu();
+        std::printf("  loudness range (Tech 3342 case 1 expect 10 +/-1, case 2 expect 5 +/-1): %.2f / %.2f LU\n", c1, c2);
+        CHECK(std::fabs(c1 - 10) < 1 && std::fabs(c2 - 5) < 1);
+    }
+    // --- true peak: fs/4 sine at 45 deg phase; samples sit 3.01 dB below the real waveform peak ---
+    {
+        m->prepare(kFs, 512);
+        Buf l(512);
+        for (int b = 0; b < 40; ++b) {
+            for (std::size_t i = 0; i < l.size(); ++i) l[i] = static_cast<float>(0.5 * std::sin(std::numbers::pi / 2 * static_cast<double>(b * 512 + static_cast<int>(i)) + std::numbers::pi / 4));
+            m->process(l.data(), l.data(), 512);
+        }
+        std::printf("  true peak, fs/4 sine 45 deg, real peak -6.02: sample peak %.2f dBFS, true peak %.2f dBTP\n", m->samplePeakDbfs(0), m->truePeakDbtp(0));
+        CHECK(std::fabs(m->samplePeakDbfs(0) + 9.03) < 0.05 && std::fabs(m->truePeakDbtp(0) + 6.02) < 0.3);
+        m->prepare(kFs, 512);
+        feed(*m, {{-23, 10}});
+        std::printf("  PLR, 1 kHz sine -23 dBFS (expect ~0 dB): %.2f dB\n", m->plrDb());
+        CHECK(std::fabs(m->plrDb()) < 0.3);
+    }
+    // --- stereo: correlation, balance, mono deviation ---
+    {
+        m->prepare(kFs, 512); feed(*m, {{-20, 4}});
+        const double same = m->correlation(), monoSame = m->monoDeviationLu();
+        m->prepare(kFs, 512); feed(*m, {{-20, 4}}, kFs, 1000, -1.0);
+        const double anti = m->correlation(), monoAnti = m->monoDeviationLu(), msAnti = m->balanceMsDb();
+        m->prepare(kFs, 512); feed(*m, {{-20, 4}}, kFs, 1000, 1.0, 1370.0);
+        const double unrel = m->correlation();
+        m->prepare(kFs, 512); feed(*m, {{-20, 4}}, kFs, 1000, 0.0);
+        const double monoLeftOnly = m->monoDeviationLu();
+        m->prepare(kFs, 512); feed(*m, {{-20, 4}}, kFs, 1000, std::pow(10.0, -6.0 / 20.0));
+        const double bal = m->balanceLrLu();
+        std::printf("  correlation: L=R %.3f, L=-R %.3f, unrelated tones %.3f\n", same, anti, unrel);
+        std::printf("  mono deviation: L=R %.2f LU, left only %.2f LU (expect -3.01), L=-R %.1f (mono cancels)\n", monoSame, monoLeftOnly, monoAnti);
+        std::printf("  L/R balance, right 6 dB lower: %.2f LU | M/S balance L=-R: %.1f dB (all side)\n", bal, msAnti);
+        CHECK(same > 0.999 && anti < -0.999 && std::fabs(unrel) < 0.05);
+        CHECK(std::fabs(monoSame) < 0.01 && std::fabs(monoLeftOnly + 3.0103) < 0.05 && monoAnti < -100);
+        CHECK(std::fabs(bal - 6) < 0.05 && msAnti > 100);
+    }
+    // --- RTA: a tone lands in its own 1/3-octave band, neighbours well down, peak hold holds ---
+    {
+        bool ok = true;
+        for (int band : {2, 7, 17, 27}) {
+            m->prepare(kFs, 512);
+            feed(*m, {{-20, 2}}, kFs, MeterBridge::bandHz(band));
+            const double at = m->bandDb(band), lo = m->bandDb(band - 2), hi = m->bandDb(band + 2);
+            std::printf("  RTA %7.1f Hz tone -20 dBFS: own band %.2f dB, two bands down %.1f, two bands up %.1f\n", MeterBridge::bandHz(band), at, lo, hi);
+            ok = ok && std::fabs(at + 20) < 0.3 && lo < at - 15 && hi < at - 15;
+        }
+        CHECK(ok);
+        m->prepare(kFs, 512);
+        feed(*m, {{-20, 2}, {-300, 1}});
+        std::printf("  RTA peak hold 1 s after the tone stops: level %.1f dB, peak %.2f dB\n", m->bandDb(17), m->bandPeakDb(17));
+        CHECK(m->bandDb(17) < -30 && std::fabs(m->bandPeakDb(17) + 20) < 0.3);
+    }
+    // --- radar history, vectorscope, reset ---
+    {
+        m->prepare(kFs, 512);
+        feed(*m, {{-23, 10}});
+        const auto hc = m->historyCount();
+        const float last = m->historyLufs(hc - 1);
+        float sl = 0, sr = 0; m->scopeFrame(m->scopeWritten() - 1, sl, sr);
+        std::printf("  history after 10 s: %llu points (every 100 ms once 3 s is filled), last %.2f LUFS; scope frames written %llu\n",
+                    static_cast<unsigned long long>(hc), last, static_cast<unsigned long long>(m->scopeWritten()));
+        CHECK(hc == 71 && std::fabs(last + 23) < 0.1 && m->scopeWritten() == 480000 && sl == sr);
+        m->reset();
+        CHECK(m->integratedLufs() == MeterBridge::kSilent && m->historyCount() == 0 && m->truePeakDbtp(0) == MeterBridge::kSilent);
+    }
+    // --- zero allocation on the audio path ---
+    {
+        m->prepare(kFs, 512);
+        Buf s = sine(997, 512.0 / kFs, -18);
+        std::uint64_t allocs = 0;
+        {
+            AllocScope scope;
+            for (int it = 0; it < 400; ++it) m->process(s.data(), s.data(), 512);
+            allocs = scope.count();
+        }
+        std::printf("  meter audio path, 400 blocks (4.3 s, loudness steps, histograms, history): %llu heap allocations\n", static_cast<unsigned long long>(allocs));
+        CHECK(allocs == 0);
+    }
+}
+
 void benchmarkConsole() {
     std::printf("[console benchmark] (machine-dependent; the CI runner is NOT the rig)\n");
     using clock = std::chrono::steady_clock;
@@ -911,10 +1049,15 @@ void benchmarkConsole() {
             for (int i = 0; i < iters; ++i) cs->process(l.data(), r.data(), frames);
             const double usCs = std::chrono::duration<double, std::micro>(clock::now() - t0).count() / iters;
 
+            MeterBridge mb; mb.prepare(fs, frames);
+            t0 = clock::now();
+            for (int i = 0; i < iters; ++i) mb.process(l.data(), r.data(), frames);
+            const double usMb = std::chrono::duration<double, std::micro>(clock::now() - t0).count() / iters;
+
             const double budget = 1e6 * frames / fs;
-            std::printf("  %3.0f kHz, %3u frames (%.2f ms): desk 13ch all-on %.1f us (%.2f%%) | step EQ %.1f us (%.2f%%) | twin bus %.1f us (%.2f%%) | colour stage %.1f us (%.2f%%)\n",
-                        fs / 1000, frames, budget / 1000, usDesk, 100 * usDesk / budget, usEq, 100 * usEq / budget, usTb, 100 * usTb / budget, usCs, 100 * usCs / budget);
-            CHECK(usDesk + usEq + usTb + usCs < budget);
+            std::printf("  %3.0f kHz, %3u frames (%.2f ms): desk 13ch all-on %.1f us (%.2f%%) | step EQ %.1f us (%.2f%%) | twin bus %.1f us (%.2f%%) | colour stage %.1f us (%.2f%%) | meter %.1f us (%.2f%%)\n",
+                        fs / 1000, frames, budget / 1000, usDesk, 100 * usDesk / budget, usEq, 100 * usEq / budget, usTb, 100 * usTb / budget, usCs, 100 * usCs / budget, usMb, 100 * usMb / budget);
+            CHECK(usDesk + usEq + usTb + usCs + usMb < budget);
         }
     }
 }
