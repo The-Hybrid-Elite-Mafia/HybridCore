@@ -235,12 +235,16 @@ int main(int argc, char** argv) {
     testFxRack();
     testFxPanel();
     testSynth();
+    testConsoleDesk();
+    testConsoleStepEq();
+    testConsoleTwinBus();
     testUiImage();
     testUiLayout();
     testUiFaceplate();
     testUiParts();
     testUiFont();
     benchmark();
+    benchmarkConsole();
     std::printf("\n%d checks, %d failed -> %s\n", gChecks, gFails, gFails ? "FAIL" : "PASS");
     return gFails ? 1 : 0;
 }

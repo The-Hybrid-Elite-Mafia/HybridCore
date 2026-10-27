@@ -63,6 +63,10 @@ void testResampler();
 void testStemLoader();
 void testStemPlayback();
 void testTransport();
+void testConsoleDesk();
+void testConsoleStepEq();
+void testConsoleTwinBus();
+void benchmarkConsole();
 
 // Folder with faceplates/ and fonts/: <exe dir>/assets (build tree) or <exe dir>/../assets (installed).
 void setExePath(const char* argv0);
