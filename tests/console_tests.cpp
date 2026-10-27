@@ -6,7 +6,9 @@
 #include "TestHarness.hpp"
 
 #include "hybrid/console/ColourStage.hpp"
+#include "hybrid/console/ConsoleRig.hpp"
 #include "hybrid/console/ConsoleSpecs.hpp"
+#include "hybrid/console/FrontTools.hpp"
 #include "hybrid/console/MeterBridge.hpp"
 #include "hybrid/console/StepEq.hpp"
 #include "hybrid/console/StudioDesk.hpp"
@@ -1001,6 +1003,330 @@ void testConsoleMeter() {
     }
 }
 
+// =============================================================================================
+//  FRONT-END TOOLS (our own designs): RESO TAMER, SHUFFLE, TAP ECHO, ToolSlot, TapTempo
+// =============================================================================================
+Buf noise(double seconds, double ampDb, std::uint32_t seed = 12345u) {
+    Buf b(static_cast<std::size_t>(seconds * kFs));
+    const double a = std::pow(10.0, ampDb / 20.0) * std::sqrt(3.0);   // uniform noise with this RMS
+    std::uint32_t x = seed;
+    for (float& v : b) { x = x * 1664525u + 1013904223u; v = static_cast<float>(a * (static_cast<double>(x >> 8) / 8388608.0 - 1.0)); }
+    return b;
+}
+double toneLevel(const Buf& x, double hz, std::size_t from, std::size_t len) {   // dBFS RMS of one frequency (DFT bin)
+    std::complex<double> acc{0, 0};
+    for (std::size_t i = 0; i < len; ++i) acc += static_cast<double>(x[from + i]) * std::polar(1.0, -2 * std::numbers::pi * hz * static_cast<double>(i) / kFs);
+    return 20.0 * std::log10(std::max(std::abs(acc) * 2.0 / static_cast<double>(len) / std::sqrt(2.0), 1e-12));
+}
+
+void testConsoleTools() {
+    std::printf("[console tools] HEM RESO TAMER / SHUFFLE / TAP ECHO (our own designs)\n");
+    namespace RI = reso_ids;
+    // ---------------- RESO TAMER ----------------
+    {
+        auto e = makeResoTamer(); e->prepare(kFs, 512);
+        Buf in = noise(1.0, -20), l = in, r = in;
+        runBlocks(*e, l, r);
+        bool exactOff = l == in && r == in;
+        e->reset(); e->set(RI::id(0, RI::On), 1); e->set(RI::id(0, RI::Freq), 1000);
+        l = in; r = in; runBlocks(*e, l, r);
+        const bool exactDepth0 = l == in && r == in;
+        std::printf("  bands off: output identical %s; band on with DEPTH 0: identical %s\n", exactOff ? "yes" : "NO", exactDepth0 ? "yes" : "NO");
+        CHECK(exactOff && exactDepth0);
+
+        // a steady tone right on the band: cut = how far the narrow band pokes out (+9.03 dB for Q 4 vs Q 0.5)
+        e->set(RI::id(0, RI::Width), 4); e->set(RI::id(0, RI::Threshold), 0); e->set(RI::id(0, RI::Depth), 12);
+        e->reset();
+        Buf t = sine(1000, 1.0, -20); l = t; r = t; runBlocks(*e, l, r);
+        const double cutTone = levelOf(l) - (-20 - 3.0103);
+        const double expect = -10 * std::log10(4.0 / 0.5);
+        std::printf("  1 kHz tone, band at 1 kHz Q 4, THRESHOLD 0, DEPTH 12: output %+.2f dB (expected %+.2f), meter %+.2f dB\n", cutTone, expect, e->meter(RI::MeterGr1));
+        CHECK(std::fabs(cutTone - expect) < 0.3 && std::fabs(e->meter(RI::MeterGr1) - expect) < 0.3);
+        e->set(RI::id(0, RI::Depth), 3); e->reset();
+        l = t; r = t; runBlocks(*e, l, r);
+        const double cut3 = levelOf(l) - (-20 - 3.0103);
+        e->set(RI::id(0, RI::Depth), 12); e->set(RI::id(0, RI::Threshold), 6); e->reset();
+        l = t; r = t; runBlocks(*e, l, r);
+        const double cutThr6 = levelOf(l) - (-20 - 3.0103);
+        std::printf("  DEPTH 3 caps the cut: %+.2f dB; THRESHOLD 6 leaves %+.2f dB (expected %+.2f)\n", cut3, cutThr6, expect + 6);
+        CHECK(std::fabs(cut3 + 3) < 0.2 && std::fabs(cutThr6 - (expect + 6)) < 0.3);
+
+        // broadband noise is left alone (THRESHOLD 3): average cut over the second half
+        e->set(RI::id(0, RI::Threshold), 3); e->reset();
+        Buf nz = noise(2.0, -20); l = nz; r = nz;
+        double grSum = 0; int grN = 0;
+        for (std::size_t i = 0; i < l.size(); i += 256) {
+            e->process(l.data() + i, r.data() + i, 256);
+            if (i > l.size() / 2) { grSum += e->meter(RI::MeterGr1); ++grN; }
+        }
+        std::printf("  white noise, band at 1 kHz, THRESHOLD 3: average cut %.2f dB (should stay near 0)\n", grSum / grN);
+        CHECK(grSum / grN > -1.0);
+
+        // a band elsewhere doesn't touch the tone; LISTEN plays only the band
+        e->set(RI::id(0, RI::Freq), 3000); e->set(RI::id(0, RI::Threshold), 0); e->reset();
+        l = t; r = t; runBlocks(*e, l, r);
+        const double other = levelOf(l) - (-20 - 3.0103);
+        e->set(RI::id(0, RI::Freq), 1000); e->set(RI::id(0, RI::Listen), 1); e->reset();
+        Buf lo = sine(100, 1.0, -20); l = lo; r = lo; runBlocks(*e, l, r);
+        const double listen100 = levelOf(l) - (-20 - 3.0103);
+        l = t; r = t; runBlocks(*e, l, r);
+        const double listen1k = levelOf(l) - (-20 - 3.0103);
+        std::printf("  band at 3 kHz on a 1 kHz tone: %+.2f dB | LISTEN on the 1 kHz band: 1 kHz %+.2f dB, 100 Hz %+.1f dB\n", other, listen1k, listen100);
+        CHECK(std::fabs(other) < 0.5 && std::fabs(listen1k) < 0.3 && listen100 < -25);
+        e->set(RI::id(0, RI::Listen), 0);
+
+        // SPEED: time to reach 63 % of the cut
+        auto attackMs = [&](int speed) {
+            e->set(RI::id(0, RI::Speed), static_cast<float>(speed)); e->reset();
+            Buf x(static_cast<std::size_t>(kFs * 0.5), 0.0f);
+            const Buf tone = sine(1000, 0.3, -20);
+            std::copy(tone.begin(), tone.end(), x.begin() + static_cast<std::ptrdiff_t>(kFs * 0.1));
+            Buf a = x, b = x;
+            for (std::size_t i = 0; i < a.size(); i += 48) {
+                e->process(a.data() + i, b.data() + i, 48);
+                if (i >= static_cast<std::size_t>(kFs * 0.1) && e->meter(RI::MeterGr1) <= 0.632 * expect) return (static_cast<double>(i) - kFs * 0.1) * 1000.0 / kFs;
+            }
+            return -1.0;
+        };
+        const double fast = attackMs(0), med = attackMs(1), slow = attackMs(2);
+        std::printf("  SPEED (time to 63 %% of the cut): FAST %.1f ms, MEDIUM %.1f ms, SLOW %.1f ms\n", fast, med, slow);
+        CHECK(fast > 0 && fast < med && med < slow);
+    }
+    // ---------------- SHUFFLE ----------------
+    {
+        namespace SI = shuffle_ids;
+        auto e = makeShuffle(); e->prepare(kFs, 512);
+        Buf a = noise(0.5, -20, 1), b = noise(0.5, -20, 2), l = a, r = b;
+        runBlocks(*e, l, r);
+        float maxDiff = 0;
+        for (std::size_t i = 0; i < l.size(); ++i) maxDiff = std::max({maxDiff, std::fabs(l[i] - a[i]), std::fabs(r[i] - b[i])});
+        std::printf("  SHUFFLE at defaults: max difference from input %.2g (float rounding only)\n", static_cast<double>(maxDiff));
+        CHECK(maxDiff < 1e-6f);
+        auto sideGain = [&](double hz) {   // a pure side signal (L = -R)
+            e->reset();
+            Buf x = sine(hz, 0.6, -20), y = x;
+            for (float& v : y) v = -v;
+            runBlocks(*e, x, y);
+            return levelOf(x) - (-20 - 3.0103);
+        };
+        auto midGain = [&](double hz) { e->reset(); Buf x = sine(hz, 0.6, -20), y = x; runBlocks(*e, x, y); return levelOf(x) - (-20 - 3.0103); };
+        e->set(SI::Shuffle, 6); e->set(SI::ShuffleFreq, 300);
+        const double s40 = sideGain(40), s5k = sideGain(5000), m40 = midGain(40);
+        e->set(SI::Shuffle, 0); e->set(SI::Mud, 6); e->set(SI::MudFreq, 250);
+        const double mud250 = midGain(250), mud5k = midGain(5000), mudSide = sideGain(250);
+        e->set(SI::Mud, 0); e->set(SI::MonoBass, 1);
+        const double mb40 = sideGain(40), mb1k = sideGain(1000);
+        e->set(SI::MonoBass, 0); e->set(SI::Width, 200);
+        const double w200 = sideGain(1000);
+        e->set(SI::Width, 0);
+        const double w0 = sideGain(1000);
+        e->set(SI::Width, 100); e->set(SI::Output, 6);
+        const double out6 = midGain(1000);
+        std::printf("  SHUFFLE +6 @ 300 Hz: side 40 Hz %+.2f, side 5 kHz %+.2f, mid 40 Hz %+.2f dB\n", s40, s5k, m40);
+        std::printf("  MUD 6 @ 250 Hz: mid 250 Hz %+.2f, mid 5 kHz %+.2f, side 250 Hz %+.2f dB\n", mud250, mud5k, mudSide);
+        std::printf("  MONO BASS: side 40 Hz %+.1f, side 1 kHz %+.2f dB | WIDTH 200 %%: side %+.2f dB, WIDTH 0: side %+.1f dB | OUTPUT +6: %+.2f dB\n", mb40, mb1k, w200, w0, out6);
+        CHECK(s40 > 5.5 && std::fabs(s5k) < 0.2 && std::fabs(m40) < 0.05);
+        CHECK(std::fabs(mud250 + 6) < 0.1 && std::fabs(mud5k) < 0.3 && std::fabs(mudSide) < 0.05);
+        CHECK(mb40 < -12 && std::fabs(mb1k) < 0.2 && std::fabs(w200 - 6.0206) < 0.05 && w0 < -100 && std::fabs(out6 - 6) < 0.05);
+        e->set(SI::Output, 0);
+        Buf x = sine(500, 0.6, -20), y = x; runBlocks(*e, x, y);
+        std::printf("  correlation meter on L = R: %+.3f\n", static_cast<double>(e->meter(SI::MeterCorrelation)));
+        CHECK(e->meter(SI::MeterCorrelation) > 0.999f);
+    }
+    // ---------------- TAP ECHO ----------------
+    {
+        namespace EI = echo_ids;
+        auto e = makeTapEcho(); e->prepare(kFs, 512);
+        Buf a = noise(0.5, -20), l = a, r = a;
+        runBlocks(*e, l, r);
+        const bool exactDry = l == a && r == a;
+        std::printf("  TAP ECHO with MIX 0: output identical %s\n", exactDry ? "yes" : "NO");
+        CHECK(exactDry);
+        auto impulseRun = [&](Buf& L, Buf& R, double seconds) {
+            L.assign(static_cast<std::size_t>(seconds * kFs), 0.0f); R = L; L[0] = 1.0f; R[0] = 1.0f;
+            runBlocks(*e, L, R);
+        };
+        auto peakAt = [](const Buf& x, std::size_t from, std::size_t to) {
+            std::size_t best = from; for (std::size_t i = from; i < to && i < x.size(); ++i) if (std::fabs(x[i]) > std::fabs(x[best])) best = i;
+            return best;
+        };
+        e->set(EI::Note, EI::NoteFree); e->set(EI::Time, 100); e->set(EI::Mix, 100); e->set(EI::Feedback, 50); e->reset();
+        Buf L, R; impulseRun(L, R, 0.5);
+        const std::size_t p1 = peakAt(L, 100, 7000), p2 = peakAt(L, 7000, 14000);
+        double e1 = 0, e2 = 0;
+        for (std::size_t i = p1 - 40; i < p1 + 40; ++i) e1 += L[i] * L[i];
+        for (std::size_t i = p2 - 40; i < p2 + 40; ++i) e2 += L[i] * L[i];
+        const double rep = 10 * std::log10(e2 / e1);
+        std::printf("  TIME 100 ms (FREE): first echo at sample %zu (%.2f ms), second at %zu; FEEDBACK 50 %%: second echo %+.2f dB (expected -6.02)\n",
+                    p1, static_cast<double>(p1) * 1000.0 / kFs, p2, rep);
+        CHECK(p1 >= 4799 && p1 <= 4802 && p2 >= 9598 && p2 <= 9604 && std::fabs(rep + 6.02) < 0.3);
+        e->set(EI::Mode, 1); e->reset(); impulseRun(L, R, 0.5);
+        double l1 = 0, r1 = 0, l2 = 0, r2 = 0;
+        for (std::size_t i = 4700; i < 4900; ++i) { l1 += L[i] * L[i]; r1 += R[i] * R[i]; }
+        for (std::size_t i = 9500; i < 9700; ++i) { l2 += L[i] * L[i]; r2 += R[i] * R[i]; }
+        std::printf("  PING-PONG: 1st echo L %.1f / R %.1f dB, 2nd echo L %.1f / R %.1f dB\n", 10 * std::log10(l1 + 1e-30), 10 * std::log10(r1 + 1e-30), 10 * std::log10(l2 + 1e-30), 10 * std::log10(r2 + 1e-30));
+        CHECK(l1 > 100 * r1 && r2 > 100 * l2);
+        const double n120 = echoNoteMs(5, 120, 0), n90 = echoNoteMs(5, 90, 0), d8 = echoNoteMs(9, 120, 0), t4 = echoNoteMs(7, 120, 0), fr = echoNoteMs(0, 120, 321);
+        std::printf("  NOTE: 1/4 @120 = %.1f ms, 1/4 @90 = %.1f ms, 1/8 D @120 = %.1f ms, 1/4 T @120 = %.1f ms, FREE = %.0f ms\n", n120, n90, d8, t4, fr);
+        CHECK(std::fabs(n120 - 500) < 1e-9 && std::fabs(n90 - 666.6667) < 1e-3 && std::fabs(d8 - 375) < 1e-9 && std::fabs(t4 - 333.3333) < 1e-3 && fr == 321);
+        e->set(EI::Mode, 0); e->set(EI::Note, 5); e->set(EI::Tempo, 120); e->set(EI::Feedback, 0); e->reset(); impulseRun(L, R, 0.7);
+        const std::size_t pq = peakAt(L, 100, 33000);
+        std::printf("  NOTE 1/4 at TEMPO 120: echo at %.2f ms\n", static_cast<double>(pq) * 1000.0 / kFs);
+        CHECK(pq >= 23999 && pq <= 24002);
+        TapTempo tt;
+        const bool first = tt.tap(10.0);
+        tt.tap(10.5); tt.tap(11.0);
+        const bool third = tt.tap(11.5);
+        const double bpm = tt.bpm();
+        const bool afterPause = tt.tap(15.0);
+        std::printf("  TAP: presses every 0.5 s -> %.2f BPM; first press alone %s; after a 3.5 s pause the count restarts %s\n", bpm,
+                    first ? "gave a tempo (WRONG)" : "gives no tempo", afterPause ? "NO" : "yes");
+        CHECK(!first && third && std::fabs(bpm - 120) < 1e-6 && !afterPause);
+    }
+    // ---------------- ToolSlot ----------------
+    {
+        ToolSlot slot; slot.prepare(kFs, 512);
+        Buf a = noise(0.2, -20), l = a, r = a;
+        slot.process(l.data(), r.data(), static_cast<std::uint32_t>(l.size()));
+        const bool offExact = l == a;
+        slot.setType(ToolSlot::Shuffle); slot.tool(ToolSlot::Shuffle).set(shuffle_ids::Width, 0);
+        Buf x = sine(1000, 0.5, -20), y(x.size(), 0.0f);
+        slot.process(x.data(), y.data(), static_cast<std::uint32_t>(x.size()));
+        float diff = 0; for (std::size_t i = x.size() * 3 / 4; i < x.size(); ++i) diff = std::max(diff, std::fabs(x[i] - y[i]));
+        std::printf("  ToolSlot: OFF passes audio untouched %s; SHUFFLE WIDTH 0 makes L-only audio mono (max L-R %.2g)\n", offExact ? "yes" : "NO", static_cast<double>(diff));
+        CHECK(offExact && diff < 1e-6f);
+        std::uint64_t allocs = 0;
+        {
+            AllocScope scope;
+            for (int t = 0; t < 4; ++t) {
+                slot.setType(t);
+                for (int k = 0; k < 20; ++k) slot.process(l.data(), r.data(), 256);
+            }
+            allocs = scope.count();
+        }
+        std::printf("  tools audio path, every tool, switching: %llu heap allocations\n", static_cast<unsigned long long>(allocs));
+        CHECK(allocs == 0);
+    }
+}
+
+// =============================================================================================
+//  HEM CONSOLE RIG: the whole path, saved state
+// =============================================================================================
+void testConsoleRig() {
+    std::printf("[console rig] stems -> desk -> MAIN INSERT rack -> bus comp -> main -> meter; saved state\n");
+    auto rig = std::make_unique<ConsoleRig>();
+    rig->prepare(kFs, 512);
+    const std::size_t N = static_cast<std::size_t>(kFs * 4);
+    Buf t = sine(1000, 4.0, -20), mL(N), mR(N), monL(N), monR(N);
+    auto run = [&](const Buf& in, int ch = 0) {
+        for (Buf* b : {&mL, &mR, &monL, &monR}) b->assign(in.size(), 0.0f);
+        ConsoleRig::Io io;
+        io.stemL[static_cast<std::size_t>(ch)] = in.data(); io.stemR[static_cast<std::size_t>(ch)] = in.data();
+        io.mainL = mL.data(); io.mainR = mR.data(); io.monL = monL.data(); io.monR = monR.data();
+        rig->process(io, static_cast<std::uint32_t>(in.size()));
+    };
+    run(t);
+    const double mainDb = levelOf(mL) - (-20 - 3.0103), monDb = levelOf(monL) - (-20 - 3.0103);
+    std::printf("  defaults, 1 kHz -20 dBFS on channel 1: main %+.3f dB, monitor %+.3f dB, meter integrated %.2f LUFS\n", mainDb, monDb, rig->meter().integratedLufs());
+    CHECK(std::fabs(mainDb) < 0.01 && std::fabs(monDb) < 0.01 && std::fabs(rig->meter().integratedLufs() + 20) < 0.15);
+
+    // MAIN INSERT with every unit OUT, then every unit IN at neutral settings: same timing both ways
+    auto impulseDelay = [&]() {
+        rig->reset();
+        constexpr std::size_t kAt = 9600;   // after the desk's gain glides have settled
+        Buf imp(kAt + 4096, 0.0f); imp[kAt] = 1.0f;
+        Buf oL(imp.size()), oR(imp.size());
+        ConsoleRig::Io io; io.stemL[0] = imp.data(); io.stemR[0] = imp.data(); io.mainL = oL.data(); io.mainR = oR.data();
+        rig->process(io, static_cast<std::uint32_t>(imp.size()));
+        std::size_t best = 0; for (std::size_t i = 0; i < oL.size(); ++i) if (std::fabs(oL[i]) > std::fabs(oL[best])) best = i;
+        return std::pair<std::size_t, float>{best - kAt, oL[best]};
+    };
+    rig->desk().setMaster(StudioDesk::MainInsert, 1);
+    for (int u = 0; u < 3; ++u) rig->setUnitIn(u, false);
+    const auto out = impulseDelay();
+    rig->twinBus().set(twinbus_ids::id(0, twinbus_ids::In), 0); rig->twinBus().set(twinbus_ids::id(1, twinbus_ids::In), 0);
+    for (int u = 0; u < 3; ++u) rig->setUnitIn(u, true);
+    const auto in = impulseDelay();
+    std::printf("  MAIN INSERT rack latency %u samples: all units OUT -> impulse at %zu (%.5f), all IN at neutral (twin bus sides OUT) -> at %zu (%.5f)\n",
+                rig->rackLatency(), out.first, static_cast<double>(out.second), in.first, static_cast<double>(in.second));
+    CHECK(out.first == rig->rackLatency() && in.first == rig->rackLatency() && std::fabs(out.second - 1.0f) < 1e-3f && std::fabs(in.second - 1.0f) < 1e-3f);
+    std::printf("  rack orders: ");
+    for (int o = 0; o < ConsoleRig::kOrderCount; ++o) std::printf("%s%s", o ? " | " : "", ConsoleRig::orderName(o).c_str());
+    std::printf("\n");
+    CHECK(ConsoleRig::orderName(0) == "EQ > BUS > COLOUR" && ConsoleRig::orderName(5) == "COLOUR > BUS > EQ");
+
+    // each order really changes the order: EQ +12 dB at 1 kHz into the colour stage's output trim -6 vs the other way is the same
+    // gain, so check order with the twin bus compressing: EQ before the bus is compressed more than EQ after it
+    rig->setDefaults(); rig->reset();
+    rig->desk().setMaster(StudioDesk::MainInsert, 1);
+    namespace T = twinbus_ids; namespace E = stepeq_ids;
+    for (int s = 0; s < 2; ++s) { rig->twinBus().set(T::id(s, T::Threshold), 0); rig->twinBus().set(T::id(s, T::Ratio), 6); }
+    for (int c = 0; c < 2; ++c) { rig->stepEq().set(E::id(c, E::HiMidFreq), 0); rig->stepEq().set(E::id(c, E::HiMidGain), 10); }
+    Buf tone = sine(800, 2.0, -10);
+    rig->setRackOrder(0); rig->reset(); run(tone); const double eqFirst = levelOf(mL);
+    rig->setRackOrder(2); rig->reset(); run(tone); const double busFirst = levelOf(mL);
+    std::printf("  order matters: EQ > BUS (EQ +12 dB hits the 10:1 compressor) %.2f dBFS vs BUS > EQ %.2f dBFS\n", eqFirst, busFirst);
+    CHECK(busFirst > eqFirst + 6);
+
+    // a channel tool behind the channel INSERT switch
+    rig->setDefaults(); rig->reset();
+    rig->channelTool(0).setType(ToolSlot::Shuffle); rig->channelTool(0).tool(ToolSlot::Shuffle).set(shuffle_ids::Width, 0);
+    Buf left = sine(1000, 1.0, -20), silent(left.size(), 0.0f);
+    auto runLR = [&](const Buf& l, const Buf& r) {
+        mL.assign(l.size(), 0.0f); mR.assign(l.size(), 0.0f);
+        ConsoleRig::Io io; io.stemL[0] = l.data(); io.stemR[0] = r.data(); io.mainL = mL.data(); io.mainR = mR.data();
+        rig->process(io, static_cast<std::uint32_t>(l.size()));
+    };
+    runLR(left, silent);
+    const double rOff = rmsDb(mR, 24000, 48000);
+    rig->desk().setChannel(0, StudioDesk::Insert, 1); rig->reset();
+    runLR(left, silent);
+    const double rOn = rmsDb(mR, 24000, 48000);
+    std::printf("  channel 1 TOOL = SHUFFLE (WIDTH 0), left-only stem: right output INSERT off %.1f dBFS, INSERT on %.2f dBFS\n", rOff, rOn);
+    CHECK(rOff < -100 && std::fabs(rOn - (-20 - 3.0103 - 6.0206)) < 0.1);
+
+    // saved state: every control round-trips through text
+    rig->setDefaults();
+    rig->desk().setChannel(4, StudioDesk::HfGain, 7.5f); rig->desk().setChannel(12, StudioDesk::Fader, -12.25f);
+    rig->desk().setMaster(StudioDesk::BusCompThreshold, -8); rig->setRackOrder(4); rig->setUnitIn(1, false);
+    rig->twinBus().set(T::id(1, T::Attack), 7); rig->colour().set(colour_ids::Drive, 8.5f);
+    rig->channelTool(6).setType(ToolSlot::Echo); rig->channelTool(6).tool(ToolSlot::Echo).set(echo_ids::Feedback, 42);
+    rig->colourTool().setType(ToolSlot::Reso);
+    const std::string saved = rig->saveText();
+    const auto lines = static_cast<int>(std::count(saved.begin(), saved.end(), '\n'));
+    auto rig2 = std::make_unique<ConsoleRig>();
+    const int applied = rig2->loadText(saved);
+    const bool same = rig2->saveText() == saved;
+    const int junk = rig2->loadText("nonsense\nfoo.bar=1\ndesk.ch99.hf=3\ndesk.ch01.nope=2\n# comment=1\n");
+    float v = 0;
+    const bool got = rig2->getByKey("desk.ch05.hf", v);
+    std::printf("  saved state: %d lines, %d applied on load, identical after reload %s; junk lines applied: %d; desk.ch05.hf reads %.2f\n",
+                lines, applied, same ? "yes" : "NO", junk, static_cast<double>(v));
+    CHECK(applied == lines && same && junk == 0 && got && v == 7.5f);
+
+    // zero allocation with everything switched on
+    rig->setDefaults(); rig->prepare(kFs, 512);
+    rig->desk().setMaster(StudioDesk::MainInsert, 1); rig->desk().setMaster(StudioDesk::BusCompIn, 1);
+    for (int c = 0; c < ConsoleRig::kChannels; ++c) {
+        for (int p : {StudioDesk::Hpf, StudioDesk::EqIn, StudioDesk::CompIn, StudioDesk::Insert}) rig->desk().setChannel(c, p, 1);
+        rig->channelTool(c).setType(1 + c % 3);
+    }
+    rig->colour().set(colour_ids::DriveIn, 1); rig->colour().set(colour_ids::Insert, 1); rig->colourTool().setType(ToolSlot::Echo);
+    std::vector<Buf> stems(13, sine(220, 512.0 / kFs, -12));
+    for (Buf* b : {&mL, &mR, &monL, &monR}) b->assign(512, 0.0f);
+    ConsoleRig::Io io;
+    for (std::size_t c = 0; c < 13; ++c) { io.stemL[c] = stems[c].data(); io.stemR[c] = stems[c].data(); }
+    io.mainL = mL.data(); io.mainR = mR.data(); io.monL = monL.data(); io.monR = monR.data();
+    std::uint64_t allocs = 0;
+    {
+        AllocScope scope;
+        for (int it = 0; it < 100; ++it) { rig->setRackOrder(it % 6); rig->setUnitIn(it % 3, it % 2 == 0); rig->process(io, 512); }
+        allocs = scope.count();
+    }
+    std::printf("  whole rig, 13 stems, every section and tool on, rack order and IN switches moving: %llu heap allocations\n", static_cast<unsigned long long>(allocs));
+    CHECK(allocs == 0);
+}
+
 void benchmarkConsole() {
     std::printf("[console benchmark] (machine-dependent; the CI runner is NOT the rig)\n");
     using clock = std::chrono::steady_clock;
@@ -1054,7 +1380,25 @@ void benchmarkConsole() {
             for (int i = 0; i < iters; ++i) mb.process(l.data(), r.data(), frames);
             const double usMb = std::chrono::duration<double, std::micro>(clock::now() - t0).count() / iters;
 
+            // the whole rig: 13 stems, every section on, the rack in, a tool on every channel
+            auto rig = std::make_unique<ConsoleRig>(); rig->prepare(fs, frames);
+            rig->desk().setMaster(StudioDesk::MainInsert, 1); rig->desk().setMaster(StudioDesk::BusCompIn, 1);
+            for (int k = 0; k < 13; ++k) {
+                for (int p : {D::Hpf, D::EqIn, D::CompIn, D::Insert}) rig->desk().setChannel(k, p, 1);
+                rig->channelTool(k).setType(1 + k % 3);
+            }
+            rig->colour().set(colour_ids::DriveIn, 1); rig->colour().set(colour_ids::EqIn, 1);
+            ConsoleRig::Io rio;
+            for (int k = 0; k < 13; ++k) { rio.stemL[static_cast<std::size_t>(k)] = st[static_cast<std::size_t>(k)].data(); rio.stemR[static_cast<std::size_t>(k)] = st[static_cast<std::size_t>(k)].data(); }
+            rio.mainL = o[0].data(); rio.mainR = o[1].data(); rio.monL = o[8].data(); rio.monR = o[9].data();
+            t0 = clock::now();
+            const int rigIters = std::max(1, iters / 4);
+            for (int i = 0; i < rigIters; ++i) rig->process(rio, frames);
+            const double usRig = std::chrono::duration<double, std::micro>(clock::now() - t0).count() / rigIters;
+
             const double budget = 1e6 * frames / fs;
+            std::printf("  %3.0f kHz, %3u frames: WHOLE RIG (13 stems, all on, rack in, 13 tools) %.1f us (%.2f%%)\n", fs / 1000, frames, usRig, 100 * usRig / budget);
+            CHECK(usRig < budget);
             std::printf("  %3.0f kHz, %3u frames (%.2f ms): desk 13ch all-on %.1f us (%.2f%%) | step EQ %.1f us (%.2f%%) | twin bus %.1f us (%.2f%%) | colour stage %.1f us (%.2f%%) | meter %.1f us (%.2f%%)\n",
                         fs / 1000, frames, budget / 1000, usDesk, 100 * usDesk / budget, usEq, 100 * usEq / budget, usTb, 100 * usTb / budget, usCs, 100 * usCs / budget, usMb, 100 * usMb / budget);
             CHECK(usDesk + usEq + usTb + usCs + usMb < budget);

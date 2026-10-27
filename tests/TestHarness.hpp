@@ -68,6 +68,8 @@ void testConsoleStepEq();
 void testConsoleTwinBus();
 void testConsoleColour();
 void testConsoleMeter();
+void testConsoleTools();
+void testConsoleRig();
 void benchmarkConsole();
 
 // Folder with faceplates/ and fonts/: <exe dir>/assets (build tree) or <exe dir>/../assets (installed).

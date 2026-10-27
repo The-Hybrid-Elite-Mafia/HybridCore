@@ -128,6 +128,7 @@ struct Side {
     fx::Oversampler4 osUp[2], osDn[2];
     std::vector<float> up[2];
     fx::DelayLine plain[2], dry[2];
+    fx::DelayLine outDl[2];   // a side switched OUT is delayed by the same latency (timing never changes)
     FirstOrder dc[2];
     std::vector<float> wet[2], dryBuf[2];
     float grMax = 0;
@@ -149,6 +150,7 @@ struct Side {
             up[c].assign(static_cast<std::size_t>(maxBlock) * fx::Oversampler4::kFactor, 0.0f);
             plain[c].prepare(fx::Oversampler4::latency());
             dry[c].prepare(fx::Oversampler4::latency());
+            outDl[c].prepare(fx::Oversampler4::latency());
             dc[c].set(FirstOrder::Type::HighPass, fs, 5.0);
             wet[c].assign(maxBlock, 0.0f);
             dryBuf[c].assign(maxBlock, 0.0f);
@@ -161,7 +163,7 @@ struct Side {
         scHpfL.clear(); scHpfR.clear(); lastScPos = -1;
         gr.clear(); lastRel = lastAtt = -1;
         hold = 0; holdLeft = 0; prevWet[0] = prevWet[1] = 0;
-        for (int c = 0; c < 2; ++c) { osUp[c].clear(); osDn[c].clear(); plain[c].clear(); dry[c].clear(); dc[c].clear(); }
+        for (int c = 0; c < 2; ++c) { osUp[c].clear(); osDn[c].clear(); plain[c].clear(); dry[c].clear(); dc[c].clear(); outDl[c].clear(); }
         lf.clear(); hf.clear(); lf.lastKey = hf.lastKey = -1; lf.lastTime = hf.lastTime = -1; hf.bellGainDb = 1e9f;
         teFast = teSlow = 0;
     }
@@ -245,13 +247,18 @@ private:
         const SideParams s1 = read(0), s2 = read(1);
         const float hfStaticStereo = twinBusStaticGainDb(s2.lfGain);   // side 2's LF/HF GAIN = HF gain in stereo modes
         float over[2] = {0, 0};
+        // A side switched OUT passes its audio through a delay equal to the latency, so switching a side in or out
+        // (or one side out in DUAL MONO / MID-SIDE) never shifts the timing between the two channels.
+        auto passOut = [&](Side& sd, float* x, int c) noexcept {
+            for (std::uint32_t i = 0; i < n; ++i) x[i] = sd.outDl[c].process(x[i], fx::Oversampler4::latency());
+        };
         if (stereo) {
             if (s1.in) runSide(side_[0], s1, A, Bv, KA, KB, n, mode, hfStaticStereo);
-            else side_[0].grMax = 0;
+            else { side_[0].grMax = 0; passOut(side_[0], A, 0); passOut(side_[0], Bv, 1); }
             side_[1].grMax = 0; side_[1].lf.act = side_[1].hf.act = 0;
         } else {
-            if (s1.in) runSide(side_[0], s1, A, nullptr, KA, nullptr, n, mode, 0.0f); else side_[0].grMax = 0;
-            if (s2.in) runSide(side_[1], s2, Bv, nullptr, KB, nullptr, n, mode, 0.0f); else side_[1].grMax = 0;
+            if (s1.in) runSide(side_[0], s1, A, nullptr, KA, nullptr, n, mode, 0.0f); else { side_[0].grMax = 0; passOut(side_[0], A, 0); }
+            if (s2.in) runSide(side_[1], s2, Bv, nullptr, KB, nullptr, n, mode, 0.0f); else { side_[1].grMax = 0; passOut(side_[1], Bv, 0); }
         }
         over[0] = linToDb(peakOf(A, n)) > S::kOverloadDbfs ? 1.0f : 0.0f;
         over[1] = linToDb(peakOf(Bv, n)) > S::kOverloadDbfs ? 1.0f : 0.0f;

@@ -240,6 +240,8 @@ int main(int argc, char** argv) {
     testConsoleTwinBus();
     testConsoleColour();
     testConsoleMeter();
+    testConsoleTools();
+    testConsoleRig();
     testUiImage();
     testUiLayout();
     testUiFaceplate();

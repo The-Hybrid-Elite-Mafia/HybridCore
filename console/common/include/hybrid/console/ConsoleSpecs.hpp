@@ -275,4 +275,28 @@ inline constexpr bool kRtaMonoSum = true;            // UNKNOWN (sum or per chan
 // (MTR-PID only says they are based on the maker's loudness technology).
 } // namespace meter
 
+// =============================================================================================
+//  FRONT-END TOOLS (the slots where the reference desk has microphone preamps). OUR OWN DESIGNS, built for the
+//  engineer's in-computer front end as described (two resonance suppressors in tandem, a "shuffle" for mud, a delay
+//  with tap tempo). No hardware to match: every number here is a HEM design choice, labelled OWN.
+// =============================================================================================
+namespace tools {
+// RESO TAMER: two dynamic notches. Each band compares a narrow band-pass (Q = WIDTH knob) with a wide one (Q 0.5)
+// around the same centre; when the narrow band pokes out above its usual share by more than THRESHOLD, the band
+// cuts it back by up to DEPTH (y = x + (g - 1)·bp(x), a bell cut with gain g at the centre).
+inline constexpr float kResoWideQ = 0.5f;                        // OWN
+inline constexpr float kResoAttackMs[3] = {2.0f, 6.0f, 15.0f};   // OWN: SPEED FAST / MEDIUM / SLOW
+inline constexpr float kResoReleaseMs[3] = {40.0f, 120.0f, 300.0f};
+inline constexpr float kResoDetectFloorDb = -80.0f;              // OWN: below this the detector does nothing (silence)
+// SHUFFLE: mid/side tool. Side low shelf (shuffling) at SHUFFLE FREQ, mid bell cut for mud, side width, mono bass.
+inline constexpr float kShuffleMudQ = 1.4f;                      // OWN
+inline constexpr float kShuffleMonoBassHz = 120.0f;              // OWN (2nd-order high-pass on the side)
+inline constexpr float kShuffleCorrelationMs = 300.0f;           // OWN
+// TAP ECHO: delay with tap tempo.
+inline constexpr float kEchoMaxSeconds = 4.0f;                   // OWN longest delay (longer note values clamp to it)
+inline constexpr float kEchoTimeGlideMs = 60.0f;                 // OWN: time changes glide like tape instead of clicking
+inline constexpr double kTapResetSeconds = 2.0;                  // OWN: a pause longer than this starts a new tap count
+inline constexpr int kTapAverage = 4;                            // OWN: tempo = mean of the last 4 intervals
+} // namespace tools
+
 } // namespace hc::console::spec
