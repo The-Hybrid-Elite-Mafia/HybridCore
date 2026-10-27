@@ -13,7 +13,6 @@
 #include "hybrid/console/StepEq.hpp"
 #include "hybrid/console/TwinBus.hpp"
 #include "hybrid/console/ui/ConsoleScreen.hpp"
-#include "hybrid/io/DeviceProbe.hpp"
 #include "hybrid/media/StemLoader.hpp"
 #include "hybrid/ui/Gl.hpp"
 #include "hybrid/ui/GlWindow.hpp"
@@ -49,7 +48,9 @@ double meanLuma(const hc::ui::Image& img) {
 } // namespace
 
 int wmain(int argc, wchar_t** argv) {
-    io::configureWideConsole();
+    // narrow printf only (UTF-8 text): no wide console mode, which would make printf invalid; unbuffered so a
+    // crash still leaves its last line in the CI log
+    std::setvbuf(stdout, nullptr, _IONBF, 0);
     fs::path out = "shots", stemsDir;
     std::vector<Size> sizes = {{3840, 2160}, {1389, 868}};
     double seconds = 6.0;
@@ -73,7 +74,7 @@ int wmain(int argc, wchar_t** argv) {
                 pos = comma + 1;
             }
         } else {
-            std::wprintf(L"usage: hem_console_snapshot [--out <folder>] [--sizes 3840x2160,1389x868] [--stems <folder>] [--seconds 6]\n");
+            std::printf("usage: hem_console_snapshot [--out <folder>] [--sizes 3840x2160,1389x868] [--stems <folder>] [--seconds 6]\n");
             return 1;
         }
     }
