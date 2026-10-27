@@ -691,6 +691,7 @@ int runClickTest(ui::GlWindow& window, U::ConsoleScreen& screen, App& a, std::ve
             // undo what the press did to the screen (page, panels) before the next control
             a.st.meterTab = saved.meterTab; a.st.bigFirst = saved.bigFirst; a.st.toolTarget = saved.toolTarget; a.st.meterLibSlot = saved.meterLibSlot;
             screen.setPage(pg);
+            settle(); settle();   // e.g. after ZOOM was stepped and put back: the next control is found where it really is
             ++tested;
             const bool good = ok && wheelOk;
             if (!good) ++failed;
