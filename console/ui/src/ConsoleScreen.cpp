@@ -414,11 +414,15 @@ void ConsoleScreen::drawFrame() {
             const std::string s = w.r.w >= 300 ? w.label + "   " + v : v;
             r.fillRound(w.r.inset(2), 12, kGlass, Blend::Over);
             if (hot) r.fillRound({w.r.x + 4, w.r.y + 3, w.r.w - 8, 3}, 1.5f, C::violet.withAlpha(0.85f), Blend::Over, true);
-            const TextStyle st = fitStyle(r, w.r.h >= 70 ? TextStyle::Title : w.r.h >= 56 ? TextStyle::Label : TextStyle::Value, s, w.r.w - 40);
+            const bool arrows = w.r.w >= 160;   // small windows (desk TOOL) give the room to the text
+            const float room = w.r.w - (arrows ? 40.0f : 14.0f);
+            const TextStyle st = fitStyle(r, w.r.h >= 70 ? TextStyle::Title : w.r.h >= 56 ? TextStyle::Label : TextStyle::Value, s, room);
             const bool on = widgetEnabled(w);
-            r.text(st, shorten(r, st, s, w.r.w - 40), w.r.cx(), w.r.cy() + r.capHeight(st) * 0.5f, on ? C::lime : C::dim, Align::Center, on ? TextFx::NeonCrisp : TextFx::Shadowed);
-            r.text(TextStyle::Caption, "<", w.r.x + 12, w.r.cy() + 8, C::dim, Align::Left, TextFx::Shadowed);
-            r.text(TextStyle::Caption, ">", w.r.right() - 12, w.r.cy() + 8, C::dim, Align::Right, TextFx::Shadowed);
+            r.text(st, shorten(r, st, s, room), w.r.cx(), w.r.cy() + r.capHeight(st) * 0.5f, on ? C::lime : C::dim, Align::Center, on ? TextFx::NeonCrisp : TextFx::Shadowed);
+            if (arrows) {
+                r.text(TextStyle::Caption, "<", w.r.x + 12, w.r.cy() + 8, C::dim, Align::Left, TextFx::Shadowed);
+                r.text(TextStyle::Caption, ">", w.r.right() - 12, w.r.cy() + 8, C::dim, Align::Right, TextFx::Shadowed);
+            }
             break;
         }
         case Kind::Leds: d.leds(w); break;

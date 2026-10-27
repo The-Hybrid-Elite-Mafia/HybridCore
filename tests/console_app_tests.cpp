@@ -10,6 +10,7 @@
 #include "hybrid/media/AudioFile.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
@@ -18,6 +19,7 @@
 #include <numbers>
 #include <set>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace hc::test {
@@ -296,6 +298,36 @@ void testConsolePlayer() {
         std::printf("  PRINT STEMS: %zu files (%s), channel 2 direct out POST fader (-6): %.2f dBFS\n", rs->files.size(), names.c_str(), stemDb);
         CHECK(rs->files.size() == 2 && rs->files[1].filename() == "02 Tone_ A_440.wav" && std::fabs(stemDb - (20 * std::log10(0.1) - 3.0103 - 6)) < 0.05);
     }
+    // ---- the background exporter: real files (MP3 44.1 kHz, FLAC 96 kHz) decoded, converted to 48 kHz, rendered ----
+    {
+        const fs::path td = testDataDir();
+        ExportJob ej;
+        ej.files[0] = td / "tone-44k1-stereo.mp3";
+        ej.files[1] = td / "tone-96k-24bit.flac";
+        ej.rigState = ConsoleRig().saveText();
+        ej.out = dir / "bg.wav";
+        ConsoleExporter ex;
+        const bool started = ex.start(ej);
+        const bool refused = !ex.start(ej);   // one at a time
+        float maxProgress = 0;
+        std::expected<ExportResult, std::string> got = std::unexpected(std::string("timeout"));
+        for (int i = 0; i < 6000; ++i) {
+            maxProgress = std::max(maxProgress, ex.progress());
+            if (ex.takeResult(got)) break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
+        if (got) {
+            auto back = media::decodeFile(got->files[0]);
+            std::printf("  background export of the real test files: %s, %.2f s long, %.1f LUFS, progress reached %.0f %%, a second start while busy refused %s%s%s\n",
+                        back ? back->format.c_str() : "unreadable", static_cast<double>(got->frames) / 48000.0, got->integratedLufs, 100.0 * maxProgress,
+                        refused ? "yes" : "NO", got->warning.empty() ? "" : "; warning: ", got->warning.c_str());
+            CHECK(started && refused && back.has_value() && back->sampleRate == 48000 && got->frames > 0 && got->warning.empty());
+        } else {
+            std::printf("  background export FAILED: %s\n", got.error().c_str());
+            CHECK(false);
+        }
+    }
+
     // ---- session file ----
     SessionData sd;
     sd.files[0] = job.out.parent_path() / "mix.wav";

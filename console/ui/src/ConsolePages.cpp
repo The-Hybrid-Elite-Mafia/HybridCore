@@ -203,9 +203,9 @@ void deskPage(B& b, ConsoleRig& rig, const AppState& app) {
         b.section({x, kTop, kW, 1830}, "");
         b.engrave(std::to_string(ch + 1), x + kW * 0.5f, 205, 1, false, C::violet);
         // TOOL slot (where the reference desk has its microphone preamp)
-        Widget& tool = b.sel({x + 8, 216, 112, 48}, "", toolType(rig.channelTool(ch)));
+        Widget& tool = b.sel({x + 6, 216, 134, 48}, "", toolType(rig.channelTool(ch)));
         tool.tip = "TOOL behind this channel's INSERT switch";
-        b.button({x + 126, 216, 60, 48}, "ED", Act::EditTool, ch).tip = "Open this channel's tool on the TOOLS page";
+        b.button({x + 144, 216, 44, 48}, "ED", Act::EditTool, ch).tip = "Open this channel's tool on the TOOLS page";
         // input
         b.knob(sq(c0, 344, 76), "TRIM", deskCh(rig, ch, D::Trim), false);
         b.sw(box(c1, 308, 84, 36), "MONO", deskCh(rig, ch, D::Mono), C::amber);

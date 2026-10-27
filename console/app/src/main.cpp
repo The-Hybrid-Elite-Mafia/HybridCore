@@ -601,6 +601,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             if (a.settings.get("dirty", "1") == "1") a.savedSnapshot.clear();   // unsaved changes last time: still unsaved
             a.say("Welcome back: your last session is restored");
         } else {
+            a.savedSnapshot = a.snapshot();   // nothing to save yet
             a.say("LOAD STEMS (or drag files onto the window) to start", 12);
         }
     }
