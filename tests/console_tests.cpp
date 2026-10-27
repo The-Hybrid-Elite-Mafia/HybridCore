@@ -1268,6 +1268,26 @@ void testConsoleRig() {
     std::printf("  order matters: EQ > BUS (EQ +12 dB hits the 10:1 compressor) %.2f dBFS vs BUS > EQ %.2f dBFS\n", eqFirst, busFirst);
     CHECK(busFirst > eqFirst + 6);
 
+    // TWIN BUS EXT S/C keyed by the EXT 2 return (not summed into main: only the key)
+    {
+        rig->setDefaults(); rig->reset();
+        rig->desk().setMaster(StudioDesk::MainInsert, 1);
+        rig->twinBus().set(T::ExtSc, 1);
+        for (int s = 0; s < 2; ++s) { rig->twinBus().set(T::id(s, T::Threshold), 0); rig->twinBus().set(T::id(s, T::Ratio), 6); }
+        Buf quiet = sine(1000, 2.0, -30), key = sine(60, 2.0, -6);
+        auto runKey = [&](const Buf* k) {
+            mL.assign(quiet.size(), 0.0f); mR.assign(quiet.size(), 0.0f);
+            ConsoleRig::Io io; io.stemL[0] = quiet.data(); io.stemR[0] = quiet.data(); io.mainL = mL.data(); io.mainR = mR.data();
+            if (k) { io.ext2L = k->data(); io.ext2R = k->data(); }
+            rig->reset();
+            rig->process(io, static_cast<std::uint32_t>(quiet.size()));
+            return levelOf(mL);
+        };
+        const double noKey = runKey(nullptr), keyed = runKey(&key);
+        std::printf("  TWIN BUS EXT S/C = COMP, key = EXT 2 (-6 dBFS, not sent to main): quiet stem %.2f dBFS without the key, %.2f dBFS with it\n", noKey, keyed);
+        CHECK(keyed < noKey - 6);
+    }
+
     // a channel tool behind the channel INSERT switch
     rig->setDefaults(); rig->reset();
     rig->channelTool(0).setType(ToolSlot::Shuffle); rig->channelTool(0).tool(ToolSlot::Shuffle).set(shuffle_ids::Width, 0);

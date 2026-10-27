@@ -72,6 +72,7 @@ option(HC_BUILD_APPS "Build The Hybrid Core app, its tools, plug-ins and tests" 
 option(HC_BUILD_VST3 "Also build the VST3 plug-in (fetches the MIT-licensed Steinberg VST3 SDK)" OFF)
 if(HC_BUILD_APPS)
     add_subdirectory(app)
+    add_subdirectory(console/app)   # HEM Digital Console app + its snapshot tool
     add_subdirectory(tools/device_probe)
     add_subdirectory(tools/engine_smoke)
     add_subdirectory(tools/ui_snapshot)

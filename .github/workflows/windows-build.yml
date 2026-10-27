@@ -2,6 +2,11 @@ name: Windows build
 
 on:
   workflow_dispatch:
+    inputs:
+      console_release:
+        description: 'Publish the HEM Digital Console installer as GitHub Release console-v<console/VERSION>'
+        type: boolean
+        default: false
 
 jobs:
   wasapi:
@@ -128,3 +133,76 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tools\ci\run-and-report.ps1 -Title "release: publish" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\publish-release.ps1'
+
+  console:
+    name: HEM Digital Console (app, screenshots, installer)
+    runs-on: windows-2022
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Configure (no ASIO - safe to share)
+        run: |
+          tools\ci\run-and-report.ps1 -Title "console: configure" -Exe cmake -ArgList '--preset','rig-public'
+
+      - name: Build the console app, snapshot tool, tests
+        run: |
+          tools\ci\run-and-report.ps1 -Title "console: build" -Exe cmake -ArgList '--build','--preset','rig-public-release','--target','HEMDigitalConsole','hem_console_snapshot','hc_tests','hc_device_probe' -WarningSummary
+
+      - name: Unit tests (whole suite)
+        run: |
+          tools\ci\publish-console-report.ps1 -Exe build\rig-public\tests\Release\hc_tests.exe
+
+      - name: Software OpenGL (Mesa llvmpipe, CI only, not shipped)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tools\ci\run-and-report.ps1 -Title "console: fetch mesa" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\fetch-mesa.ps1','-TargetDirs','build\rig-public\console\app\Release'
+
+      - name: Every faceplate, live rig, 3840x2160 + 1389x868
+        env:
+          GALLIUM_DRIVER: llvmpipe
+        run: |
+          tools\ci\run-and-report.ps1 -Title "console: snapshots" -Exe .\build\rig-public\console\app\Release\hem_console_snapshot.exe -ArgList '--out','console-shots','--sizes','3840x2160,1389x868','--seconds','6'
+
+      - name: Start the real app and capture its window
+        env:
+          GALLIUM_DRIVER: llvmpipe
+        run: |
+          tools\ci\run-and-report.ps1 -Title "console: app smoke run" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\run-console-smoke.ps1','-Exe','build\rig-public\console\app\Release\HEMDigitalConsole.exe','-Shot','console-shots\app_window.png'
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          tools\ci\run-and-report.ps1 -Title "console: app opens a session from the command line" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\run-console-smoke.ps1','-Exe','build\rig-public\console\app\Release\HEMDigitalConsole.exe','-Shot','console-shots\app_session.png','-StemsDir','tests\data','-Page','4'
+
+      - name: Publish screenshots to the console-screenshots branch
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tools\ci\run-and-report.ps1 -Title "console: publish screenshots" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\publish-screenshots.ps1','-Folder','console-shots','-Branch','console-screenshots'
+
+      - name: Build installer
+        env:
+          HEM_CONSOLE_RELEASE: ${{ inputs.console_release && '1' || '0' }}
+        run: |
+          tools\ci\run-and-report.ps1 -Title "console: installer build" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\build-console-installer.ps1'
+
+      - name: Verify installer (install, self-test, app start, upgrade, uninstall)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GALLIUM_DRIVER: llvmpipe
+        run: |
+          tools\ci\run-and-report.ps1 -Title "console: installer verify" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\verify-console-installer.ps1','-Installer',"$env:HEM_CONSOLE_INSTALLER"
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: HEMDigitalConsole-Setup-${{ env.HEM_CONSOLE_VERSION }}
+          path: installer/output/HEMDigitalConsole-Setup-*.exe
+
+      - name: Publish GitHub Release console-v<version> (only when asked)
+        if: inputs.console_release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tools\ci\run-and-report.ps1 -Title "console: release publish" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\publish-console-release.ps1'

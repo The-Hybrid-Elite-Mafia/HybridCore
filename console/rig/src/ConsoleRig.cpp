@@ -66,6 +66,7 @@ struct ConsoleRig::Impl {
     ToolSlot colourTool;
     RackInsert rack;
     std::atomic<int> order{0};
+    std::atomic<bool> meterReset{false};
     std::array<std::atomic<bool>, kUnitCount> unitIn{};
     std::array<std::array<fx::DelayLine, 2>, kUnitCount> outDelay;   // used while a unit is out
     std::vector<float> mainL, mainR, scratchL, scratchR;
@@ -162,13 +163,17 @@ void ConsoleRig::reset() noexcept {
 
 void ConsoleRig::process(const Io& io, std::uint32_t frames) noexcept {
     Impl& d = *d_;
+    if (d.meterReset.exchange(false, std::memory_order_acq_rel)) d.meter.reset();
     for (std::uint32_t done = 0; done < frames;) {
         const std::uint32_t n = std::min(frames - done, d.maxBlock);
+        auto at = [done](const float* p) noexcept { return p ? p + done : nullptr; };
+        auto atW = [done](float* p) noexcept { return p ? p + done : nullptr; };
         StudioDesk::Inputs in;
         for (std::size_t c = 0; c < StudioDesk::kChannels; ++c) {
-            in.left[c] = io.stemL[c] ? io.stemL[c] + done : nullptr;
-            in.right[c] = io.stemR[c] ? io.stemR[c] + done : nullptr;
+            in.left[c] = at(io.stemL[c]);
+            in.right[c] = at(io.stemR[c]);
         }
+        in.ext1L = at(io.ext1L); in.ext1R = at(io.ext1R); in.ext2L = at(io.ext2L); in.ext2R = at(io.ext2R);
         StudioDesk::Outputs out;
         out.mainL = io.mainL ? io.mainL + done : d.mainL.data();
         out.mainR = io.mainR ? io.mainR + done : d.mainR.data();
@@ -176,6 +181,10 @@ void ConsoleRig::process(const Io& io, std::uint32_t frames) noexcept {
         out.monR = io.monR ? io.monR + done : nullptr;
         out.altL = io.altL ? io.altL + done : nullptr;
         out.altR = io.altR ? io.altR + done : nullptr;
+        out.cue1L = atW(io.cue1L); out.cue1R = atW(io.cue1R); out.cue2L = atW(io.cue2L); out.cue2R = atW(io.cue2R);
+        for (std::size_t c = 0; c < StudioDesk::kChannels; ++c) { out.directL[c] = atW(io.directL[c]); out.directR[c] = atW(io.directR[c]); }
+        // TWIN BUS EXT S/C: the key is the EXT 2 return (a file loaded into EXT 2)
+        twinBusSetKey(*d.units[UnitTwinBus], in.ext2L, in.ext2R ? in.ext2R : in.ext2L);
         d.desk.process(in, out, n);
         d.meter.process(out.mainL, out.mainR, n);
         done += n;
@@ -187,6 +196,7 @@ const StudioDesk& ConsoleRig::desk() const noexcept { return d_->desk; }
 fx::Effect& ConsoleRig::unit(int u) noexcept { return *d_->units[static_cast<std::size_t>(std::clamp(u, 0, kUnitCount - 1))]; }
 const fx::Effect& ConsoleRig::unit(int u) const noexcept { return *d_->units[static_cast<std::size_t>(std::clamp(u, 0, kUnitCount - 1))]; }
 MeterBridge& ConsoleRig::meter() noexcept { return d_->meter; }
+void ConsoleRig::requestMeterReset() noexcept { d_->meterReset.store(true, std::memory_order_release); }
 ToolSlot& ConsoleRig::channelTool(int ch) noexcept { return d_->tools[static_cast<std::size_t>(std::clamp(ch, 0, kChannels - 1))]; }
 const ToolSlot& ConsoleRig::channelTool(int ch) const noexcept { return d_->tools[static_cast<std::size_t>(std::clamp(ch, 0, kChannels - 1))]; }
 ToolSlot& ConsoleRig::colourTool() noexcept { return d_->colourTool; }

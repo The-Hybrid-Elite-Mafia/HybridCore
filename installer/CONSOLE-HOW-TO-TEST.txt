@@ -1,0 +1,58 @@
+HEM DIGITAL CONSOLE - HOW TO TEST
+=================================
+
+1. START IT
+   Double-click "HEM Digital Console" on the desktop. It opens full screen.
+   The DEVICE button (bottom right) shows where the sound goes. Click it to step to the next output
+   (your speakers, the soundbar on HDMI, your headset). If an output can't play, it says so - click DEVICE again.
+
+2. LOAD YOUR STEMS
+   Click LOAD STEMS (bottom left) and pick up to 13 files (WAV, MP3, FLAC). They go onto channels 1 to 13
+   in name order. You can also drag files from a folder onto the window.
+   Click a channel's name strip (bottom of the channel) to load one file into just that channel.
+   Right-click a name strip to empty it.
+
+3. PLAY
+   PLAY / PAUSE, STOP, |< (back to the start), LOOP. Click or drag the long bar to jump in the song.
+   Keyboard: SPACE play/pause, HOME start, END stop, L loop, 1-6 the pages.
+
+4. THE PAGES (tabs at the top)
+   DESK       the 13-channel desk: TRIM, MONO, PHASE, HPF, two cue sends, 3-band EQ with the two BELL switches,
+              the one-knob compressor, PAN, INSERT, BUS B, PFL, faders and meters. Right side: bus compressor,
+              EXT returns, Bus B, the monitor section, the main meter and the main fader.
+   STEP EQ    the 2-channel 4-band stepped mastering EQ.
+   TWIN BUS   the 2-channel bus compressor with the dynamic EQ.
+   COLOUR     drive, tone EQ, HF compressor, stereo image, transformer.
+   METER      loudness (LUFS), true peak, range, spectrum, stereo, the loudness radar.
+   TOOLS      the front-end tools that sit where the desk has its mic preamps: RESO TAMER (two dynamic notches),
+              SHUFFLE (mud and width), TAP ECHO (delay with TAP). Pick a tool on a channel with its TOOL window
+              (top of the channel), then light that channel's INS switch. ED opens it on the TOOLS page.
+
+5. THE RACK
+   The STEP EQ, TWIN BUS and COLOUR STAGE sit on the desk's MAIN INSERT. Light MAIN INSERT (desk, right side)
+   to hear them. RACK at the top picks their order. RACK IN (desk) or RACK IN on each page takes a unit out.
+
+6. KNOBS
+   Drag up / down. Hold SHIFT or CTRL for fine moves. Mouse wheel works too.
+   Double-click (or right-click) a knob or fader: back to its start position.
+   Hover any control to see its name and value.
+
+7. SAVE, OPEN, EXPORT
+   SAVE / OPEN keep a session (.hemc): your stems and every control. NEW starts clean.
+   EXPORT writes the MAIN OUT to a WAV (24-bit, 48 kHz), offline, with the same sound as playback.
+   PRINT STEMS writes each channel's direct out to its own WAV (D.POST on a channel = after its fader).
+   When you close the console, everything is kept and comes back the next time you open it.
+
+8. RESET
+   RESET (bottom bar) asks SURE?, then puts every control back to its start (your stems stay).
+   For 15 seconds after, it says UNDO: press it to get everything back.
+
+9. DIAGNOSTICS (Start menu, HEM Digital Console folder)
+   Rig Check         lists your CPU and audio outputs.
+   Engine Self-Test  runs every measured test of the engines (the same tests GitHub runs).
+   Screen Snapshots  saves pictures of every page to a folder on your desktop.
+
+WHAT IS NOT KNOWN YET
+   The sound is built from the manuals and the makers' published graphs, "in the spirit of" the real gear.
+   It has not been compared by ear or by recording against your engineer's actual units.
+   Guesses are labelled ASSUMED in the code (one file: ConsoleSpecs.hpp).

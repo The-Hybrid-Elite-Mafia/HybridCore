@@ -242,6 +242,8 @@ int main(int argc, char** argv) {
     testConsoleMeter();
     testConsoleTools();
     testConsoleRig();
+    testConsoleUi();
+    testConsolePlayer();
     testUiImage();
     testUiLayout();
     testUiFaceplate();

@@ -7,7 +7,7 @@
 //                                                (any order, each with its own IN switch)
 //             ─► desk bus compressor ─► main fader ─► MAIN OUT ─► HEM METER BRIDGE
 //             └─► desk monitor section ─► MONITOR OUT (what you hear) / ALT OUT
-//  The COLOUR STAGE's own INSERT holds a TOOL slot too.
+//  The COLOUR STAGE's own INSERT holds a TOOL slot too. The TWIN BUS's external side-chain key is the EXT 2 return.
 //
 //  Threads:
 //    message thread : prepare() (allocates), reset(), loadText(), setDefaults()
@@ -38,9 +38,12 @@ public:
 
     struct Io {
         std::array<const float*, StudioDesk::kChannels> stemL{}, stemR{};   // nullptr = silent channel; R nullptr = mono
+        const float *ext1L = nullptr, *ext1R = nullptr, *ext2L = nullptr, *ext2R = nullptr;   // EXT 1 / EXT 2 returns
         float *mainL = nullptr, *mainR = nullptr;   // MAIN OUT (what is printed / exported)
         float *monL = nullptr, *monR = nullptr;     // MONITOR OUT
         float *altL = nullptr, *altR = nullptr;     // ALT OUT
+        float *cue1L = nullptr, *cue1R = nullptr, *cue2L = nullptr, *cue2R = nullptr;   // ST CUE 1 / 2 mixes
+        std::array<float*, StudioDesk::kChannels> directL{}, directR{};   // direct outs (stem printing)
     };
 
     ConsoleRig();
@@ -61,6 +64,8 @@ public:
     [[nodiscard]] fx::Effect& twinBus() noexcept { return unit(UnitTwinBus); }
     [[nodiscard]] fx::Effect& colour() noexcept { return unit(UnitColour); }
     [[nodiscard]] MeterBridge& meter() noexcept;
+    // The meter's RESET from the UI thread: done by the audio thread at the start of the next process().
+    void requestMeterReset() noexcept;
     [[nodiscard]] ToolSlot& channelTool(int ch) noexcept;          // behind each channel's INSERT switch
     [[nodiscard]] const ToolSlot& channelTool(int ch) const noexcept;
     [[nodiscard]] ToolSlot& colourTool() noexcept;                 // behind the COLOUR STAGE's INSERT switch
