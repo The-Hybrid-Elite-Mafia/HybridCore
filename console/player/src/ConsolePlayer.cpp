@@ -242,6 +242,9 @@ std::expected<ExportResult, std::string> renderExport(const ExportJob& job, cons
     auto rig = std::make_unique<ConsoleRig>();
     rig->loadText(job.rigState);
     rig->prepare(static_cast<double>(hc::kSampleRate), kBlock);
+    // the export's loudness numbers measure the whole render, whatever the meter's RUN / FOLLOW TRANSPORT are set to
+    rig->meter().set(meter_ids::Run, 1.0f);
+    rig->meter().setTransportPlaying(true);
     rig->reset();
     const bool mix = job.kind == ExportJob::Kind::Mix;
     const std::uint32_t latency = mix && rig->desk().master(StudioDesk::MainInsert) > 0.5f ? rig->rackLatency() : 0;

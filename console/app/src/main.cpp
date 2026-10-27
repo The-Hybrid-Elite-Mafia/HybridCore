@@ -236,7 +236,48 @@ struct App {
     std::string notice;
     Clock::time_point noticeUntil{}, resetUntil{};
     std::string resetBackup, savedSnapshot;
+    std::string meterRecalled;   // the meter settings as last recalled (EDITED shows once they differ)
+    bool wasPlaying = false;
     HWND hwnd = nullptr;
+
+    // METER LIBRARY: the user slots live in %APPDATA%\HEM Digital Console\meter-presets.ini ("userN.<id>=value"),
+    // so they belong to the console, not to one session (like the presets folder on the reference unit).
+    void meterRecall() {
+        auto& mb = rig.meter();
+        const int k = st.meterLibSlot;
+        if (!U::meterLibIsUser(k)) {
+            mb.applyFactoryPreset(k);
+        } else {
+            const std::string prefix = "user" + std::to_string(k - hc::console::MeterBridge::factoryPresetCount() + 1) + ".";
+            std::istringstream in(readFile(data / L"meter-presets.ini"));
+            std::string line, body;
+            while (std::getline(in, line)) if (line.starts_with(prefix)) body += line.substr(prefix.size()) + "\n";
+            if (body.empty()) { say(std::string(U::meterLibName(k)) + " is empty: STORE into it first"); return; }
+            mb.applySettingsText(body);
+        }
+        st.meterPreset = U::meterLibName(k);
+        meterRecalled = mb.settingsText();
+        st.meterEdited = false;
+        settings.set("meter.preset", st.meterPreset);
+        settings.set("meter.recalled", "");
+        say(std::string("METER: ") + st.meterPreset + " recalled", 4);
+    }
+    void meterStore() {
+        const int k = st.meterLibSlot;
+        if (!U::meterLibIsUser(k)) { say("Factory presets can't be overwritten: pick a USER slot"); return; }
+        const std::string prefix = "user" + std::to_string(k - hc::console::MeterBridge::factoryPresetCount() + 1) + ".";
+        std::istringstream in(readFile(data / L"meter-presets.ini"));
+        std::string line, out = "; HEM Digital Console - meter LIBRARY user presets\n";
+        while (std::getline(in, line)) if (!line.starts_with(prefix) && !line.starts_with(";") && !line.empty()) out += line + "\n";
+        std::istringstream cur(rig.meter().settingsText());
+        while (std::getline(cur, line)) out += prefix + line + "\n";
+        if (!writeFile(data / L"meter-presets.ini", out)) { say("Could not save the meter preset"); return; }
+        st.meterPreset = U::meterLibName(k);
+        meterRecalled = rig.meter().settingsText();
+        st.meterEdited = false;
+        settings.set("meter.preset", st.meterPreset);
+        say(std::string("METER: stored in ") + st.meterPreset, 4);
+    }
 
     void say(std::string t, int seconds = 8) { notice = std::move(t); noticeUntil = Clock::now() + std::chrono::seconds(seconds); }
     [[nodiscard]] hc::console::ConsoleProcessor& player() { return host.player(); }
@@ -520,6 +561,8 @@ struct App {
             break;
         }
         case U::Act::ResetMeter: rig.requestMeterReset(); break;
+        case U::Act::MeterRecall: meterRecall(); break;
+        case U::Act::MeterStore: meterStore(); break;
         case U::Act::ResetAll: resetPressed(); break;
         case U::Act::Page: settings.set("page", std::to_string(static_cast<int>(screen.page()))); break;
         default: break;
@@ -614,6 +657,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             a.say("LOAD STEMS (or drag files onto the window) to start", 12);
         }
     }
+    a.st.meterPreset = a.settings.get("meter.preset", "DEFAULT");
+    a.meterRecalled = a.rig.meter().settingsText();   // what is on now counts as "as recalled" until something changes
     const int page = opts.page >= 0 ? opts.page : std::atoi(a.settings.get("page", "0").c_str());
     screen.setPage(static_cast<U::PageId>(std::clamp(page, 0, U::kPageCount - 1)));
 
@@ -693,7 +738,14 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         a.st.dspLoad = a.host.status().load;
         if (a.st.resetStage != 0 && Clock::now() > a.resetUntil) { a.st.resetStage = 0; a.resetBackup.clear(); }
         a.st.status = Clock::now() < a.noticeUntil ? a.notice : a.host.status().problem;
-        if (++frame % 30 == 0) a.st.dirty = a.savedSnapshot != a.snapshot();
+        if (++frame % 30 == 0) {
+            a.st.dirty = a.savedSnapshot != a.snapshot();
+            a.st.meterEdited = !a.meterRecalled.empty() && a.meterRecalled != a.rig.meter().settingsText();
+        }
+        // the meter's FOLLOW TRANSPORT / RESET ON PLAY follow the console's own transport
+        a.rig.meter().setTransportPlaying(a.st.playing);
+        if (a.st.playing && !a.wasPlaying && a.rig.meter().get(hc::console::meter_ids::ResetOnPlay) > 0.5f) a.rig.requestMeterReset();
+        a.wasPlaying = a.st.playing;
         a.st.session = a.session.empty() ? "UNTITLED" : u8(a.session.stem());
         if (a.session != shownSession || a.st.dirty != shownDirty) {
             shownSession = a.session; shownDirty = a.st.dirty;

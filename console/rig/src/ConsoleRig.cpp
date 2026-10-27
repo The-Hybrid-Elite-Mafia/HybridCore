@@ -256,6 +256,7 @@ std::uint32_t ConsoleRig::rackLatency() const noexcept {
 void ConsoleRig::setDefaults() noexcept {
     Impl& d = *d_;
     d.desk.setDefaults();
+    d.meter.setDefaults();
     for (auto& u : d.units) u->setDefaults();
     d.stepEqSe->setDefaults();
     d.eqModel.store(EqSpecial);
@@ -280,6 +281,10 @@ std::string ConsoleRig::saveText() const {
     const auto mps = StudioDesk::masterParams();
     for (std::size_t i = 0; i < mps.size(); ++i) line(std::string("desk.") + mps[i].id, d.desk.master(static_cast<int>(i)));
     line("rack.order", static_cast<float>(rackOrder()));
+    {
+        const auto meterPs = MeterBridge::params();
+        for (std::size_t i = 0; i < meterPs.size(); ++i) line(std::string("meter.") + meterPs[i].id, d.meter.get(static_cast<int>(i)));
+    }
     line("rack.eq_model", static_cast<float>(eqModel()));
     for (int u = 0; u < kUnitCount; ++u) line(std::string("rack.in_") + kUnitKey[u], unitIn(u) ? 1.0f : 0.0f);
     for (int c = 0; c < kChannels; ++c) line("tool." + chKey(c) + ".type", static_cast<float>(d.tools[static_cast<std::size_t>(c)].type()));
@@ -306,6 +311,12 @@ bool ConsoleRig::setByKey(std::string_view key, float v) noexcept {
         return true;
     }
     if (key == "rack.order") { setRackOrder(static_cast<int>(std::lround(v))); return true; }
+    if (key.starts_with("meter.")) {
+        const int i = findParam(MeterBridge::params(), key.substr(6));
+        if (i < 0) return false;
+        d.meter.set(i, v);
+        return true;
+    }
     if (key == "rack.eq_model") { setEqModel(static_cast<int>(std::lround(v))); return true; }
     for (int u = 0; u < kUnitCount; ++u)
         if (key == std::string("rack.in_") + kUnitKey[u]) { setUnitIn(u, v > 0.5f); return true; }

@@ -73,13 +73,22 @@ struct AppState {
     int resetStage = 0;                        // RESET button: 0 idle, 1 asking "SURE?", 2 offering UNDO
     float zoom = 1.0f;                         // view zoom (kZoomMin..kZoomMax), saved in the settings
     int bigFirst = 0;                          // BIG DESK: first channel shown (0 .. kChannels - kBigChannels)
+    int meterTab = 0;                          // METER page EDIT panel: 0 RADAR, 1 RTA, 2 SCOPE, 3 GENERAL, 4 LIBRARY
+    int meterLibSlot = 0;                      // LIBRARY: preset picked (factory presets first, then the user slots)
+    std::string meterPreset = "DEFAULT";       // the preset last recalled (shown on the radar; "EDITED:" once changed)
+    bool meterEdited = false;
 };
+inline constexpr int kMeterUserPresets = 8;
 
 // Everything the screen asks the app to do.
 enum class Act : std::uint8_t {
     None, Page, LoadStems, LoadSlot, ClearSlot, Play, Stop, Rewind, Loop, Seek, Export, PrintStems,
     NewSession, OpenSession, SaveSession, Device, Listen, ToolTarget, EditTool, Tap, ResetMeter, ResetAll,
     BigNav,     // BIG DESK: arg = channels to move (+/-), or 100 + channel to show that channel
+    MeterTab,   // METER: EDIT panel page (arg)
+    MeterAuto,  // METER: RTA AUTO scale
+    MeterRecall,// METER: LIBRARY recall (AppState::meterLibSlot)
+    MeterStore, // METER: LIBRARY store into a user slot (AppState::meterLibSlot)
 };
 struct ActionEvent {
     Act act = Act::None;
@@ -120,7 +129,7 @@ enum class Kind : std::uint8_t {
     Custom,     // drawn by the view (radar, spectrum, scope, number grid ...)
 };
 
-enum class CustomId : std::uint8_t { None, StemName, Radar, Rta, Scope, LoudNumbers, StereoBars, GrNeedle, DeskLoud, ToolMeters };
+enum class CustomId : std::uint8_t { None, StemName, Radar, Rta, Scope, LoudNumbers, StereoBars, GrNeedle, DeskLoud, ToolMeters, PeakMeter, MeterStatus };
 
 struct Widget {
     Kind kind = Kind::Knob;
@@ -180,6 +189,11 @@ struct Page {
 [[nodiscard]] float faderDb(float travel) noexcept;
 
 // Normalized position of a control's current value and back (Choice / Toggle snap; faders use the console scale).
+// METER LIBRARY: the name of preset slot k (factory presets, then USER 1..8).
+[[nodiscard]] int meterLibCount() noexcept;
+[[nodiscard]] const char* meterLibName(int k) noexcept;
+[[nodiscard]] bool meterLibIsUser(int k) noexcept;
+
 [[nodiscard]] float widgetNorm(const Widget& w);
 void widgetSetNorm(const Widget& w, float n);
 [[nodiscard]] std::string widgetValueText(const Widget& w);   // "+4.5 dB", "1.5 kHz", "ON"

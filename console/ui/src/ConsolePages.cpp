@@ -577,18 +577,111 @@ void colourPage(B& b, ConsoleRig& rig, const AppState& app) {
 }
 
 // ---- METER BRIDGE ----------------------------------------------------------------------------------
-void meterPage(B& b, ConsoleRig& rig) {
-    (void)rig;
+Ctl meterP(ConsoleRig& rig, int id) {
+    return {&MeterBridge::params()[static_cast<std::size_t>(id)], [&rig, id] { return rig.meter().get(id); },
+            [&rig, id](float v) { rig.meter().set(id, v); }};
+}
+struct LibNames {
+    std::vector<std::string> s;
+    std::vector<const char*> p;
+    LibNames() {
+        for (int k = 0; k < MeterBridge::factoryPresetCount(); ++k) s.emplace_back(MeterBridge::factoryPresetName(k));
+        for (int k = 0; k < kMeterUserPresets; ++k) s.push_back("USER " + std::to_string(k + 1));
+        for (const auto& x : s) p.push_back(x.c_str());
+    }
+};
+const LibNames& libNames() { static const LibNames n; return n; }
+
+void meterPage(B& b, ConsoleRig& rig, AppState& app) {
+    namespace M = meter_ids;
+    MeterBridge& mb = rig.meter();
     b.engrave("HEM METER BRIDGE", 60, 250, 0, false, C::lime);
-    b.engrave("LOUDNESS (ITU-R BS.1770-4 / EBU R128)  /  TRUE PEAK  /  SPECTRUM  /  STEREO", 60, 300, 0, true, C::dim);
-    b.button({3440, 196, 330, 84}, "RESET", Act::ResetMeter, 0, C::red).tip = "Start integrated loudness, range, maxima and history again";
-    b.section({40, 340, 3760, 1650}, "");
-    b.custom({70, 380, 1240, 1240}, CustomId::Radar).tip = "Loudness radar: short-term loudness, one turn = 4 minutes (ASSUMED speed)";
-    b.custom({1340, 380, 860, 1580}, CustomId::LoudNumbers);
-    b.custom({2230, 380, 1540, 800}, CustomId::Rta).tip = "1/3-octave spectrum (L+R), peak hold";
-    b.custom({2230, 1210, 740, 750}, CustomId::Scope).tip = "Vectorscope (mid up, side across)";
-    b.custom({3000, 1210, 770, 750}, CustomId::StereoBars);
-    b.engrave("ONE TURN = 4 MIN", 690, 1700, 1, true);
+    b.engrave("LOUDNESS (ITU-R BS.1770-4 / EBU R128)  /  TRUE PEAK  /  RTA  /  VECTOR SCOPE", 60, 300, 0, true, C::dim);
+    // the front buttons
+    b.sw({1000, 176, 220, 80}, "RUN", meterP(rig, M::Run), C::green).tip = "RUN / PAUSE the loudness measurement (true peak and correlation keep going)";
+    b.button({1236, 176, 220, 80}, "RESET", Act::ResetMeter, 0, C::red).tip = "Start every measurement again (integrated, range, maxima, radar, time)";
+    b.sel({1472, 176, 460, 80}, "VIEW", meterP(rig, M::View)).tip = "Main view: loudness RADAR, RTA (spectrum) or vector SCOPE";
+    Widget& autoB = b.button({1948, 176, 200, 80}, "AUTO", Act::MeterAuto, 0, C::amber);
+    autoB.visible = [&mb] { return static_cast<int>(mb.get(M::View) + 0.5f) == M::ViewRta; };
+    autoB.tip = "AUTO: set the RTA scale from what is playing now (RANGE & TOP or TOP: EDIT > RTA)";
+    b.lamp({2180, 202, 28, 28}, "PEAK", [&mb] { return mb.peakAlert() ? 1.0f : 0.0f; }, C::red).tip = "PEAK: true peak reached the PEAK ALERT level";
+    b.lamp({2350, 202, 28, 28}, "LOUD", [&mb] { return mb.loudAlert() ? 1.0f : 0.0f; }, C::red).tip = "LOUD: momentary loudness reached TARGET + LOUD ALERT";
+    b.readout({2520, 176, 680, 80}, [&mb, &app] {
+        const double t = mb.measuredSeconds();
+        const int h = static_cast<int>(t / 3600), mi = static_cast<int>(t / 60) % 60, se = static_cast<int>(t) % 60;
+        char buf[96];
+        std::snprintf(buf, sizeof buf, "%02d:%02d:%02d  %s  %s%s", h, mi, se, mb.measuring() ? "RUNNING" : "PAUSED",
+                      app.meterEdited ? "EDITED: " : "", app.meterPreset.c_str());
+        return std::string(buf);
+    }, C::text).tip = "Time measured since RESET, and the preset";
+    b.sw({3216, 176, 290, 80}, "FOLLOW PLAY", meterP(rig, M::FollowTransport), C::cyan).tip = "FOLLOW TRANSPORT: measure only while the console plays";
+    b.sw({3520, 176, 290, 80}, "RESET ON PLAY", meterP(rig, M::ResetOnPlay), C::cyan).tip = "RESET ON PLAY: start the measurement again each time PLAY is pressed";
+
+    // main view, descriptors, true-peak meter, channel measures
+    b.section({30, 320, 1660, 1670}, "");
+    auto view = [&mb](int v) { return [&mb, v] { return static_cast<int>(mb.get(M::View) + 0.5f) == v; }; };
+    Widget& radar = b.custom({50, 340, 1620, 1630}, CustomId::Radar);
+    radar.visible = view(M::ViewRadar);
+    radar.tip = "Loudness radar: short-term history (rings set by TARGET and RADAR RESOLUTION), momentary loudness on the outer ring";
+    Widget& rta = b.custom({50, 340, 1620, 1630}, CustomId::Rta);
+    rta.visible = view(M::ViewRta);
+    rta.tip = "Real time analyzer (EDIT > RTA: channels, resolution, speed, hold, scale; CURSOR picks a band)";
+    Widget& scope = b.custom({50, 340, 1620, 1630}, CustomId::Scope);
+    scope.visible = view(M::ViewScope);
+    scope.tip = "Vector scope: L against R (mono = a straight line up the middle)";
+    b.custom({1700, 330, 760, 1650}, CustomId::LoudNumbers).tip = "Loudness descriptors (EDIT > GENERAL: SCREEN LAYOUT)";
+    Widget& tpShort = b.custom({2480, 330, 460, 1160}, CustomId::PeakMeter);
+    tpShort.visible = [&mb] { return mb.get(M::TpFull) < 0.5f; };
+    Widget& tpFull = b.custom({2480, 330, 460, 1650}, CustomId::PeakMeter);
+    tpFull.visible = [&mb] { return mb.get(M::TpFull) >= 0.5f; };
+    tpShort.tip = tpFull.tip = "Peak meter (EDIT > GENERAL: PEAK METER SCALE, PPM ALIGNMENT)";
+    Widget& chm = b.custom({2480, 1510, 460, 470}, CustomId::StereoBars);
+    chm.visible = [&mb] { return mb.get(M::TpFull) < 0.5f; };
+    chm.tip = "Channel measures: correlation and mono deviation";
+
+    // EDIT panel (the unit's EDIT / LIB menus)
+    b.section({2960, 330, 850, 1650}, "EDIT");
+    const char* tabs[] = {"RADAR", "RTA", "SCOPE", "GENERAL", "LIBRARY"};
+    for (int k = 0; k < 5; ++k) {
+        Widget& t = b.button({2976 + 166.0f * static_cast<float>(k), 392, 158, 64}, tabs[k], Act::MeterTab, k, C::violet);
+        t.value = [&app, k] { return app.meterTab == k ? 1.0f : 0.0f; };
+        t.tip = std::string("EDIT: ") + tabs[k] + " settings";
+    }
+    auto onTab = [&app](int k) { return [&app, k] { return app.meterTab == k; }; };
+    auto rows = [&](int tab, std::initializer_list<int> ids) {
+        float y = 480;
+        for (int id : ids) {
+            Widget& w = MeterBridge::params()[static_cast<std::size_t>(id)].taper == Taper::Toggle
+                            ? b.sw({2976, y, 818, 66}, MeterBridge::params()[static_cast<std::size_t>(id)].name, meterP(rig, id), C::cyan)
+                            : b.sel({2976, y, 818, 66}, MeterBridge::params()[static_cast<std::size_t>(id)].name, meterP(rig, id));
+            w.visible = onTab(tab);
+            y += 84;
+        }
+        return y;
+    };
+    rows(0, {M::RadarSpeed, M::RadarRes, M::Target, M::LoudAlert, M::MomRange});
+    rows(1, {M::RtaChannels, M::RtaBands, M::RtaTime, M::RtaHold, M::RtaRange, M::RtaTop, M::RtaAuto, M::RtaCursor});
+    rows(2, {M::ScopePersist, M::ScopeScale, M::ScopeStyle});
+    const float yg = rows(3, {M::Layout, M::LoudMaxMetric, M::Unit, M::MonoDownmix, M::DevSpan, M::PeakAlert, M::PeakHold, M::PeakScale, M::PpmAlign, M::TpFull});
+    for (int k = 0; k < 6; ++k) {
+        Widget& w = b.sel({2976, yg + 84.0f * static_cast<float>(k), 818, 66},
+                          "SLOT " + std::to_string(k + 1), meterP(rig, M::Slot1 + k));
+        w.visible = [&app, &mb] { return app.meterTab == 3 && static_cast<int>(mb.get(M::Layout) + 0.5f) == 6; };
+        w.tip = "CUSTOM layout: descriptor slot " + std::to_string(k + 1);
+    }
+    // LIBRARY
+    static const ParamInfo libInfo{"meter_lib", "Preset", "", 0, static_cast<float>(meterLibCount() - 1), 0, Taper::Choice, libNames().p.data()};
+    Widget& lib = b.sel({2976, 480, 818, 66}, "PRESET", {&libInfo, [&app] { return static_cast<float>(app.meterLibSlot); },
+                                                         [&app](float v) { app.meterLibSlot = std::clamp(static_cast<int>(std::lround(v)), 0, meterLibCount() - 1); }});
+    lib.visible = onTab(4);
+    Widget& rec = b.button({2976, 564, 400, 72}, "RECALL", Act::MeterRecall, 0, C::lime);
+    rec.visible = onTab(4);
+    rec.tip = "Load the picked preset (factory presets set the target, unit, peak alert and momentary range of a delivery standard)";
+    Widget& sto = b.button({3394, 564, 400, 72}, "STORE", Act::MeterStore, 0, C::amber);
+    sto.visible = [&app] { return app.meterTab == 4 && meterLibIsUser(app.meterLibSlot); };
+    sto.tip = "Save every meter setting into the picked USER slot (kept with the console, not with the session)";
+    Widget& note = b.readout({2976, 656, 818, 66}, [&app] { return std::string(meterLibIsUser(app.meterLibSlot) ? "USER SLOT: RECALL OR STORE" : "FACTORY PRESET: RECALL ONLY"); }, C::dim);
+    note.visible = onTab(4);
 }
 
 // ---- TOOLS -----------------------------------------------------------------------------------------
@@ -808,7 +901,7 @@ std::vector<Page> buildPages(ConsoleRig& rig, AppState& app) {
         case PageId::StepEq: stepEqPage(b, rig); break;
         case PageId::TwinBus: twinBusPage(b, rig); break;
         case PageId::Colour: colourPage(b, rig, app); break;
-        case PageId::Meter: meterPage(b, rig); break;
+        case PageId::Meter: meterPage(b, rig, app); break;
         case PageId::Tools: toolsPage(b, rig, app); break;
         case PageId::DeskBig: bigDeskPage(b, rig, app); break;
         default: break;
@@ -857,6 +950,9 @@ std::string widgetValueText(const Widget& w) {
 }
 bool widgetVisible(const Widget& w) { return !w.visible || w.visible(); }
 bool widgetEnabled(const Widget& w) { return !w.enabled || w.enabled(); }
+int meterLibCount() noexcept { return MeterBridge::factoryPresetCount() + kMeterUserPresets; }
+const char* meterLibName(int k) noexcept { return libNames().p[static_cast<std::size_t>(std::clamp(k, 0, meterLibCount() - 1))]; }
+bool meterLibIsUser(int k) noexcept { return k >= MeterBridge::factoryPresetCount(); }
 int widgetArg(const Widget& w) { return w.argFn ? w.argFn() : w.kind == Kind::Custom ? w.customArg : w.arg; }
 int bigDeskFirst(int first, int delta, int jumpTo) noexcept {
     constexpr int kLast = ConsoleRig::kChannels - kBigChannels;

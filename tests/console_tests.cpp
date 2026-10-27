@@ -1130,6 +1130,125 @@ void testConsoleMeter() {
         m->reset();
         CHECK(m->integratedLufs() == MeterBridge::kSilent && m->historyCount() == 0 && m->truePeakDbtp(0) == MeterBridge::kSilent);
     }
+    // --- the EDIT menu / front buttons (MTR-UM) ---
+    {
+        namespace M = meter_ids;
+        // RUN / PAUSE: loudness stops, true peak and correlation go on
+        m->setDefaults(); m->prepare(kFs, 512);
+        feed(*m, {{-23, 5}});
+        const double iBefore = m->integratedLufs(), tBefore = m->measuredSeconds();
+        m->set(M::Run, 0);
+        feed(*m, {{-10, 5}});
+        const double iPaused = m->integratedLufs(), tpPaused = m->truePeakDbtp(0), tPaused = m->measuredSeconds();
+        m->set(M::Run, 1);
+        std::printf("  PAUSE: integrated %.2f before, %.2f after 5 s of -10 dBFS while paused (time since reset %.1f s -> %.1f s); true peak still followed: %.2f dBTP\n",
+                    iBefore, iPaused, tBefore, tPaused, tpPaused);
+        CHECK(std::fabs(iPaused - iBefore) < 0.01 && std::fabs(tPaused - tBefore) < 0.02 && std::fabs(tpPaused + 10) < 0.3);
+        // FOLLOW TRANSPORT: measures only while the console plays
+        m->setDefaults(); m->set(M::FollowTransport, 1); m->prepare(kFs, 512);
+        m->setTransportPlaying(false); feed(*m, {{-23, 2}});
+        const double stopped = m->measuredSeconds();
+        m->setTransportPlaying(true); feed(*m, {{-23, 2}});
+        std::printf("  FOLLOW TRANSPORT: 2 s stopped -> %.1f s measured, then 2 s playing -> %.1f s measured\n", stopped, m->measuredSeconds());
+        CHECK(stopped == 0.0 && std::fabs(m->measuredSeconds() - 2.0) < 0.02);
+        m->set(M::FollowTransport, 0);
+        // SLIDING 10 SEC: the loudest momentary of the last 10 s
+        m->setDefaults(); m->prepare(kFs, 512);
+        feed(*m, {{-14, 3}, {-30, 6}});
+        const double slideIn = m->sliding10Lufs();
+        feed(*m, {{-30, 6}});
+        std::printf("  SLIDING 10 SEC: -14 burst 6 s ago -> %.2f LUFS; 12 s later -> %.2f LUFS\n", slideIn, m->sliding10Lufs());
+        CHECK(std::fabs(slideIn + 14) < 0.2 && std::fabs(m->sliding10Lufs() + 30) < 0.2);
+        // STEREO-MONO DOWNMIX SUM vs -3 dB, DEVIATION SPAN short-term vs program
+        m->setDefaults(); m->set(M::MonoDownmix, 0); m->set(M::DevSpan, 0); m->prepare(kFs, 512);
+        feed(*m, {{-20, 4}});
+        const double sumMono = m->monoDeviationLu();
+        m->set(M::DevSpan, 1); m->prepare(kFs, 512);
+        feed(*m, {{-20, 4}}, kFs, 1000, 0.0);
+        const double progLeft = m->monoDeviationLu();
+        std::printf("  mono deviation: SUM downmix, L=R -> %+.2f LU (manual: about +3); PROGRAM span, left only, SUM -> %+.2f LU\n", sumMono, progLeft);
+        CHECK(std::fabs(sumMono - 3.0103) < 0.05 && std::fabs(progLeft) < 0.05);
+        // PEAK alert lamp and its hold; LOUD lamp
+        m->setDefaults(); m->set(M::PeakAlert, 21); m->set(M::PeakHold, 0); m->prepare(kFs, 512);   // -2.0 dBTP, held 1 s
+        feed(*m, {{-1, 0.2}});
+        const bool lit = m->peakAlert();
+        feed(*m, {{-20, 0.5}});
+        const bool held = m->peakAlert();
+        feed(*m, {{-20, 0.7}});
+        const bool off = m->peakAlert();
+        m->set(M::Target, 12); m->set(M::LoudAlert, 6);   // target index 12 = -24 LUFS m->prepare(kFs, 512);
+        feed(*m, {{-19, 1}});
+        const bool quiet = m->loudAlert();
+        feed(*m, {{-17, 1}});
+        const bool loud = m->loudAlert();
+        std::printf("  PEAK lamp (alert -2 dBTP, hold 1 s): at -1 dBFS %s, 0.5 s later %s, 1.2 s later %s; LOUD lamp (target -24, alert 6 LU): -19 LUFS %s, -17 LUFS %s\n",
+                    lit ? "lit" : "off", held ? "lit" : "off", off ? "lit" : "off", quiet ? "lit" : "off", loud ? "lit" : "off");
+        CHECK(lit && held && !off && !quiet && loud);
+        // peak-meter ballistics: the fall rate of each scale (dB after 1 s of silence from a -6 dBFS tone)
+        std::string fl;
+        bool fallsOk = true;
+        for (int sc : {M::ScaleTp60, M::ScaleDin, M::ScaleNordic, M::ScaleBbc}) {
+            m->setDefaults(); m->set(M::PeakScale, static_cast<float>(sc)); m->prepare(kFs, 512);
+            feed(*m, {{-6, 1}});
+            const double top = m->ppmDb(0);
+            feed(*m, {{-300, 1}});
+            const double fell = top - m->ppmDb(0);
+            const double want = sc == M::ScaleDin ? 20.0 / 1.5 : sc == M::ScaleBbc ? 24.0 / 2.8 : 20.0 / 1.7;
+            char t[96]; std::snprintf(t, sizeof t, " %s: top %.2f, fell %.2f dB/s (set %.2f);", MeterBridge::params()[M::PeakScale].choices[sc], top, fell, want); fl += t;
+            fallsOk = fallsOk && std::fabs(fell - want) < 0.3 && std::fabs(top + (sc == M::ScaleTp60 ? 6.0 : 6.0)) < 0.6;
+        }
+        std::printf("  peak meter scales (ballistics ASSUMED):%s\n", fl.c_str());
+        CHECK(fallsOk);
+        // RTA: channel select, 10-band resolution, integration times
+        m->setDefaults(); m->set(M::RtaChannels, 1); m->prepare(kFs, 512);   // R only
+        feed(*m, {{-20, 1}}, kFs, 1000, 0.0);                               // tone on the left only
+        const double rOnly = m->bandDb(17);
+        m->set(M::RtaChannels, 0); m->prepare(kFs, 512);
+        feed(*m, {{-20, 1}}, kFs, 1000, 0.0);
+        const double lOnly = m->bandDb(17);
+        m->set(M::RtaBands, 0); m->prepare(kFs, 512);
+        feed(*m, {{-20, 1}}, kFs, 1000, 0.0);
+        const double octave = m->octaveDb(5);
+        auto riseMs = [&](int mode) {
+            m->setDefaults(); m->set(M::RtaTime, static_cast<float>(mode)); m->prepare(kFs, 512);
+            Buf l(48), r(48);
+            for (int k = 0; k < 4000; ++k) {
+                for (int i = 0; i < 48; ++i) l[static_cast<std::size_t>(i)] = r[static_cast<std::size_t>(i)] = static_cast<float>(0.1 * std::sin(2 * std::numbers::pi * 1000.0 * (k * 48 + i) / kFs));
+                m->process(l.data(), r.data(), 48);
+                if (m->bandDb(17) >= -20.0 + 10.0 * std::log10(0.632)) return k + 1.0;   // 63 % of the final mean square (in ms: 48 frames = 1 ms)
+            }
+            return -1.0;
+        };
+        const double tSlow = riseMs(0), tFast = riseMs(1), tImp = riseMs(2);
+        std::printf("  RTA: tone on the left, CHANNELS R %.1f dB / L %.2f dB; 10-band (1 kHz octave) %.2f dB; rise to 63 %%: SLOW %.0f ms, FAST %.0f ms, IMPULSE %.0f ms (spec 1000 / 125 / 35)\n",
+                    rOnly, lOnly, octave, tSlow, tFast, tImp);
+        CHECK(rOnly < -100 && std::fabs(lOnly + 20) < 0.3 && std::fabs(octave + 20) < 0.5);
+        CHECK(std::fabs(tSlow - 1000) < 60 && std::fabs(tFast - 125) < 12 && std::fabs(tImp - 35) < 6);
+        // AUTO scale from the bands now playing
+        m->setDefaults(); m->prepare(kFs, 512);
+        feed(*m, {{-23, 1}}, kFs, 1000);
+        m->rtaAutoScale();
+        std::printf("  RTA AUTO with a -23 dB tone: scale top %s, range %s\n", MeterBridge::params()[M::RtaTop].choices[static_cast<int>(m->get(M::RtaTop))],
+                    MeterBridge::params()[M::RtaRange].choices[static_cast<int>(m->get(M::RtaRange))]);
+        CHECK(m->get(M::RtaTop) == 4.0f);   // -20 dBFS
+        // SCREEN LAYOUT descriptors, presets as text
+        m->setDefaults();
+        const auto full = m->descriptors();
+        m->set(M::Layout, 3);
+        const auto live = m->descriptors();
+        m->set(M::Layout, 6); m->set(M::Slot1, M::DescBalance);
+        const auto custom = m->descriptors();
+        const std::string preset = m->settingsText();
+        auto m2 = std::make_unique<MeterBridge>();
+        const int applied = m2->applySettingsText(preset);
+        std::printf("  layouts: FULL LIST %d %d %d %d %d %d, LIVE PRODUCTION %d .. %d %d, CUSTOM slot 1 = %d; preset text %d settings, %d applied, same after %s\n",
+                    full[0], full[1], full[2], full[3], full[4], full[5], live[0], live[4], live[5], custom[0],
+                    static_cast<int>(std::count(preset.begin(), preset.end(), '\n')), applied, m2->settingsText() == preset ? "yes" : "NO");
+        CHECK(full == (std::array<int, 6>{M::DescProgram, M::DescTruePeakMax, M::DescLoudMax, M::DescRange, M::DescPlr, M::DescSliding10}));
+        CHECK(live[0] == M::DescSliding10 && live[4] == M::DescProgram && live[5] == M::DescRange && custom[0] == M::DescBalance);
+        CHECK(applied == M::kCount - 1 && m2->settingsText() == preset);
+        m->setDefaults();
+    }
     // --- zero allocation on the audio path ---
     {
         m->prepare(kFs, 512);

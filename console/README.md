@@ -166,24 +166,28 @@ real measured value). "Left out" = it only makes sense with a physical plug, dev
 
 ### HEM METER BRIDGE
 
-Built from the reference desktop meter's product sheet plus the published standards it follows
-(ITU-R BS.1770-4, EBU R128, EBU Tech 3341 and 3342). The reference's full user manual is not in hand yet,
-so its own buttons and display settings (presets, radar speed, scales) are not built; they wait for the manual.
+Built from the reference desktop meter's user manual (source key MTR-UM, stereo model) plus the published standards it
+follows (ITU-R BS.1770-4, EBU R128, EBU Tech 3341 and 3342). Settings are `meter.<id>` in saved state.
 
-| Reference feature | Engine reading | Status |
+| Reference control / feature | Engine (id / reading) | Status |
 |---|---|---|
-| Momentary / short-term / integrated loudness | `momentaryLufs()`, `shortTermLufs()`, `integratedLufs()` | Built (standard; checked with the standard's test signals) |
-| Loudness range (LRA) | `loudnessRangeLu()` | Built (standard) |
-| Max momentary / max short-term | `maxMomentaryLufs()`, `maxShortTermLufs()` | Built |
-| True peak per channel, sample peak | `truePeakDbtp()`, `truePeakNowDbtp()`, `samplePeakDbfs()` | Built (4x oversampled) |
-| PLR | `plrDb()` | Built |
-| Loudness radar history | `historyCount()`, `historyLufs()` | Built (short-term every 100 ms; radar drawing is Phase 2) |
-| Correlation, L/R balance, M/S balance, mono deviation | `correlation()`, `balanceLrLu()`, `balanceMsDb()`, `monoDeviationLu()` | Built (averaging times ASSUMED) |
-| 1/3-octave spectrum (RTA) with peak hold | `bandHz()`, `bandDb()`, `bandPeakDb()` | Built (averaging and hold ASSUMED) |
-| Vectorscope / stereo position | `scopeWritten()`, `scopeFrame()` | Built (data; drawing is Phase 2) |
-| RESET | `reset()` | Built |
-| AUTO, SCOPE, cursor/frequency knob, LIB, SYS, EDIT, presets, radar settings | — | UNKNOWN: waits for the reference user manual |
-| Inputs (digital/analog/HDMI), network/USB, power | — | Left out: hardware |
+| Button 1: RUN / PAUSE (true peak and correlation keep going) | `run`, `measuring()` | Built |
+| Button 2: RESET (global) | `reset()` | Built |
+| Button 3: RADAR / RTA / VECTOR SCOPE | `view` | Built |
+| RTA: AUTO (scale from the audio now) | `rtaAutoScale()` | Built (rounding to 5 / 10 dB ASSUMED) |
+| Rotary knob: radar speed / RTA cursor / scope scale | `radar_speed`, `rta_cursor`, `scope_scale` | Built (on screen each has its own control) |
+| EDIT Radar: speed (1 min .. 24 h), resolution (3 .. 12 dB), target (-36 .. -6), loud alert, momentary range (+9 / +18) | `radar_speed`, `radar_res`, `target`, `loud_alert`, `mom_range` | Built (in-between steps ASSUMED) |
+| EDIT RTA: channels (L / R / L+R), resolution (10 / 31 bands), integration (Slow 1 s / Fast 125 ms / Impulse 35 ms up 1.5 s down), peak hold, scale range (10 .. 60 dB), scale top, auto scale (range & top / top) | `rta_ch`, `rta_res`, `rta_time`, `rta_hold`, `rta_range`, `rta_top`, `rta_auto` | Built (hold choices, top range ASSUMED) |
+| EDIT Vector scope: channel (L vs R), persistence, scale (0 .. -24 dB, auto fast / slow), style (colour) | `scope_persist`, `scope_scale`, `scope_style` | Built (persistence and colour choices ASSUMED) |
+| EDIT General: screen layout (Normal, Full List, Basic, Live Production, Single Sliding, Single Program, Custom), loudness max metric (M / S), unit (LUFS / LKFS / LU), stereo-mono downmix (sum / -3 dB), deviation span (S / I), peak alert (-12 .. 0 dBTP / off), peak alert hold, peak meter scale (true-peak 60/30/20, digital PPM, DIN, Nordic, BBC, EBU), PPM alignment (-18 EBU / -20 SMPTE) | `layout`, `lmax_metric`, `unit`, `mono_dmx`, `dev_span`, `peak_alert`, `peak_hold`, `peak_scale`, `ppm_align` | Built (layout "Normal" entries, PPM ballistics and scale layouts ASSUMED) |
+| EDIT Layout: descriptor slots, Balance-O-Meter, true-peak meter full height | `slot1..6`, `tp_full` | Built |
+| Descriptors: program loudness, true-peak max, loudness max, loudness range, peak to loudness, sliding 10 sec (+ short-term, momentary, correlation, mono deviation) | `integratedLufs()`, `truePeakDbtp()`, `max*Lufs()`, `loudnessRangeLu()`, `plrDb()`, `sliding10Lufs()` | Built |
+| Radar (short-term history rings, momentary ring, PEAK and LOUD lamps, time since reset) | `historyLufs()`, `momentaryLufs()`, `peakAlert()`, `loudAlert()`, `measuredSeconds()` | Built |
+| Correlation, mono deviation, Balance-O-Meter | `correlation()`, `monoDeviationLu()`, `balanceLrLu()`, `balanceMsDb()` | Built (averaging ASSUMED) |
+| LIBRARY: factory presets, store / recall | `applyFactoryPreset()`, `settingsText()`, `applySettingsText()` | Built (factory contents are our picks from the standards; user slots in %APPDATA%) |
+| Plug-in: follow transport, reset on play | `follow`, `reset_on_play` | Built (follows the console's transport) |
+| Offline mode | — | The console's EXPORT reports integrated loudness and true peak of the render |
+| Source / digital inputs, USB modes, GPI / GPO, LCD brightness / contrast, logo, screenshots, firmware, 5.1 items | — | Left out: hardware (or the stereo model has none) |
 
 ### Front-end tools (our own designs, no reference unit)
 

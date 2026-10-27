@@ -211,7 +211,22 @@ int wmain(int argc, wchar_t** argv) {
                     100.0 * z, static_cast<double>(screen.canvas().scale), static_cast<double>(std::max(U::kMinTextPx, 24.0f * screen.canvas().scale)));
         if (!zok || z < 2.0f) ++failures;
         app.zoom = 1.0f;
-        screen.resize(1389, 868, &err);
+        screen.resize(1920, 1080, &err);
+        // the METER page's other two views and two EDIT pages
+        screen.setPage(U::PageId::Meter);
+        screen.waitForPlate(60);
+        const struct { int view, tab; const char* name; } mv[] = {{1, 1, "RTA"}, {2, 3, "SCOPE"}};
+        for (const auto& v : mv) {
+            rig->meter().set(hc::console::meter_ids::View, static_cast<float>(v.view));
+            app.meterTab = v.tab;
+            screen.renderToCapture();
+            const std::string nm = std::string("HEM-Console-5-METER-") + v.name + "-1920x1080.png";
+            const bool ok = hc::ui::writePng(out / nm, screen.capture());
+            std::printf("%s %s\n", nm.c_str(), ok ? "saved" : "FAILED");
+            if (!ok) ++failures;
+        }
+        rig->meter().set(hc::console::meter_ids::View, 0.0f);
+        app.meterTab = 0;
     }
     screen.shutdown();
     std::printf("%s (%d failure(s))\n", failures ? "FAIL" : "PASS", failures);

@@ -297,9 +297,64 @@ inline constexpr double kCorrelationSeconds = 0.3;   // UNKNOWN integration time
 inline constexpr double kRtaAverageSeconds = 0.3;    // UNKNOWN RTA speed -> ASSUMED
 inline constexpr double kRtaPeakHoldSeconds = 2.0;   // UNKNOWN -> ASSUMED
 inline constexpr double kRtaFilterQ = 2.78;          // ours: two cascaded band-passes give a 1/3-octave -3 dB width
+inline constexpr double kRtaOctaveQ = 0.91;          // ours: the same for the 10-band (1/1-octave) resolution
 inline constexpr bool kRtaMonoSum = true;            // UNKNOWN (sum or per channel) -> ASSUMED (L+R)/2
 // Balance and mono deviation are measured on K-weighted signals over the short-term (3 s) window: ASSUMED definitions
 // (MTR-PID only says they are based on the maker's loudness technology).
+// ---- settings (MTR-UM chapters 6, 7, 9) ----
+// RADAR SPEED "from 1 minute to 24 hours" VERIFIED MTR-UM p.12; the steps in between ASSUMED.
+inline constexpr std::array<double, 12> kRadarSpeedS{60, 120, 240, 480, 900, 1800, 3600, 7200, 14400, 28800, 43200, 86400};
+inline constexpr int kRadarSpeedDefault = 0;                       // 1 min as in the EDIT screenshot (MTR-UM p.12)
+inline constexpr float kRadarResMin = 3, kRadarResMax = 12;       // VERIFIED range; 1 dB steps ASSUMED
+inline constexpr float kRadarResDefault = 3;                      // screenshot value
+inline constexpr float kTargetMin = -36, kTargetMax = -6;         // VERIFIED range; 1 LU steps ASSUMED
+inline constexpr float kTargetDefault = -24;                      // screenshot value
+inline constexpr float kLoudAlertMax = 12;                        // OFF or 1..12 LU above target: range ASSUMED (examples 6, 8 LU)
+inline constexpr float kLoudAlertDefault = 8;                     // screenshot value
+inline constexpr std::array<float, 2> kMomRangeLu{9, 18};         // VERIFIED (+9 / +18 LU above target at the 3 o'clock point)
+inline constexpr int kMomRangeDefault = 1;
+// RTA: integration times VERIFIED MTR-UM p.12 (Slow 1 s, Fast 125 ms, Impulse 35 ms up / 1.5 s down)
+inline constexpr double kRtaSlowS = 1.0, kRtaFastS = 0.125, kRtaImpulseUpS = 0.035, kRtaImpulseDownS = 1.5;
+inline constexpr std::array<double, 8> kRtaHoldS{0, 0.5, 1, 2, 3, 5, 10, 1e9};   // OFF .. HOLD: choices ASSUMED ("2s" shown)
+inline constexpr int kRtaHoldDefault = 3;                         // 2 s (screenshot)
+inline constexpr float kRtaRangeMin = 10, kRtaRangeMax = 60;      // VERIFIED range; 10 dB steps ASSUMED
+inline constexpr float kRtaTopMin = -60, kRtaTopMax = 0;          // ASSUMED range (0 dBFS shown), 5 dB steps ASSUMED
+// VECTOR SCOPE: scale 0 .. -24 dB plus AUTO FAST / AUTO SLOW VERIFIED; persistence choices other than "Off (fast)" ASSUMED.
+inline constexpr int kScopeScaleSteps = 25;                       // 0 .. -24 dB in 1 dB steps (ASSUMED step)
+inline constexpr std::array<double, 4> kScopePersistS{0.02, 0.15, 0.5, 1.3};   // trail length per choice: ASSUMED
+inline constexpr double kScopeAutoFastS = 0.3, kScopeAutoSlowS = 3.0;           // auto-scale speeds: ASSUMED
+// GENERAL: PEAK ALERT -12 .. 0 dBTP or OFF VERIFIED; 0.5 dB steps ASSUMED; PEAK HOLD choices ASSUMED (3 s shown).
+inline constexpr float kPeakAlertMin = -12, kPeakAlertDefault = -1;
+inline constexpr std::array<double, 6> kPeakHoldS{1, 2, 3, 5, 10, 1e9};
+inline constexpr int kPeakHoldDefault = 2;
+inline constexpr std::array<float, 2> kPpmAlignDbfs{-18, -20};    // EBU / SMPTE VERIFIED MTR-UM p.13
+inline constexpr float kSumDownmixDb = 3.0103f;                    // STEREO-MONO DOWNMIX "sum" vs "-3 dB" VERIFIED
+inline constexpr double kSlidingSeconds = 10.0;                    // "Sliding 10 sec" VERIFIED: the max momentary in it ASSUMED
+// The "Normal" entries of the NORMAL layout (MTR-UM p.13 table): UNKNOWN -> ASSUMED short-term and momentary.
+// Peak-meter ballistics (PEAK METER SCALE). The meter manual only names the standards; these numbers are the commonly
+// published IEC 60268-10 / -18 values: ASSUMED (not checked against the standards' own text).
+//   integration = a tone burst this long reads -1 dB (the rectified level charges with tau = integration / 2.2),
+//   fall = dB per second. Scale layouts (where each standard's 0 / TEST / marks sit re the alignment level) are drawn
+//   by the screen and are ASSUMED the same way: DIN 0 dB = alignment + 9 dB (-50 .. +5), Nordic TEST = alignment
+//   (-36 .. +12), BBC mark 4 = alignment with 4 dB a mark (1 .. 7), EBU TEST = alignment (-12 .. +12), digital PPM in
+//   dBFS (-50 .. 0).
+struct PpmBallistics { double integrationS, fallDbPerS; };
+inline constexpr PpmBallistics kTpBallistics{0.0, 20.0 / 1.7};     // true-peak bars: instant rise, 20 dB / 1.7 s fall
+inline constexpr PpmBallistics kDigitalPpm{0.005, 20.0 / 1.7};     // IEC 60268-18
+inline constexpr PpmBallistics kDinPpm{0.010, 20.0 / 1.5};         // IEC 60268-10 Type I (DIN)
+inline constexpr PpmBallistics kNordicPpm{0.005, 20.0 / 1.7};      // IEC 60268-10 Type I (Nordic)
+inline constexpr PpmBallistics kBbcPpm{0.010, 24.0 / 2.8};         // IEC 60268-10 Type IIa (BBC)
+inline constexpr PpmBallistics kEbuPpm{0.010, 24.0 / 2.8};         // IEC 60268-10 Type IIb (EBU)
+// LIBRARY factory presets. The reference unit ships broadcast folders (ATSC A85, EBU R128, Japan TRB32 ...) whose preset
+// contents the manual does not list. Ours set the targets the standards publish (as we know them: ASSUMED, not checked
+// against the standards' text) plus one of OUR OWN for music streaming.
+struct MeterPreset { const char* name; int targetLufs; int unit; float peakAlertDbtp; int momRange; };   // unit 0 LUFS, 1 LKFS
+inline constexpr std::array<MeterPreset, 4> kFactoryPresets{{
+    {"EBU R128", -23, 0, -1.0f, 0},
+    {"ATSC A/85", -24, 1, -2.0f, 1},
+    {"ARIB TR-B32", -24, 1, -1.0f, 1},
+    {"MUSIC STREAMING (OWN)", -14, 0, -1.0f, 1},
+}};
 } // namespace meter
 
 // =============================================================================================

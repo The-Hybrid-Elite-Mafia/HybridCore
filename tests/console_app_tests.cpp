@@ -72,20 +72,21 @@ void testConsoleUi() {
         for (const auto& pi : ps) { if (bound.count(&pi)) ++n; else missingOut.push_back(pi.id); }
         return n;
     };
-    std::vector<std::string> missDesk, missMaster, missEq, missSe, missTb, missCol, missReso, missSh, missEcho;
+    std::vector<std::string> missMeter, missDesk, missMaster, missEq, missSe, missTb, missCol, missReso, missSh, missEcho;
     const int nDesk = covered(StudioDesk::channelParams(), missDesk), nMaster = covered(StudioDesk::masterParams(), missMaster);
     const int nEq = covered(rig->stepEq().params(), missEq), nSe = covered(rig->stepEqSe().params(), missSe), nTb = covered(rig->twinBus().params(), missTb), nCol = covered(rig->colour().params(), missCol);
     const int nReso = covered(rig->channelTool(0).tool(ToolSlot::Reso).params(), missReso);
     const int nSh = covered(rig->channelTool(0).tool(ToolSlot::Shuffle).params(), missSh);
     const int nEcho = covered(rig->channelTool(0).tool(ToolSlot::Echo).params(), missEcho);
     std::printf("  %d widgets on %d pages, %d bound to controls; all inside the 3840x2160 canvas %s\n", widgets, U::kPageCount, controls, inside ? "yes" : "NO");
-    std::printf("  step EQ SE on screen: %d/%zu\n", nSe, rig->stepEqSe().params().size());
+    const int nMeter = covered(MeterBridge::params(), missMeter);
+    std::printf("  step EQ SE on screen: %d/%zu, meter settings on screen: %d/%zu\n", nSe, rig->stepEqSe().params().size(), nMeter, MeterBridge::params().size());
     std::printf("  on screen: desk channel %d/%zu, desk master %d/%zu, step EQ %d/%zu, twin bus %d/%zu, colour %d/%zu, reso %d/%zu, shuffle %d/%zu, echo %d/%zu\n",
                 nDesk, StudioDesk::channelParams().size(), nMaster, StudioDesk::masterParams().size(), nEq, rig->stepEq().params().size(),
                 nTb, rig->twinBus().params().size(), nCol, rig->colour().params().size(), nReso, rig->channelTool(0).tool(ToolSlot::Reso).params().size(),
                 nSh, rig->channelTool(0).tool(ToolSlot::Shuffle).params().size(), nEcho, rig->channelTool(0).tool(ToolSlot::Echo).params().size());
     CHECK(inside && valid);
-    CHECK(missDesk.empty() && missMaster.empty() && missEq.empty() && missSe.empty() && missTb.empty() && missCol.empty() && missReso.empty() && missSh.empty() && missEcho.empty());
+    CHECK(missMeter.empty() && missDesk.empty() && missMaster.empty() && missEq.empty() && missSe.empty() && missTb.empty() && missCol.empty() && missReso.empty() && missSh.empty() && missEcho.empty());
 
     // every clickable control is hit-tested back to itself at its centre (nothing hides another)
     int unreachable = 0, clickable = 0;
@@ -106,6 +107,25 @@ void testConsoleUi() {
     }
     }
     rig->setEqModel(ConsoleRig::EqSpecial);
+    {   // the METER page's EDIT panel pages, the CUSTOM layout slots and the RTA view's AUTO
+        rig->meter().set(meter_ids::Layout, 6); rig->meter().set(meter_ids::View, meter_ids::ViewRta);
+        const auto& mp = pages[static_cast<std::size_t>(U::PageId::Meter)];
+        for (int tab = 0; tab < 5; ++tab) {
+            app.meterTab = tab;
+            app.meterLibSlot = tab == 4 ? MeterBridge::factoryPresetCount() : 0;   // a USER slot: STORE shows
+            U::Controller c([](const U::ActionEvent&) {});
+            c.setPage(&mp);
+            for (std::size_t i = 0; i < mp.widgets.size(); ++i) {
+                const auto& w = mp.widgets[i];
+                const bool click = w.kind == U::Kind::Switch || w.kind == U::Kind::Selector || w.kind == U::Kind::Button || w.kind == U::Kind::Stepped || w.kind == U::Kind::Knob;
+                if (!click || !U::widgetVisible(w)) continue;
+                ++clickable;
+                if (c.hit(w.r.cx(), w.r.cy()) != static_cast<int>(i)) ++unreachable;
+            }
+        }
+        app.meterTab = 0; app.meterLibSlot = 0;
+        rig->meter().setDefaults();
+    }
     std::printf("  %d clickable controls (visible now), unreachable at their centre: %d\n", clickable, unreachable);
     CHECK(unreachable == 0);
 

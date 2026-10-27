@@ -26,7 +26,10 @@ HEM DIGITAL CONSOLE - HOW TO TEST
               band, 20 Hz and 40 kHz bands, HP-FILT + HPF knob, M/S: channel 1 = mid, channel 2 = side).
    TWIN BUS   the 2-channel bus compressor with the dynamic EQ.
    COLOUR     drive, tone EQ, HF compressor, stereo image, transformer.
-   METER      loudness (LUFS), true peak, range, spectrum, stereo, the loudness radar.
+   METER      the loudness meter: RUN (pause / go on), RESET, VIEW (RADAR, RTA spectrum, vector SCOPE), AUTO (RTA),
+              PEAK and LOUD lamps, the loudness numbers, the peak meter, correlation and mono deviation. EDIT on the
+              right: RADAR, RTA, SCOPE, GENERAL (layout, units, alerts, meter scale) and LIBRARY (presets: RECALL,
+              STORE into USER 1-8). FOLLOW PLAY measures only while playing; RESET ON PLAY starts again on PLAY.
    TOOLS      the front-end tools that sit where the desk has its mic preamps: RESO TAMER (two dynamic notches),
               SHUFFLE (mud and width), TAP ECHO (delay with TAP). Pick a tool on a channel with its TOOL window
               (top of the channel), then light that channel's INS switch. ED opens it on the TOOLS page.

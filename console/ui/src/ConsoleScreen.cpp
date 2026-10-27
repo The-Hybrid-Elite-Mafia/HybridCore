@@ -2,11 +2,13 @@
 #include "hybrid/console/ui/ConsoleScreen.hpp"
 
 #include "hybrid/console/ColourStage.hpp"
+#include "hybrid/console/ConsoleSpecs.hpp"
 #include "hybrid/console/TwinBus.hpp"
 #include "hybrid/ui/Faceplate.hpp"
 
 #include <algorithm>
 #include <chrono>
+#include <vector>
 #include <cmath>
 #include <cstdio>
 #include <numbers>
@@ -52,6 +54,18 @@ float plateBucket(float scale) {
     return std::min(1.0f, 4096.0f / kWidth);
 }
 
+// An arc at any angles (0 = 12 o'clock, clockwise, may pass +/-pi or span a full turn): the renderer's arcs live in
+// -pi .. pi, so the span is cut where it crosses the bottom.
+void arcCw(Renderer& r, float cx, float cy, float radius, float width, float a0, float a1, Rgba col, bool emissive) {
+    if (a1 < a0) std::swap(a0, a1);
+    if (a1 - a0 >= 2 * kPi - 1e-4f) { r.arc(cx, cy, radius, width, -kPi, kPi, col, emissive); return; }
+    while (a0 >= kPi) { a0 -= 2 * kPi; a1 -= 2 * kPi; }
+    while (a0 < -kPi) { a0 += 2 * kPi; a1 += 2 * kPi; }
+    if (a1 <= kPi) { r.arc(cx, cy, radius, width, a0, a1, col, emissive); return; }
+    r.arc(cx, cy, radius, width, a0, kPi, col, emissive);
+    r.arc(cx, cy, radius, width, -kPi, a1 - 2 * kPi, col, emissive);
+}
+
 // Detented knobs big enough get their step names printed around them.
 bool hasStepRing(const Widget& w) { return w.kind == Kind::Stepped && w.r.w >= 180 && w.ctl.valid() && w.ctl.info->choices; }
 void drawStepRing(Renderer& r, const Widget& w) {
@@ -79,6 +93,9 @@ void drawStepRing(Renderer& r, const Widget& w) {
 struct ConsoleScreen::ViewState {
     float needle[2] = {0, 0};
     std::array<float, MeterBridge::kBands> rta{};
+    std::array<float, MeterBridge::kOctaves> oct{};
+    float scopeGain = 1.0f;                                     // AUTO scope scale (smoothed)
+    std::chrono::steady_clock::time_point last = std::chrono::steady_clock::now();
 };
 
 ConsoleScreen::ConsoleScreen(ConsoleRig& rig, AppState& app, std::function<void(const ActionEvent&)> onAction)
@@ -226,6 +243,8 @@ void ConsoleScreen::setPage(PageId p) {
 
 void ConsoleScreen::handle(const ActionEvent& e) {
     if (e.act == Act::Page) setPage(static_cast<PageId>(std::clamp(e.arg, 0, kPageCount - 1)));
+    if (e.act == Act::MeterTab) app_.meterTab = std::clamp(e.arg, 0, 4);
+    if (e.act == Act::MeterAuto) rig_.meter().rtaAutoScale();
     if (e.act == Act::BigNav) app_.bigFirst = e.arg >= 100 ? bigDeskFirst(app_.bigFirst, 0, e.arg - 100) : bigDeskFirst(app_.bigFirst, e.arg);
     if (e.act == Act::EditTool) {
         app_.toolTarget = e.arg;
@@ -589,132 +608,297 @@ void ConsoleScreen::drawFrame() {
                 }
                 break;
             }
-            case CustomId::LoudNumbers: {
+            case CustomId::LoudNumbers: {   // the loudness descriptors (SCREEN LAYOUT), with the source line on top
+                namespace M = meter_ids;
                 r.fillRound(w.r.inset(4), 18, kGlass, Blend::Over);
-                const double tpl = mb.truePeakDbtp(0), tpr = mb.truePeakDbtp(1);
-                struct Row { const char* cap; std::string v; const char* unit; bool warn; };
-                const Row rows[] = {
-                    {"MOMENTARY", lufsText(mb.momentaryLufs()), "LUFS", false},
-                    {"SHORT-TERM", lufsText(mb.shortTermLufs()), "LUFS", false},
-                    {"INTEGRATED", lufsText(mb.integratedLufs()), "LUFS", false},
-                    {"LOUDNESS RANGE", mb.integratedLufs() <= -143 ? "--" : fmt("%.1f", mb.loudnessRangeLu()), "LU", false},
-                    {"MAX MOMENTARY", lufsText(mb.maxMomentaryLufs()), "LUFS", false},
-                    {"MAX SHORT-TERM", lufsText(mb.maxShortTermLufs()), "LUFS", false},
-                    {"TRUE PEAK L", lufsText(tpl), "dBTP", tpl > -1.0},
-                    {"TRUE PEAK R", lufsText(tpr), "dBTP", tpr > -1.0},
-                    {"PLR", mb.plrDb() <= -143 ? "--" : fmt("%.1f", mb.plrDb()), "dB", false},
-                    {"SAMPLE PEAK", lufsText(std::max(mb.samplePeakDbfs(0), mb.samplePeakDbfs(1))), "dBFS", false},
-                };
-                const float rh = (w.r.h - 40) / static_cast<float>(std::size(rows));
-                for (std::size_t k = 0; k < std::size(rows); ++k) {
-                    const float y = w.r.y + 20 + rh * static_cast<float>(k);
-                    r.text(TextStyle::Value, rows[k].cap, w.r.x + 40, y + rh * 0.5f + 12, C::dim, Align::Left, TextFx::Shadowed);
-                    r.text(TextStyle::Panel, rows[k].v, w.r.right() - 150, y + rh * 0.5f + 20, rows[k].warn ? C::red : C::lime, Align::Right, TextFx::NeonCrisp);
-                    r.text(TextStyle::Caption, rows[k].unit, w.r.right() - 40, y + rh * 0.5f + 12, C::dim, Align::Right, TextFx::Shadowed);
+                const int unit = static_cast<int>(mb.get(M::Unit) + 0.5f);
+                const double target = mb.targetLufs();
+                const char* lu = unit == 1 ? "LKFS" : unit == 2 ? "LU" : "LUFS";
+                auto loud = [&](double v) { return v <= -143.0 ? std::string("--") : fmt("%.1f", unit == 2 ? v - target : v); };
+                r.fillRound({w.r.x + 30, w.r.y + 30, 26, 26}, 4, C::green, Blend::Over, true);
+                r.text(TextStyle::Label, "HEM MAIN OUT", w.r.x + 72, w.r.y + 55, C::text, Align::Left, TextFx::Shadowed);
+                const auto ds = mb.descriptors();
+                const float top = w.r.y + 90, slotH = (w.r.h - 110) / 6.0f;
+                for (int k = 0; k < 6; ++k) {
+                    const int dsc = ds[static_cast<std::size_t>(k)];
+                    const float y = top + slotH * static_cast<float>(k);
+                    if (dsc == M::DescNone) continue;
+                    if (dsc == M::DescBalance) {   // BALANCE-O-METER: two slots, a triangle in a half circle
+                        const float h = slotH * (k < 5 ? 2.0f : 1.0f), cx = w.r.cx(), base = y + h - 30, R = std::min(h - 60, w.r.w * 0.42f);
+                        r.arc(cx, base, R, 3.0f, -0.5f * kPi, 0.5f * kPi, C::text.withAlpha(0.35f), false);
+                        const float tilt = static_cast<float>(std::clamp(mb.balanceLrLu() / 6.0, -1.0, 1.0)) * 0.45f * kPi;   // left louder: top leans left
+                        const double ms = mb.balanceMsDb();
+                        const float width = static_cast<float>(std::clamp((ms + 30.0) / 30.0, 0.02, 1.0));   // side vs mid: base width
+                        const float tx = cx - std::sin(tilt) * R * 0.92f, ty = base - std::cos(tilt) * R * 0.92f;
+                        const float xs[] = {tx, cx - R * width, cx + R * width, tx}, ys[] = {ty, base, base, ty};
+                        r.polyline(xs, ys, 4, 4.0f, C::lime, Blend::Over, true);
+                        r.text(TextStyle::Caption, "L", cx - R - 20, base, C::dim, Align::Right, TextFx::Shadowed);
+                        r.text(TextStyle::Caption, "R", cx + R + 20, base, C::dim, Align::Left, TextFx::Shadowed);
+                        r.text(TextStyle::Caption, "MID / SIDE", cx, base + 26, C::dim, Align::Center, TextFx::Shadowed);
+                        ++k;
+                        continue;
+                    }
+                    std::string cap = M::DescNone < dsc && dsc < M::kDescCount ? MeterBridge::params()[M::Slot1].choices[dsc] : "";
+                    std::string val, un;
+                    bool warn = false;
+                    switch (dsc) {
+                    case M::DescProgram: val = loud(mb.integratedLufs()); un = lu; break;
+                    case M::DescTruePeakMax: { const double tp = std::max(mb.truePeakDbtp(0), mb.truePeakDbtp(1)); val = lufsText(tp); un = "dBTP"; warn = mb.peakAlert(); break; }
+                    case M::DescLoudMax: val = loud(mb.get(M::LoudMaxMetric) < 0.5f ? mb.maxMomentaryLufs() : mb.maxShortTermLufs()); un = lu;
+                                         cap += mb.get(M::LoudMaxMetric) < 0.5f ? " (M)" : " (S)"; break;
+                    case M::DescRange: val = mb.integratedLufs() <= -143 ? "--" : fmt("%.1f", mb.loudnessRangeLu()); un = "LU"; break;
+                    case M::DescPlr: val = mb.plrDb() <= -143 ? "--" : fmt("%.1f", mb.plrDb()); un = "dB"; break;
+                    case M::DescSliding10: val = loud(mb.sliding10Lufs()); un = lu; break;
+                    case M::DescShortTerm: val = loud(mb.shortTermLufs()); un = lu; break;
+                    case M::DescMomentary: val = loud(mb.momentaryLufs()); un = lu; warn = mb.loudAlert(); break;
+                    case M::DescCorrelation: val = fmt("%+.2f", mb.correlation()); break;
+                    case M::DescMonoDev: { const double md = mb.monoDeviationLu(); val = md < -100 ? "CANCELS" : fmt("%+.1f", md); un = "LU"; break; }
+                    default: break;
+                    }
+                    r.text(TextStyle::Label, cap, w.r.x + 40, y + 48, C::text, Align::Left, TextFx::Shadowed);
+                    r.text(TextStyle::Display, val, w.r.right() - 170, y + slotH - 34, warn ? C::red : C::amber, Align::Right, TextFx::NeonCrisp);
+                    r.text(TextStyle::Label, un, w.r.right() - 40, y + slotH - 40, C::dim, Align::Right, TextFx::Shadowed);
                 }
                 break;
             }
             case CustomId::Radar: {
-                const float cx = w.r.cx(), cy = w.r.cy(), R = w.r.w * 0.47f;
-                r.fillRound(w.r.inset(w.r.w * 0.02f), w.r.w * 0.48f, kGlass, Blend::Over);
-                auto rad = [R](double lufs) { return static_cast<float>(std::clamp((lufs + 60.0) / 60.0, 0.0, 1.0)) * R * 0.86f; };
-                // history: one turn = 4 minutes of short-term loudness (2400 points of 100 ms)
+                namespace M = meter_ids;
+                const float cx = w.r.cx(), cy = w.r.cy(), R = std::min(w.r.w, w.r.h) * 0.47f;
+                r.fillRound(w.r.inset(4), 18, kGlass, Blend::Over);
+                const double target = mb.targetLufs(), res = mb.radarResolutionDb();
+                const int unit = static_cast<int>(mb.get(M::Unit) + 0.5f);
+                const float Rr = R * 0.80f;   // the radar; the momentary ring sits outside it
+                // radius: ring 1 (outer) = target + res, ring 2 = target, ... ring 5 = target - 3 res, centre = target - 4 res
+                auto rad = [&](double l) { return static_cast<float>(std::clamp((l - (target - 4 * res)) / (5 * res), 0.0, 1.0)) * Rr; };
+                auto ringCol = [&](double l) {   // black, blue, dark green, light green, orange (MTR-UM p.9)
+                    if (l >= target) return rgb8(0xFFB020);
+                    if (l >= target - res) return rgb8(0x9BE15D);
+                    if (l >= target - 2 * res) return rgb8(0x2E9E4F);
+                    if (l >= target - 3 * res) return rgb8(0x3A7BD5);
+                    return rgb8(0x1A2A40);
+                };
+                const double turn = MeterBridge::radarSpeedSeconds(static_cast<int>(mb.get(M::RadarSpeed) + 0.5f));
+                const std::uint64_t perTurn = std::max<std::uint64_t>(1, static_cast<std::uint64_t>(turn / 0.1));
                 const std::uint64_t n = mb.historyCount();
-                constexpr std::uint64_t kTurn = 2400;
-                const std::uint64_t from = n > kTurn ? n - kTurn : 0;
-                for (std::uint64_t k = from; k < n; k += 2) {
-                    const double l = mb.historyLufs(k);
+                constexpr std::uint64_t kSegs = 720;
+                const std::uint64_t stride = std::max<std::uint64_t>(1, perTurn / kSegs);
+                for (std::uint64_t sgi = 0; sgi < kSegs && sgi * stride < n && sgi * stride < perTurn; ++sgi) {
+                    const std::uint64_t idx = n - 1 - sgi * stride;
+                    double l = -200;
+                    for (std::uint64_t q = 0; q < std::min<std::uint64_t>(stride, 8) && q <= idx; ++q) l = std::max(l, static_cast<double>(mb.historyLufs(idx - q * std::max<std::uint64_t>(1, stride / 8))));
                     if (l <= -100) continue;
-                    const float a0 = 2 * kPi * static_cast<float>(k % kTurn) / static_cast<float>(kTurn);
-                    const float a1 = a0 + 2 * kPi * 2.2f / static_cast<float>(kTurn);
+                    const float a1 = 2 * kPi * static_cast<float>(idx % perTurn) / static_cast<float>(perTurn);
+                    const float a0 = a1 - 2 * kPi * static_cast<float>(stride) / static_cast<float>(perTurn) * 1.15f;
                     const float rr = rad(l);
+                    const Rgba c = ringCol(l);
                     const float xs[4] = {cx, cx + std::sin(a0) * rr, cx + std::sin(a1) * rr, cx};
                     const float ys[4] = {cy, cy - std::cos(a0) * rr, cy - std::cos(a1) * rr, cy};
-                    const Rgba c = l > -9 ? C::red : l > -16 ? C::amber : C::lime;
-                    const Rgba cc[4] = {c.withAlpha(0.15f), c.withAlpha(0.85f), c.withAlpha(0.85f), c.withAlpha(0.15f)};
+                    const Rgba cc[4] = {c.withAlpha(0.35f), c.withAlpha(0.95f), c.withAlpha(0.95f), c.withAlpha(0.35f)};
                     r.colorQuad(xs, ys, cc, Blend::Over, true);
                 }
-                for (int db = -50; db <= 0; db += 10) {
-                    const float rr = rad(db);
-                    r.arc(cx, cy, rr, 2.0f, 0, 2 * kPi - 0.001f, C::text.withAlpha(0.18f), false);
-                    r.text(TextStyle::Caption, std::to_string(db), cx + 6, cy - rr - 6, C::dim, Align::Left, TextFx::Shadowed);
+                for (int k = 1; k <= 5; ++k) {
+                    const double l = target + res * (2 - k);
+                    const float rr = rad(l);
+                    arcCw(r, cx, cy, rr, k == 2 ? 3.0f : 2.0f, 0, 2 * kPi - 0.001f, (k == 2 ? C::amber : C::text).withAlpha(k == 2 ? 0.55f : 0.18f), false);
+                    r.text(TextStyle::Caption, fmt("%.0f", unit == 2 ? l - target : l), cx + 8, cy - rr + 30, C::dim, Align::Left, TextFx::Shadowed);
                 }
                 if (n > 0) {   // sweep arm
-                    const float a = 2 * kPi * static_cast<float>((n - 1) % kTurn) / static_cast<float>(kTurn);
-                    const float xs[] = {cx, cx + std::sin(a) * R * 0.86f}, ys[] = {cy, cy - std::cos(a) * R * 0.86f};
+                    const float a = 2 * kPi * static_cast<float>((n - 1) % perTurn) / static_cast<float>(perTurn);
+                    const float xs[] = {cx, cx + std::sin(a) * Rr}, ys[] = {cy, cy - std::cos(a) * Rr};
                     r.polyline(xs, ys, 2, 3.0f, C::text.withAlpha(0.7f), Blend::Over, true);
                 }
-                // momentary loudness: outer ring
+                // momentary ring: 6 o'clock (target - 2 x range) clockwise to 3 o'clock (target + range); blue / green / orange
+                const double mr = spec::meter::kMomRangeLu[static_cast<std::size_t>(std::clamp(static_cast<int>(mb.get(M::MomRange) + 0.5f), 0, 1))];
+                const double lo = target - 2 * mr, hi = target + mr;
+                auto ang = [&](double l) { return kPi + static_cast<float>(std::clamp((l - lo) / (hi - lo), 0.0, 1.0)) * 1.5f * kPi; };
+                const float mrR = R * 0.93f, mrW = R * 0.05f;
+                arcCw(r, cx, cy, mrR, mrW, kPi, 2.5f * kPi, C::text.withAlpha(0.08f), false);
                 const double m = mb.momentaryLufs();
-                const float mf = static_cast<float>(std::clamp((m + 60.0) / 60.0, 0.0, 1.0));
-                r.arc(cx, cy, R * 0.94f, R * 0.05f, -kPi, kPi - 0.001f, C::violet.withAlpha(0.15f), false);
-                if (mf > 0) r.arc(cx, cy, R * 0.94f, R * 0.05f, -kPi, -kPi + 2 * kPi * mf, m > -9 ? C::red : C::violet, true);
-                r.text(TextStyle::Display, lufsText(mb.shortTermLufs()), cx, cy + 40, C::text, Align::Center, TextFx::NeonCrisp);
-                r.text(TextStyle::Caption, "SHORT-TERM LUFS", cx, cy + 90, C::dim, Align::Center, TextFx::Shadowed);
+                if (m > lo) {
+                    const float am = ang(m);
+                    const float aG = ang(target - mr), aO = ang(target);
+                    arcCw(r, cx, cy, mrR, mrW, kPi, std::min(am, aG), rgb8(0x3A7BD5), true);
+                    if (am > aG) arcCw(r, cx, cy, mrR, mrW, aG, std::min(am, aO), C::green, true);
+                    if (am > aO) arcCw(r, cx, cy, mrR, mrW, aO, am, C::amber, true);
+                }
+                for (int k = 0; k <= 6; ++k) {   // numbers round the ring every quarter of the range
+                    const double l = lo + (hi - lo) * k / 6.0;
+                    const float a = ang(l), tr = R * 1.02f;
+                    r.text(TextStyle::Caption, fmt("%.0f", unit == 2 ? l - target : l), cx + std::sin(a) * tr, cy - std::cos(a) * tr + 9, C::dim, Align::Center, TextFx::Shadowed);
+                }
+                if (mb.get(M::LoudAlert) > 0.5f) {   // the LOUD level marked in red on the ring
+                    const float a = ang(target + mb.get(M::LoudAlert));
+                    const float xs[] = {cx + std::sin(a) * (mrR - mrW), cx + std::sin(a) * (mrR + mrW)}, ys[] = {cy - std::cos(a) * (mrR - mrW), cy - std::cos(a) * (mrR + mrW)};
+                    r.polyline(xs, ys, 2, 5.0f, C::red, Blend::Over, true);
+                }
+                // corner lamps and texts, as on the unit
+                const Rect pk{w.r.x + 40, w.r.y + 40, 26, 26}, ld{w.r.right() - 66, w.r.y + 40, 26, 26};
+                r.fillRound(pk, 5, mb.peakAlert() ? C::red : C::red.withAlpha(0.18f), Blend::Over, mb.peakAlert());
+                r.fillRound(ld, 5, mb.loudAlert() ? C::red : C::red.withAlpha(0.18f), Blend::Over, mb.loudAlert());
+                r.text(TextStyle::Label, "PEAK", pk.right() + 14, pk.bottom(), C::text, Align::Left, TextFx::Shadowed);
+                r.text(TextStyle::Label, "LOUD", ld.x - 14, ld.bottom(), C::text, Align::Right, TextFx::Shadowed);
+                const double t = mb.measuredSeconds();
+                const int hh = static_cast<int>(t / 3600), mi = static_cast<int>(t / 60) % 60, se = static_cast<int>(t) % 60;
+                char tb[32]; std::snprintf(tb, sizeof tb, "%02d:%02d:%02d", hh, mi, se);
+                r.text(TextStyle::Label, unit == 1 ? "LKFS" : unit == 2 ? "LU" : "LUFS", w.r.right() - 40, w.r.bottom() - 110, C::text, Align::Right, TextFx::Shadowed);
+                r.text(TextStyle::Panel, tb, w.r.right() - 40, w.r.bottom() - 50, C::text, Align::Right, TextFx::NeonCrisp);
+                r.text(TextStyle::Label, app_.meterEdited ? "EDITED:" : "PRESET:", w.r.x + 40, w.r.bottom() - 130, C::dim, Align::Left, TextFx::Shadowed);
+                r.text(TextStyle::Label, app_.meterPreset, w.r.x + 40, w.r.bottom() - 80, C::text, Align::Left, TextFx::Shadowed);
+                r.text(TextStyle::Label, fmt("TARGET %.0f", unit == 2 ? 0.0 : target) + (unit == 2 ? " LU" : unit == 1 ? " LKFS" : " LUFS"), w.r.x + 40, w.r.bottom() - 20, C::amber, Align::Left, TextFx::Shadowed);
+                if (!mb.measuring()) r.text(TextStyle::Heading, "PAUSED", cx, cy + 20, C::amber, Align::Center, TextFx::NeonCrisp);
                 break;
             }
             case CustomId::Rta: {
+                namespace M = meter_ids;
                 r.fillRound(w.r.inset(4), 16, kGlass, Blend::Over);
-                const Rect in{w.r.x + 70, w.r.y + 30, w.r.w - 100, w.r.h - 90};
-                for (int db = 0; db >= -80; db -= 20) {
-                    const float y = in.y + in.h * static_cast<float>(-db) / 80.0f;
+                const bool oct = mb.get(M::RtaBands) < 0.5f;
+                const int nb = oct ? MeterBridge::kOctaves : MeterBridge::kBands;
+                const double topDb = -5.0 * std::lround(mb.get(M::RtaTop)), range = 10.0 * (std::lround(mb.get(M::RtaRange)) + 1);
+                const Rect in{w.r.x + 110, w.r.y + 110, w.r.w - 150, w.r.h - 200};
+                auto yOf = [&](double db) { return in.y + in.h * static_cast<float>(std::clamp((topDb - db) / range, 0.0, 1.0)); };
+                const double step = range <= 20 ? 2.0 : range <= 40 ? 5.0 : 10.0;
+                for (double db = topDb; db >= topDb - range - 0.01; db -= step) {
+                    const float y = yOf(db);
                     r.fillRound({in.x, y - 1, in.w, 2}, 1, C::text.withAlpha(0.10f), Blend::Over);
-                    r.text(TextStyle::Caption, std::to_string(db), in.x - 12, y + 8, C::dim, Align::Right, TextFx::Shadowed);
+                    r.text(TextStyle::Caption, fmt("%.0f", db), in.x - 16, y + 9, C::dim, Align::Right, TextFx::Shadowed);
                 }
-                const float bw = in.w / static_cast<float>(MeterBridge::kBands);
-                for (int b = 0; b < MeterBridge::kBands; ++b) {
-                    float& sm = view_->rta[static_cast<std::size_t>(b)];
-                    const float v = static_cast<float>(std::max(mb.bandDb(b), -80.0));
-                    sm = v > sm ? v : sm + (v - sm) * 0.25f;
-                    const float f = std::clamp((sm + 80.0f) / 80.0f, 0.0f, 1.0f);
-                    const float pk = std::clamp((static_cast<float>(mb.bandPeakDb(b)) + 80.0f) / 80.0f, 0.0f, 1.0f);
+                r.text(TextStyle::Caption, "dB", in.x - 16, in.y - 30, C::dim, Align::Right, TextFx::Shadowed);
+                const int cursor = static_cast<int>(mb.get(M::RtaCursor) + 0.5f);
+                const int cur = oct ? std::clamp((cursor - 1) / 3, 0, MeterBridge::kOctaves - 1) : cursor;
+                const float bw = in.w / static_cast<float>(nb);
+                for (int b = 0; b < nb; ++b) {
+                    float& sm = oct ? view_->oct[static_cast<std::size_t>(b)] : view_->rta[static_cast<std::size_t>(b)];
+                    const float v = static_cast<float>(oct ? mb.octaveDb(b) : mb.bandDb(b));
+                    sm = v;   // the engine does the ballistics (INTEGRATION TIME)
+                    const float yTop = yOf(sm), yPk = yOf(oct ? mb.octavePeakDb(b) : mb.bandPeakDb(b));
                     const float x = in.x + bw * static_cast<float>(b);
-                    if (f > 0) r.fillRound({x + bw * 0.12f, in.bottom() - in.h * f, bw * 0.76f, in.h * f}, 3, C::lime.withAlpha(0.85f), Blend::Over, true);
-                    if (pk > 0) r.fillRound({x + bw * 0.12f, in.bottom() - in.h * pk - 3, bw * 0.76f, 6}, 2, C::text, Blend::Over, true);
+                    const Rgba col = b == cur ? C::amber : C::lime;
+                    if (b == cur) r.fillRound({x, in.y, bw, in.h}, 3, C::amber.withAlpha(0.12f), Blend::Over);
+                    if (in.bottom() - yTop > 1) r.fillRound({x + bw * 0.12f, yTop, bw * 0.76f, in.bottom() - yTop}, 3, col.withAlpha(0.85f), Blend::Over, true);
+                    if (mb.get(M::RtaHold) > 0.5f && in.bottom() - yPk > 1) r.fillRound({x + bw * 0.12f, yPk - 3, bw * 0.76f, 6}, 2, C::text, Blend::Over, true);
                 }
-                const char* labels[] = {"31", "63", "125", "250", "500", "1k", "2k", "4k", "8k", "16k"};
-                const int idx[] = {1, 4, 7, 10, 13, 16, 19, 22, 25, 28};   // 31.6, 63, 125 ... Hz centres
-                for (int k = 0; k < 10; ++k)
-                    r.text(TextStyle::Caption, labels[k], in.x + bw * (static_cast<float>(idx[k]) + 0.5f), in.bottom() + 40, C::dim, Align::Center, TextFx::Shadowed);
+                const char* labels[] = {"31.5", "63", "125", "250", "500", "1k", "2k", "4k", "8k", "16k"};
+                for (int k = 0; k < 10; ++k) {
+                    const float bx = oct ? in.x + bw * (static_cast<float>(k) + 0.5f) : in.x + bw * (static_cast<float>(2 + 3 * k) + 0.5f);
+                    r.text(TextStyle::Caption, labels[k], bx, in.bottom() + 44, C::dim, Align::Center, TextFx::Shadowed);
+                }
+                const double hz = oct ? MeterBridge::octaveHz(cur) : MeterBridge::bandHz(cur);
+                const double lv = oct ? mb.octaveDb(cur) : mb.bandDb(cur);
+                const std::string fs = hz >= 1000 ? fmt("%.3g kHz", hz / 1000.0) : fmt("%.3g Hz", hz);
+                r.text(TextStyle::Label, "FREQUENCY  " + fs + "     LEVEL  " + (lv <= -143 ? std::string("--") : fmt("%.1f dB", lv)), w.r.right() - 40, w.r.y + 64,
+                       C::amber, Align::Right, TextFx::Shadowed);
+                r.text(TextStyle::Label, std::string(MeterBridge::params()[M::RtaChannels].choices[static_cast<int>(mb.get(M::RtaChannels) + 0.5f)]) + "   " +
+                       MeterBridge::params()[M::RtaTime].choices[static_cast<int>(mb.get(M::RtaTime) + 0.5f)], in.x, w.r.y + 64, C::dim, Align::Left, TextFx::Shadowed);
                 break;
             }
             case CustomId::Scope: {
+                namespace M = meter_ids;
                 r.fillRound(w.r.inset(4), 16, kGlass, Blend::Over);
-                const float cx = w.r.cx(), cy = w.r.cy(), S = std::min(w.r.w, w.r.h) * 0.42f;
-                const float xs1[] = {cx - S, cx + S}, ys1[] = {cy, cy}, xs2[] = {cx, cx}, ys2[] = {cy - S, cy + S};
-                r.polyline(xs1, ys1, 2, 2, C::text.withAlpha(0.12f));
+                const float cx = w.r.cx(), cy = w.r.cy() + 20, S = std::min(w.r.w, w.r.h) * 0.42f;
+                const float xs1[] = {cx - S, cx + S}, ys1[] = {cy + S, cy - S}, xs2[] = {cx - S, cx + S}, ys2[] = {cy - S, cy + S};
+                r.polyline(xs1, ys1, 2, 2, C::text.withAlpha(0.12f));   // the L and R axes
                 r.polyline(xs2, ys2, 2, 2, C::text.withAlpha(0.12f));
+                const auto now = std::chrono::steady_clock::now();
+                const float dt = std::clamp(std::chrono::duration<float>(now - view_->last).count(), 0.0f, 0.5f);
+                view_->last = now;
                 const std::uint64_t n = mb.scopeWritten();
-                constexpr int kPts = 1024;
-                if (n > kPts) {
-                    static thread_local std::vector<float> px, py;
-                    px.resize(kPts); py.resize(kPts);
-                    for (int k = 0; k < kPts; ++k) {
-                        float l = 0, rr = 0;
-                        mb.scopeFrame(n - kPts + static_cast<std::uint64_t>(k), l, rr);
-                        const float side = (l - rr) * 0.7071f, mid = (l + rr) * 0.7071f;
-                        px[static_cast<std::size_t>(k)] = cx + std::clamp(side, -1.0f, 1.0f) * S;
-                        py[static_cast<std::size_t>(k)] = cy - std::clamp(mid, -1.0f, 1.0f) * S;
-                    }
-                    r.polyline(px.data(), py.data(), kPts, 2.0f, C::lime.withAlpha(0.55f), Blend::Add, true);
+                const int persist = static_cast<int>(mb.get(M::ScopePersist) + 0.5f);
+                const auto frames = static_cast<std::uint64_t>(std::min<double>(spec::meter::kScopePersistS[static_cast<std::size_t>(std::clamp(persist, 0, 3))] * 48000.0,
+                                                                                MeterBridge::kScopeFrames - 1));
+                const std::uint64_t have = std::min(n, frames);
+                constexpr std::uint64_t kMaxPts = 6000;
+                const std::uint64_t step = std::max<std::uint64_t>(1, have / kMaxPts);
+                // scale: fixed (0 .. -24 dB = the level that fills the screen) or AUTO FAST / AUTO SLOW
+                const int sc = static_cast<int>(mb.get(M::ScopeScale) + 0.5f);
+                float peak = 1e-6f;
+                for (std::uint64_t k = 0; k < have; k += step) { float l = 0, rr = 0; mb.scopeFrame(n - have + k, l, rr); peak = std::max({peak, std::fabs(l), std::fabs(rr)}); }
+                if (sc >= 25) {
+                    const float tau = static_cast<float>(sc == 25 ? spec::meter::kScopeAutoFastS : spec::meter::kScopeAutoSlowS);
+                    const float want = 0.8f / std::max(peak, 1e-4f);
+                    view_->scopeGain += (want - view_->scopeGain) * (1.0f - std::exp(-dt / tau));
+                } else {
+                    view_->scopeGain = std::pow(10.0f, static_cast<float>(sc) / 20.0f);
                 }
-                r.text(TextStyle::Caption, "M", cx, w.r.y + 40, C::dim, Align::Center, TextFx::Shadowed);
-                r.text(TextStyle::Caption, "L", w.r.x + 40, w.r.y + 40, C::dim, Align::Center, TextFx::Shadowed);
-                r.text(TextStyle::Caption, "R", w.r.right() - 40, w.r.y + 40, C::dim, Align::Center, TextFx::Shadowed);
+                const float g = view_->scopeGain;
+                static const Rgba styles[] = {rgb8(0x9FD8FF), C::green, C::amber, C::text};
+                const Rgba col = styles[std::clamp(static_cast<int>(mb.get(M::ScopeStyle) + 0.5f), 0, 3)];
+                if (have > 8) {
+                    static thread_local std::vector<float> px, py;
+                    const std::size_t cnt = static_cast<std::size_t>(have / step);
+                    px.resize(cnt); py.resize(cnt);
+                    for (std::size_t k = 0; k < cnt; ++k) {
+                        float l = 0, rr = 0;
+                        mb.scopeFrame(n - have + k * step, l, rr);
+                        const float side = (l - rr) * 0.7071f * g, mid = (l + rr) * 0.7071f * g;
+                        px[k] = cx + std::clamp(side, -1.0f, 1.0f) * S;
+                        py[k] = cy - std::clamp(mid, -1.0f, 1.0f) * S;
+                    }
+                    r.polyline(px.data(), py.data(), static_cast<int>(cnt), 2.0f, col.withAlpha(persist == 0 ? 0.65f : 0.35f), Blend::Add, true);
+                }
+                const std::string mode = sc == 25 ? "AUTO FAST" : sc == 26 ? "AUTO SLOW" : "SCALE";
+                r.text(TextStyle::Label, mode + fmt("  %.1f dB", 20.0 * std::log10(std::max(1e-6f, 1.0f / g))), cx, w.r.y + 64, C::text, Align::Center, TextFx::Shadowed);
+                r.text(TextStyle::Label, "L", w.r.x + 50, w.r.y + 64, C::dim, Align::Center, TextFx::Shadowed);
+                r.text(TextStyle::Label, "R", w.r.right() - 50, w.r.y + 64, C::dim, Align::Center, TextFx::Shadowed);
                 break;
             }
+            case CustomId::PeakMeter: {   // the true-peak meter / PPM (PEAK METER SCALE, PPM ALIGNMENT)
+                namespace M = meter_ids;
+                r.fillRound(w.r.inset(4), 16, kGlass, Blend::Over);
+                const int scale = static_cast<int>(mb.get(M::PeakScale) + 0.5f);
+                const double align = spec::meter::kPpmAlignDbfs[static_cast<std::size_t>(std::clamp(static_cast<int>(mb.get(M::PpmAlign) + 0.5f), 0, 1))];
+                // display units: dBTP / dBFS, or the standard's own scale re the alignment level (ASSUMED layouts, ConsoleSpecs)
+                double lo = -60, hi = 0, off = 0, mul = 1;   // unit = (dBFS - off) * mul
+                std::vector<double> marks;
+                const char* unitName = "dBTP";
+                switch (scale) {
+                case M::ScaleTp60: lo = -60; marks = {0, -6, -12, -18, -24, -30, -40, -50, -60}; break;
+                case M::ScaleTp30: lo = -30; marks = {0, -3, -6, -9, -12, -15, -18, -21, -24, -27, -30}; break;
+                case M::ScaleTp20: lo = -20; marks = {0, -2, -4, -6, -8, -10, -12, -14, -16, -18, -20}; break;
+                case M::ScaleDigitalPpm: lo = -50; marks = {0, -5, -10, -15, -20, -30, -40, -50}; unitName = "dBFS"; break;
+                case M::ScaleDin: off = align + 9; lo = -50; hi = 5; marks = {5, 0, -5, -10, -20, -30, -40, -50}; unitName = "DIN dB"; break;
+                case M::ScaleNordic: off = align; lo = -36; hi = 12; marks = {12, 6, 0, -6, -12, -18, -24, -30, -36}; unitName = "NORDIC"; break;
+                case M::ScaleBbc: off = align - 16; mul = 0.25; lo = 0.5; hi = 7.5; marks = {7, 6, 5, 4, 3, 2, 1}; unitName = "BBC"; break;
+                default: off = align; lo = -12; hi = 12; marks = {12, 8, 4, 0, -4, -8, -12}; unitName = "EBU"; break;
+                }
+                const Rect in{w.r.x + 40, w.r.y + 90, w.r.w - 80, w.r.h - 150};
+                auto yOf = [&](double dbfs) { const double u = (dbfs - off) * mul; return in.bottom() - in.h * static_cast<float>(std::clamp((u - lo) / (hi - lo), 0.0, 1.0)); };
+                r.text(TextStyle::Label, unitName, w.r.x + 30, w.r.y + 56, C::dim, Align::Left, TextFx::Shadowed);
+                const float barW = in.w * 0.24f, gap = in.w * 0.06f, scaleX = in.x + in.w * 0.5f;
+                for (double mk : marks) {
+                    const double dbfs = mk / mul + off;
+                    const float y = yOf(dbfs);
+                    r.fillRound({in.x, y - 1, in.w, 2}, 1, C::text.withAlpha(0.08f), Blend::Over);
+                    r.text(TextStyle::Caption, (scale == M::ScaleBbc ? fmt("%.0f", mk) : fmt("%+.0f", mk)), scaleX, y + 9, C::dim, Align::Center, TextFx::Shadowed);
+                }
+                const int alertIdx = static_cast<int>(mb.get(M::PeakAlert) + 0.5f);
+                const double alertDb = alertIdx > 0 ? -12.0 + 0.5 * (alertIdx - 1) : 1e9;
+                for (int side = 0; side < 2; ++side) {
+                    const float x = side == 0 ? scaleX - gap - barW - 30 : scaleX + gap + 30;
+                    const Rect bar{x, in.y, barW, in.h};
+                    r.fillRound(bar, 6, kSlot, Blend::Over);
+                    const double v = mb.ppmDb(side), h = mb.peakHoldDb(side);
+                    const float yv = yOf(v);
+                    if (bar.bottom() - yv > 1) {
+                        const float ya = std::clamp(yOf(alertDb), yv, bar.bottom());
+                        r.fillRound({bar.x + 4, ya, bar.w - 8, bar.bottom() - ya}, 4, rgb8(0xE8E04A), Blend::Over, true);
+                        if (ya > yv) r.fillRound({bar.x + 4, yv, bar.w - 8, ya - yv}, 4, C::red, Blend::Over, true);
+                    }
+                    if (h > -143) r.fillRound({bar.x + 2, yOf(h) - 3, bar.w - 4, 6}, 2, h >= alertDb ? C::red : C::text, Blend::Over, true);
+                    r.text(TextStyle::Label, side == 0 ? "L" : "R", bar.cx(), w.r.bottom() - 26, C::text, Align::Center, TextFx::Shadowed);
+                }
+                break;
+            }
+            case CustomId::MeterStatus: break;
             case CustomId::StereoBars:
             case CustomId::ToolMeters: {
                 r.fillRound(w.r.inset(4), 16, kGlass, Blend::Over);
-                struct Bar { const char* cap; float v, lo, hi; std::string text; };
+                struct Bar { std::string cap; float v, lo, hi; std::string text; };
                 std::vector<Bar> bars;
-                if (w.custom == CustomId::StereoBars) {
+                if (w.custom == CustomId::StereoBars) {   // CHANNEL MEASURES (MTR-UM p.12): correlation, mono deviation
                     bars.push_back({"CORRELATION", static_cast<float>(mb.correlation()), -1, 1, fmt("%+.2f", mb.correlation())});
-                    bars.push_back({"BALANCE L / R", static_cast<float>(mb.balanceLrLu()), -6, 6, fmt("%+.1f LU", mb.balanceLrLu())});
-                    const double ms = mb.balanceMsDb();
-                    bars.push_back({"SIDE vs MID", static_cast<float>(std::clamp(ms, -30.0, 10.0)), -30, 10, std::fabs(ms) > 100 ? std::string("--") : fmt("%+.1f dB", ms)});
                     const double md = mb.monoDeviationLu();
-                    bars.push_back({"MONO DEVIATION", static_cast<float>(std::clamp(md, -12.0, 3.0)), -12, 3, md < -100 ? std::string("CANCELS") : fmt("%+.1f LU", md)});
+                    bars.push_back({mb.get(meter_ids::DevSpan) < 0.5f ? "MONO DEV. (S)" : "MONO DEV. (I)", static_cast<float>(std::clamp(md, -4.0, 4.0)), -4, 4,
+                                    md < -100 ? std::string("CANCELS") : fmt("%+.1f LU", md)});
                 } else {
                     const float c = targetSlotCorrelation(w);
                     bars.push_back({"CORRELATION", c, -1, 1, fmt("%+.2f", c)});
@@ -731,7 +915,9 @@ void ConsoleScreen::drawFrame() {
                     const float f = std::clamp((b.v - b.lo) / (b.hi - b.lo), 0.0f, 1.0f);
                     const float x0 = track.x + track.w * std::min(zero, f), x1 = track.x + track.w * std::max(zero, f);
                     r.fillRound({track.x + track.w * zero - 1.5f, track.y - 4, 3, track.h + 8}, 1.5f, C::text.withAlpha(0.5f), Blend::Over);
-                    if (x1 - x0 > 1) r.fillRound({x0, track.y + 4, x1 - x0, track.h - 8}, 4, b.v < 0 && std::string(b.cap) == "CORRELATION" ? C::red : C::lime, Blend::Over, true);
+                    // correlation: out-of-phase (below 0) in orange, in phase in blue-green (MTR-UM p.12)
+                    const Rgba col = b.cap == "CORRELATION" ? (b.v < 0 ? C::amber : C::cyan) : C::lime;
+                    if (x1 - x0 > 1) r.fillRound({x0, track.y + 4, x1 - x0, track.h - 8}, 4, col, Blend::Over, true);
                 }
                 break;
             }
