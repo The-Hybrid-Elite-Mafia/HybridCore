@@ -16,6 +16,9 @@
 //    DESK-GR        reference desk EQ response graphs (DESK-UG p.8)
 //    EQ-OM    §N    reference 4-band EQ operator's manual (2024-01-17), section N
 //    BUS-UG   p.N   reference bus processor user guide rev 1.1, printed page N
+//    COL-UG   p.N   reference stereo colour processor user guide V1.4.0, printed page N
+//    COL-RS         its recall sheet (COL-UG p.29, panel drawing)
+//    COL-GR   p.N   its published response / spectrum graphs (traced; fit error given)
 //
 //  Rig constants (sample rate, stem count) are NOT here: they live in hybrid/core/Config.hpp.
 //  Every engine takes its sample rate from prepare(); nothing below assumes 48 kHz.
@@ -183,5 +186,70 @@ inline constexpr float kDeqSlope = 0.5f;              // dB of band change per d
 inline constexpr float kTeFastAttackMs = 1, kTeFastReleaseMs = 20, kTeSlowAttackMs = 20, kTeSlowReleaseMs = 200;
 inline constexpr float kTeMaxBoostDb = 12.0f;
 } // namespace twinbus
+
+// =============================================================================================
+//  COLOUR STAGE (stereo colour processor: drive, shelving EQ, HF compressor / crush, M/S image,
+//  transformer, insert, trims, bypass, meter)
+// =============================================================================================
+namespace colour {
+inline constexpr float kTrimDb = 12.0f;                         // VERIFIED ±12 dB input and output trim (COL-UG p.8, p.14)
+inline constexpr std::array<float, 3> kHpfHz{30, 40, 50};       // VERIFIED OFF/30/40/50, 3rd order 18 dB/oct (COL-UG p.8)
+// FITTED COL-GR p.8: the 50 Hz curve is a 3rd-order Butterworth with its -3 dB point at 53.1 Hz (rms 0.12 dB).
+// The 30/40 Hz traces were too noisy to fit; all three use the marked value as the Butterworth -3 dB point.
+inline constexpr float kOverloadDbu = 27.0f;                    // VERIFIED O/L LEDs above +27 dBu (COL-UG p.8)
+inline constexpr float kDbuAtFullScale = 24.0f;                 // ASSUMED converter alignment (as the desk)
+// Master meter: VERIFIED dBu scale, +24 at the top, 3 s peak hold, shows the input in BYPASS (COL-UG p.15);
+// segment marks VERIFIED COL-RS.
+inline constexpr std::array<float, 15> kMeterDbu{24, 21, 18, 15, 12, 9, 6, 4, 0, -4, -6, -12, -15, -18, -21};
+inline constexpr float kMeterHoldSeconds = 3.0f;
+
+// DRIVE: DRIVE 1..11 (VERIFIED COL-RS), DENSITY MIN..MAX (VERIFIED, printed MIN 2 4 6 8 MAX = 0..10 here),
+// auto level compensation for the drive (VERIFIED COL-UG p.9), density raises level (VERIFIED, amount UNKNOWN).
+inline constexpr float kDriveDbPerStep = 2.0f;        // ASSUMED: drive 1 = +0 dB into the saturator .. 11 = +20 dB
+inline constexpr float kDensityLevelDb = 3.0f;        // ASSUMED: MIN -> MAX adds up to +3 dB
+// Saturator y = v + e·v², v = soft-knee(u, T): FITTED to COL-GR p.10 (1 kHz spectra) with the test conditions
+// ASSUMED as drive 5 and a -10 dBFS tone: "low" density -> H2 -27.5 dBc, H3 -38.0 dBc; "high" -> H2 -64.2, H3 -54.8.
+inline constexpr float kDensityLowAt = 2.0f, kDensityHighAt = 8.0f;   // ASSUMED: which knob values the plots used
+inline constexpr float kKneeLow = 0.5072f, kEvenLow = 0.11086f;       // FITTED (exact match to the two harmonics)
+inline constexpr float kKneeHigh = 0.6739f, kEvenHigh = 0.00156f;     // FITTED (exact match)
+inline constexpr float kKneeMin = 0.30f, kKneeMax = 0.80f, kEvenMax = 0.16f;   // ASSUMED clamps outside the anchors
+// MIN density: "dynamic expansion effect when driven hard" (VERIFIED p.9). Amount UNKNOWN -> ASSUMED.
+inline constexpr float kMinExpansionDb = 4.0f;        // up to +4 dB on peaks at MIN (fades out by density 1)
+// LED: VERIFIED THD bands (COL-UG Appendix B): green 0.2-0.5 %, orange 0.5-2 %, red > 2 %.
+inline constexpr float kLedGreenThd = 0.2f, kLedOrangeThd = 0.5f, kLedRedThd = 2.0f;
+// Hiss: VERIFIED -75 dBu typical (mid drive, mid density), falls as DRIVE / DENSITY rise (p.9; slope UNKNOWN -> ASSUMED).
+inline constexpr float kHissDbu = -75.0f, kHissFallDb = 6.0f;
+
+// TONE EQ: VERIFIED LOW 30/50/70/90 Hz, HIGH 8/12/16/20 kHz, gain ±9 dB continuous, minimum-phase shelves (p.11).
+// FITTED COL-GR p.11: 1st-order shelves; geometric mid-point (Hz) of each and full depth (dB) at the ±9 end stop.
+inline constexpr std::array<float, 4> kLowMidHz{121.84f, 195.19f, 327.55f, 568.60f};     // rms 0.020/0.022/0.024/0.188 dB
+inline constexpr std::array<float, 4> kHighMidHz{2680.18f, 3859.89f, 5337.06f, 6290.59f}; // rms 0.052/0.041/0.028/0.024 dB
+inline constexpr float kToneDepthAtNineDb = 9.95f;   // FITTED (fits 9.82..10.18 dB; mean used), knob law ASSUMED linear
+
+// HF COMPRESSOR: VERIFIED THRESHOLD +10..-10 dB, X-OVER 3..20 kHz, fixed attack/release/ratio, no make-up (p.12).
+inline constexpr float kHfcXoverMinHz = 3000.0f, kHfcXoverMaxHz = 20000.0f;
+inline constexpr float kHfcThresholdRefDbu = 0.0f;   // UNKNOWN reference -> ASSUMED knob dB = dBu
+inline constexpr float kHfcRatio = 3.0f, kHfcAttackMs = 1.0f, kHfcReleaseMs = 100.0f, kHfcKneeDb = 3.0f;   // UNKNOWN -> ASSUMED
+inline constexpr float kHfcXoverQ = 0.7071f;          // UNKNOWN band split -> ASSUMED 2nd-order high-pass detector + dynamic shelf
+inline constexpr std::array<float, 3> kHfcLedDb{0.5f, 3.0f, 6.0f};   // UNKNOWN LED points -> ASSUMED
+// Crush mode (hold IN 5 s; X-OVER becomes WET/DRY): VERIFIED (p.12). Curves UNKNOWN -> ASSUMED:
+inline constexpr float kCrushRatio = 10.0f, kCrushAttackMs = 0.5f, kCrushReleaseMs = 250.0f, kCrushKneeDb = 2.0f;
+inline constexpr float kCrushMakeupRefDbu = 10.0f;     // ASSUMED: make-up keeps a +10 dBu signal level (so WET/DRY blends sensibly)
+
+// STEREO IMAGE: VERIFIED WIDTH = side level ±6 dB, SPACE = broad bass boost/cut of the side ±12 dB (p.12, COL-RS).
+inline constexpr float kWidthDb = 6.0f, kSpaceDb = 12.0f;
+inline constexpr float kSpaceHz = 600.0f;            // UNKNOWN ("stereo shuffling" shelf) -> ASSUMED 1st-order shelf mid-point
+
+// TRANSFORMER: VERIFIED 600 Ω 1:1; LF harmonics, slight top-end phase shift, under-damping weight; more level =
+// more LF roll-off; +16 dBu gives about 0.5 dB loss between 40 and 30 Hz (p.13).
+// FITTED COL-GR p.13 (+16 dBu): 1st-order high-pass at 31.88 Hz plus an under-damped bump (bell 28.58 Hz, Q 0.778,
+// +2.37 dB) — rms 0.08 dB, max 0.19 dB over 9-200 Hz. (A plain 2nd-order high-pass fits 5x worse: rms 0.40 dB.)
+inline constexpr float kTxHpHzAt16Dbu = 31.88f;
+inline constexpr float kTxBumpHz = 28.58f, kTxBumpQ = 0.778f, kTxBumpDb = 2.37f;
+inline constexpr float kTxHpDbPerDecadeOfLevel = 20.0f;   // ASSUMED: the corner moves x10 per 40 dB of level (√ law)
+inline constexpr float kTxLfBandHz = 150.0f, kTxHarmonicAt16Dbu = 0.0015f;   // ASSUMED: ~0.1 % LF 2nd/3rd at +16 dBu
+inline constexpr float kTxAllpassHz = 23000.0f;           // ASSUMED top-end phase shift (1st-order all-pass, flat level)
+inline constexpr float kTxSparkleDb = 0.25f, kTxSparkleHz = 12000.0f;   // ASSUMED "touch of sparkle" (1st-order shelf)
+} // namespace colour
 
 } // namespace hc::console::spec

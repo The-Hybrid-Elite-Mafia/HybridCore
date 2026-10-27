@@ -11,6 +11,7 @@ Change a guess there and nowhere else. The stem count comes from `hybrid/core/Co
 | `hc::console_desk` | **HEM STUDIO DESK** (`StudioDesk`) | 13 full stereo channel strips, main bus, Bus B, two cue buses, EXT returns, monitor section, bus compressor |
 | `hc::console_stepeq` | **HEM STEP EQ** (`makeStepEq()`) | 2-channel, 4-band stepped EQ with proportional Q and RANGE |
 | `hc::console_twinbus` | **HEM TWIN BUS** (`makeTwinBus()`) | 2-channel bus compressor (4 modes, colours, negative ratios) + 2-band dynamic EQ + transient expander |
+| `hc::console_colour` | **HEM COLOUR STAGE** (`makeColourStage()`) | stereo colour processor: HPF, drive, tone EQ, HF compressor / crush, M/S image, transformer, insert, trims, bypass, meter |
 
 Real-time rules: `process()` never allocates, locks or waits (tested). Controls are lock-free atomics
 that any thread may set. Step EQ and Twin Bus implement `hc::fx::Effect`, so they plug into the same
@@ -53,7 +54,7 @@ real measured value). "Left out" = it only makes sense with a physical plug, dev
 | Reference panel control | Engine control (id) | Status |
 |---|---|---|
 | EXT 1 FROM USB 13/14, EXT 2 FROM USB 15/16 | — | Left out: hardware input select (EXT returns come straight in) |
-| TALK LEVEL, talkback XLR, 48V, LMC | — | Left out: needs a talkback microphone |
+| TALK LEVEL, talkback XLR, 48V, talkback compressor | — | Left out: needs a talkback microphone |
 | POWER LED, USB LED | — | Left out: hardware status |
 | Bus comp THRESHOLD −20..+20 | `bc_thr` | Built |
 | Bus comp AUTO RELEASE | `bc_auto` | Built (dual rate) |
@@ -122,3 +123,23 @@ real measured value). "Left out" = it only makes sense with a physical plug, dev
 | Transient expander (bonus mode) | `tex` | Built |
 | Settings: brightness, relay click, sleep / auto-sleep, meter calibration, UID, soak test, factory reset, code game | — | Left out: no effect on sound |
 | EXT SEND jacks, power | — | Left out: hardware |
+
+### HEM COLOUR STAGE
+
+| Reference panel control | Engine control (id) | Status |
+|---|---|---|
+| O/L LEDs (L, R) | meters `O/L L/R` | Built (+27 dBu) |
+| INPUT TRIM ±12 dB | `in_trim` | Built |
+| HPF OFF / 30 / 40 / 50 Hz | `hpf` | Built (3rd order) |
+| Drive section: DRIVE 1..11, DENSITY MIN..MAX, IN, tri-colour LED | `drive`, `density`, `vd_in`, meter `DRIVE THD` + `colourDriveLedColour()` | Built (harmonics fitted to the maker's spectra) |
+| Tone EQ: LOW 30/50/70/90 Hz, HIGH 8/12/16/20 kHz, LOW / HIGH gain ±9 dB, IN | `low_freq`, `high_freq`, `low_gain`, `high_gain`, `eq_in` | Built (shelves fitted to the maker's curves) |
+| HF COMPRESSOR: THRESHOLD +10..−10, X-OVER 3..20 kHz, IN, LED | `hfc_thr`, `hfc_xover`, `hfc_in`, meter `HF COMP GR` | Built (fixed timing ASSUMED) |
+| Full-band crush mode (hold IN 5 s; X-OVER becomes WET/DRY) | `hfc_crush` | Built (curves ASSUMED) |
+| STEREO IMAGE: SPACE ±12 dB, WIDTH ±6 dB, IN | `space`, `width`, `si_in` | Built |
+| TRANSFORMER switch | `transformer` | Built (low-end curve fitted to the maker's graph) |
+| INSERT (+ hold for M/S mode), PRE EQ | `insert`, `insert_ms`, `pre_eq` + `colourStageSetInsert()` | Built: plug-in slot (Mid on left / Side on right in M/S) |
+| OUTPUT TRIM ±12 dB | `out_trim` | Built |
+| BYPASS (+ hold for POST I/P TRIM) | `bypass`, `bypass_post` | Built (timing unchanged) |
+| Master meter L/R, +24 dBu top, 3 s peak hold, input in BYPASS | meters `METER L/R`, `HOLD L/R` | Built |
+| Settings: brightness, relay click, factory reset, memory game, UID, soak test | — | Left out: no effect on sound |
+| Rear: XLR inputs/outputs, insert send/return jacks, fuse/voltage, power | — | Left out: hardware |

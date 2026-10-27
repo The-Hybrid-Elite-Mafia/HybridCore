@@ -4,6 +4,7 @@
 #    hc::console_desk    HEM STUDIO DESK  (13-channel desk, buses, monitor, bus compressor)
 #    hc::console_stepeq  HEM STEP EQ      (2-channel 4-band stepped EQ)
 #    hc::console_twinbus HEM TWIN BUS     (2-channel bus compressor + dynamic EQ)
+#    hc::console_colour  HEM COLOUR STAGE (stereo colour processor: drive, EQ, HF comp/crush, image, transformer)
 #  None of them touch hc::fx's existing effects (HEM DESK, HEM BUS PRESS ...); they only reuse its
 #  Effect interface and small filter helpers.
 # =============================================================================
@@ -26,3 +27,8 @@ add_library(hc_console_twinbus STATIC twinbus/src/TwinBus.cpp)
 add_library(hc::console_twinbus ALIAS hc_console_twinbus)
 target_include_directories(hc_console_twinbus PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/twinbus/include")
 target_link_libraries(hc_console_twinbus PUBLIC hc::console_common)
+
+add_library(hc_console_colour STATIC colour/src/ColourStage.cpp)
+add_library(hc::console_colour ALIAS hc_console_colour)
+target_include_directories(hc_console_colour PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/colour/include")
+target_link_libraries(hc_console_colour PUBLIC hc::console_common)

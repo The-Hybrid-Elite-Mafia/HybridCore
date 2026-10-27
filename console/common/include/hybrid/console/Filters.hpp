@@ -35,6 +35,23 @@ struct FirstOrder {
         else                    { b0 = n;     b1 = -n;    }
         a1 = (k - 1.0) * n;
     }
+    // Any 1st-order analogue section H(s) = (nb1·s/w0 + nb0) / (na1·s/w0 + na0), bilinear with pre-warp at f0.
+    void setAnalog(double fs, double f0, double nb1, double nb0, double na1, double na0) noexcept {
+        f0 = std::clamp(f0, 1.0, fs * 0.49);
+        const double K = 1.0 / std::tan(std::numbers::pi * f0 / fs);
+        const double B0 = nb1 * K + nb0, B1 = -nb1 * K + nb0, A0 = na1 * K + na0, A1 = -na1 * K + na0;
+        b0 = B0 / A0; b1 = B1 / A0; a1 = A1 / A0;
+    }
+    // Shelves with a geometric mid-point at f0 and `gainDb` at the far end; 1st-order all-pass.
+    void setLowShelf(double fs, double f0, double gainDb) noexcept {
+        const double r = std::pow(10.0, gainDb / 40.0);
+        setAnalog(fs, f0, 1.0, r, 1.0, 1.0 / r);
+    }
+    void setHighShelf(double fs, double f0, double gainDb) noexcept {
+        const double r = std::pow(10.0, gainDb / 40.0);
+        setAnalog(fs, f0, r, 1.0, 1.0 / r, 1.0);
+    }
+    void setAllPass(double fs, double f0) noexcept { setAnalog(fs, f0, -1.0, 1.0, 1.0, 1.0); }
     void clear() noexcept { z = 0; }
     [[nodiscard]] double tick(double x) noexcept {   // transposed direct form II
         const double y = b0 * x + z;

@@ -5,6 +5,7 @@
 // Every number printed here is measured by running audio through the engine.
 #include "TestHarness.hpp"
 
+#include "hybrid/console/ColourStage.hpp"
 #include "hybrid/console/ConsoleSpecs.hpp"
 #include "hybrid/console/StepEq.hpp"
 #include "hybrid/console/StudioDesk.hpp"
@@ -107,6 +108,7 @@ double measuredRatio(const Proc& p, const std::function<void()>& reset, double i
 // ---- the reference maker's published desk EQ curves (traced from DESK-GR, full boost) -----------
 struct GraphPt { double hz, db; };
 #include "console_graph_tables.inc"
+#include "console_colour_tables.inc"
 
 // ---- desk wiring helper: one stem in channel 0, everything else silent ------------------------
 struct DeskRig {
@@ -687,6 +689,179 @@ void testConsoleTwinBus() {
     }
 }
 
+
+// =================================================================================================
+void testConsoleColour() {
+    std::printf("[console: HEM COLOUR STAGE]\n");
+    namespace I = colour_ids;
+    namespace Sp = spec::colour;
+    auto cs = makeColourStage();
+    cs->prepare(kFs, 512);
+    const std::uint32_t lat = cs->latency();
+    Proc p = [&](float* l, float* r, std::uint32_t n) { cs->process(l, r, n); };
+    auto fresh = [&] { cs->setDefaults(); cs->reset(); };
+    std::printf("  latency %u samples (%.2f ms at 48 kHz), the same with every section in or out\n", lat, 1000.0 * lat / kFs);
+    // all circuits off: flat (reference spec: +/-0.05 dB)
+    {
+        fresh();
+        double mx = 0;
+        for (double hz : {20.0, 100.0, 1000.0, 10000.0, 20000.0}) mx = std::max(mx, std::fabs(gainDb(p, hz)));
+        std::printf("  all circuits off: max deviation 20 Hz-20 kHz %.3f dB (reference spec +/-0.05 dB)\n", mx);
+        CHECK(mx < 0.05);
+    }
+    // HPF OFF / 30 / 40 / 50 Hz, 18 dB/oct
+    {
+        std::string line;
+        for (int h = 1; h <= 3; ++h) {
+            fresh(); cs->set(I::Hpf, static_cast<float>(h));
+            const double hz = Sp::kHpfHz[static_cast<std::size_t>(h - 1)];
+            const double atF = gainDb(p, hz), oct = gainDb(p, hz / 2) - gainDb(p, hz / 4);
+            char t[64]; std::snprintf(t, sizeof t, " %g Hz: %.2f dB at %g Hz, %.1f dB/oct below;", hz, atF, hz, oct); line += t;
+            CHECK(std::fabs(atF + 3.01) < 0.2 && oct > 16.5);
+        }
+        std::printf("  HPF:%s\n", line.c_str());
+    }
+    // TONE EQ vs the maker's published curves (+9 dB)
+    {
+        struct C { const char* name; const GraphPt* pts; std::size_t n; int fp, gp, fi; };
+        const C cases[] = {
+            {"LOW 30 Hz", kToneLow30, std::size(kToneLow30), I::LowFreq, I::LowGain, 0}, {"LOW 50 Hz", kToneLow50, std::size(kToneLow50), I::LowFreq, I::LowGain, 1},
+            {"LOW 70 Hz", kToneLow70, std::size(kToneLow70), I::LowFreq, I::LowGain, 2}, {"LOW 90 Hz", kToneLow90, std::size(kToneLow90), I::LowFreq, I::LowGain, 3},
+            {"HIGH 8 kHz", kToneHigh8, std::size(kToneHigh8), I::HighFreq, I::HighGain, 0}, {"HIGH 12 kHz", kToneHigh12, std::size(kToneHigh12), I::HighFreq, I::HighGain, 1},
+            {"HIGH 16 kHz", kToneHigh16, std::size(kToneHigh16), I::HighFreq, I::HighGain, 2}, {"HIGH 20 kHz", kToneHigh20, std::size(kToneHigh20), I::HighFreq, I::HighGain, 3},
+        };
+        for (const auto& c : cases) {
+            fresh(); cs->set(I::EqIn, 1); cs->set(c.fp, static_cast<float>(c.fi)); cs->set(c.gp, 9.0f);
+            std::vector<double> err;
+            for (std::size_t i = 0; i < c.n; ++i) err.push_back(gainDb(p, c.pts[i].hz) - c.pts[i].db);
+            double mean = 0; for (double e : err) mean += e; mean /= static_cast<double>(err.size());
+            double se = 0, sh = 0, mx = 0, mxs = 0;
+            for (double e : err) { se += e * e; sh += (e - mean) * (e - mean); mx = std::max(mx, std::fabs(e)); mxs = std::max(mxs, std::fabs(e - mean)); }
+            const double rms = std::sqrt(se / static_cast<double>(c.n)), shape = std::sqrt(sh / static_cast<double>(c.n));
+            std::printf("  TONE EQ %-11s +9 vs published curve: raw rms %.2f / max %.2f dB; shape (graph level offset %+.2f dB removed) rms %.2f / max %.2f dB (%zu pts)\n",
+                        c.name, rms, mx, -mean, shape, mxs, c.n);
+            CHECK(shape < 0.3 && rms < 0.8);
+        }
+        fresh(); cs->set(I::EqIn, 1); cs->set(I::LowGain, 9); const double up = gainDb(p, 30);
+        cs->set(I::LowGain, -9); const double dn = gainDb(p, 30);
+        std::printf("  TONE LOW 30 Hz at 30 Hz: +9 knob %+.2f dB, -9 knob %+.2f dB (mirror err %.3f dB)\n", up, dn, up + dn);
+        CHECK(std::fabs(up + dn) < 0.05);
+    }
+    // DRIVE vs the maker's 1 kHz spectra (test conditions ASSUMED: drive 5, -10 dBFS)
+    {
+        auto harmonics = [&](float density, float drive, double inDb, double& h2, double& h3, float& thd) {
+            fresh(); cs->set(I::DriveIn, 1); cs->set(I::Drive, drive); cs->set(I::Density, density);
+            Buf l = sine(1000, 0.5, inDb), r = l;
+            runBlocks(*cs, l, r);
+            thd = cs->meter(I::MeterDriveThd);
+            const std::size_t from = static_cast<std::size_t>(kFs * 0.2), len = static_cast<std::size_t>(kFs * 0.2);
+            auto mag = [&](double hz) { std::complex<double> a{0, 0}; for (std::size_t i = 0; i < len; ++i) a += static_cast<double>(l[from + i]) * std::polar(1.0, -2 * std::numbers::pi * hz * static_cast<double>(i) / kFs); return std::abs(a); };
+            const double f1 = mag(1000);
+            h2 = 20 * std::log10(mag(2000) / f1); h3 = 20 * std::log10(mag(3000) / f1);
+        };
+        double h2, h3; float thd;
+        harmonics(2.0f, 5.0f, -10.0, h2, h3, thd);
+        std::printf("  DRIVE density 2: H2 %.1f dBc (graph -27.5), H3 %.1f dBc (graph -38.0); LED %s (%.2f%%)\n", h2, h3,
+                    std::array<const char*, 4>{"off", "green", "orange", "red"}[static_cast<std::size_t>(colourDriveLedColour(thd))], thd);
+        CHECK(std::fabs(h2 + 27.5) < 1.5 && std::fabs(h3 + 38.0) < 1.5);
+        harmonics(8.0f, 5.0f, -10.0, h2, h3, thd);
+        std::printf("  DRIVE density 8: H2 %.1f dBc (graph -64.2), H3 %.1f dBc (graph -54.8); LED %s (%.2f%%)\n", h2, h3,
+                    std::array<const char*, 4>{"off", "green", "orange", "red"}[static_cast<std::size_t>(colourDriveLedColour(thd))], thd);
+        CHECK(std::fabs(h3 + 54.8) < 2.0 && h3 > h2);
+        std::string line;
+        for (float dr : {1.0f, 5.0f, 9.0f, 11.0f}) { harmonics(5.0f, dr, -14.0, h2, h3, thd); char t[48]; std::snprintf(t, sizeof t, " drive %.0f: %.2f%%;", dr, thd); line += t; }
+        std::printf("  DRIVE distortion vs DRIVE (density 5, -14 dBFS):%s\n", line.c_str());
+        // auto level compensation: small signal level barely moves with DRIVE
+        fresh(); cs->set(I::DriveIn, 1); cs->set(I::Density, 5); cs->set(I::Drive, 1); const double g1 = gainDb(p, 1000, kFs, -40);
+        cs->set(I::Drive, 11); const double g11 = gainDb(p, 1000, kFs, -40);
+        std::printf("  DRIVE auto level compensation: quiet tone %+.2f dB at drive 1, %+.2f dB at drive 11\n", g1, g11);
+        CHECK(std::fabs(g1 - g11) < 1.0);
+        // hiss: silent input
+        fresh(); cs->set(I::DriveIn, 1); cs->set(I::Drive, 6); cs->set(I::Density, 5);
+        Buf z(static_cast<std::size_t>(kFs), 0.0f), z2 = z;
+        runBlocks(*cs, z, z2);
+        const double hissDbu = rmsDb(z, z.size() / 2, z.size()) + Sp::kDbuAtFullScale;
+        std::printf("  DRIVE hiss, mid drive / mid density: %.1f dBu (reference spec -75 dBu typical)\n", hissDbu);
+        CHECK(std::fabs(hissDbu - Sp::kHissDbu) < 2.0);
+    }
+    // HF COMPRESSOR: only the top above X-OVER moves; no make-up
+    {
+        fresh(); cs->set(I::HfcIn, 1); cs->set(I::HfcThreshold, -10.0f); cs->set(I::HfcXover, 8000.0f);
+        const double g1k = gainDb(p, 1000, kFs, -6), g15k = gainDb(p, 15000, kFs, -6);
+        cs->reset();
+        const double quiet15k = gainDb(p, 15000, kFs, -60);
+        std::printf("  HF COMPRESSOR (threshold -10, X-OVER 8 kHz): loud 1 kHz %+.2f dB, loud 15 kHz %+.2f dB, quiet 15 kHz %+.2f dB\n", g1k, g15k, quiet15k);
+        CHECK(std::fabs(g1k) < 0.6 && g15k < -3.0 && std::fabs(quiet15k) < 0.1);
+        // Crush: X-OVER becomes WET/DRY
+        fresh(); cs->set(I::HfcIn, 1); cs->set(I::HfcCrush, 1); cs->set(I::HfcThreshold, -10.0f);
+        cs->set(I::HfcXover, Sp::kHfcXoverMinHz); const double dry = gainDb(p, 1000, kFs, -6);
+        cs->set(I::HfcXover, Sp::kHfcXoverMaxHz);
+        const double wetLoud = gainDb(p, 1000, kFs, -6), wetQuiet = gainDb(p, 1000, kFs, -40);
+        std::printf("  CRUSH: knob at DRY %+.2f dB; WET loud (-6 dBFS) %+.2f dB vs quiet (-40 dBFS) %+.2f dB (heavy squash)\n", dry, wetLoud, wetQuiet);
+        CHECK(std::fabs(dry) < 0.05 && wetQuiet - wetLoud > 15);
+    }
+    // STEREO IMAGE: WIDTH moves only the side; SPACE is a broad bass shelf on the side
+    {
+        auto sideGain = [&](float width, float space, double hz, bool sideOnly) {
+            fresh(); cs->set(I::ImageIn, 1); cs->set(I::Width, width); cs->set(I::Space, space);
+            Buf l = sine(hz, 0.5, -20), r = l;
+            if (sideOnly) for (auto& v : r) v = -v;
+            runBlocks(*cs, l, r);
+            return rmsDb(l, l.size() / 2, l.size()) - (-20 - 3.0103);
+        };
+        const double wSide = sideGain(6, 0, 1000, true), wMid = sideGain(6, 0, 1000, false), spLow = sideGain(0, 12, 60, true), spHigh = sideGain(0, 12, 8000, true);
+        std::printf("  STEREO IMAGE: WIDTH +6 -> side %+.2f dB, mid %+.2f dB; SPACE +12 on side -> 60 Hz %+.2f dB, 8 kHz %+.2f dB\n", wSide, wMid, spLow, spHigh);
+        CHECK(std::fabs(wSide - 6) < 0.05 && std::fabs(wMid) < 0.05 && spLow > 9 && std::fabs(spHigh) < 1.0);
+    }
+    // TRANSFORMER: low-end roll-off grows with level (+16 dBu = -8 dBFS)
+    {
+        // dBu is an RMS level: a sine at +16 dBu RMS peaks 3 dB higher
+        auto tx = [&](double hz, double dbu) { fresh(); cs->set(I::Transformer, 1); return gainDb(p, hz, kFs, dbu + 3.0103 - Sp::kDbuAtFullScale); };
+        const double a10 = tx(10, 16), a20 = tx(20, 16), a30 = tx(30, 16), a40 = tx(40, 16), a1k = tx(1000, 16), q20 = tx(20, -10);
+        std::printf("  TRANSFORMER at +16 dBu: 10 Hz %+.2f (graph -10.1), 20 Hz %+.2f (graph -3.8), 30 Hz %+.2f (graph -0.9), 40 Hz %+.2f (graph -0.2), 1 kHz %+.2f dB; 20 Hz at -10 dBu %+.2f dB\n",
+                    a10, a20, a30, a40, a1k, q20);
+        CHECK(std::fabs(a20 + 3.8) < 0.8 && std::fabs(a30 + 0.9) < 0.5 && q20 > a20 && std::fabs(a1k) < 0.5);
+    }
+    // INSERT (stereo and M/S), BYPASS, O/L, meter
+    {
+        struct Probe final : InsertSlot {
+            double l = 0, r = 0; int calls = 0;
+            void process(float* a, float* b, std::uint32_t n) noexcept override { ++calls; for (std::uint32_t i = 0; i < n; ++i) { l += std::fabs(a[i]); r += std::fabs(b[i]); } }
+        } probe;
+        fresh(); colourStageSetInsert(*cs, &probe); cs->set(I::Insert, 1); cs->set(I::InsertMs, 1);
+        Buf l = sine(1000, 0.1, -20), r = l;   // mono: Mid = signal, Side = 0
+        runBlocks(*cs, l, r);
+        std::printf("  INSERT M/S mode: slot called %d times, left (Mid) energy %.1f, right (Side) energy %.4f\n", probe.calls, probe.l, probe.r);
+        CHECK(probe.calls > 0 && probe.l > 100 && probe.r < 1e-3);
+        colourStageSetInsert(*cs, nullptr);
+        fresh(); cs->set(I::InputTrim, 6); cs->set(I::DriveIn, 1); cs->set(I::Bypass, 1);
+        Buf a(4800, 0.0f), b(4800, 0.0f); a[100] = b[100] = 0.5f;
+        runBlocks(*cs, a, b);
+        const bool exact = std::fabs(a[100 + lat] - 0.5f) < 1e-6f;
+        cs->set(I::BypassPostTrim, 1); cs->reset();
+        Buf c(4800, 0.0f), d(4800, 0.0f); c[100] = d[100] = 0.5f;
+        runBlocks(*cs, c, d);
+        std::printf("  BYPASS: impulse unchanged after %u samples %s; POST I/P TRIM (+6 dB) gives %.3f (expect %.3f)\n", lat, exact ? "yes" : "NO", c[100 + lat], 0.5 * std::pow(10.0, 6.0 / 20));
+        CHECK(exact && std::fabs(c[100 + lat] - 0.5f * dbToLin(6.0f)) < 1e-3f);
+        fresh();
+        Buf hot = sine(1000, 0.1, 27.5 - Sp::kDbuAtFullScale), hot2 = hot;
+        runBlocks(*cs, hot, hot2);
+        const float ol = cs->meter(I::MeterOverL), m = cs->meter(I::MeterHoldL);
+        std::printf("  O/L at +27.5 dBu: %s; meter hold reads %.1f dBu\n", ol > 0.5f ? "lit" : "NOT lit", m);
+        CHECK(ol > 0.5f && std::fabs(m - 27.5f) < 0.2f);
+    }
+    // zero allocation
+    {
+        fresh();
+        for (int prm : {I::DriveIn, I::EqIn, I::HfcIn, I::ImageIn, I::Transformer}) cs->set(prm, 1);
+        Buf l = sine(1000, 0.01, -10), r = l;
+        AllocScope scope;
+        for (int it = 0; it < 200; ++it) { cs->set(I::HfcCrush, static_cast<float>(it & 1)); cs->set(I::LowGain, static_cast<float>(it % 9)); cs->process(l.data(), r.data(), 256); }
+        std::printf("  colour stage audio path, 200 blocks, every section on, knobs moving: %llu heap allocations\n", static_cast<unsigned long long>(scope.count()));
+        CHECK(scope.count() == 0);
+    }
+}
+
 // =================================================================================================
 void benchmarkConsole() {
     std::printf("[console benchmark] (machine-dependent; the CI runner is NOT the rig)\n");
@@ -728,10 +903,18 @@ void benchmarkConsole() {
             for (int i = 0; i < iters; ++i) tb->process(l.data(), r.data(), frames);
             const double usTb = std::chrono::duration<double, std::micro>(clock::now() - t0).count() / iters;
 
+            auto cs = makeColourStage(); cs->prepare(fs, frames);
+            namespace C = colour_ids;
+            for (int prm : {C::DriveIn, C::EqIn, C::HfcIn, C::ImageIn, C::Transformer}) cs->set(prm, 1);
+            cs->set(C::Hpf, 1);
+            t0 = clock::now();
+            for (int i = 0; i < iters; ++i) cs->process(l.data(), r.data(), frames);
+            const double usCs = std::chrono::duration<double, std::micro>(clock::now() - t0).count() / iters;
+
             const double budget = 1e6 * frames / fs;
-            std::printf("  %3.0f kHz, %3u frames (%.2f ms): desk 13ch all-on %.1f us (%.2f%%) | step EQ 8 bands %.1f us (%.2f%%) | twin bus worst case %.1f us (%.2f%%)\n",
-                        fs / 1000, frames, budget / 1000, usDesk, 100 * usDesk / budget, usEq, 100 * usEq / budget, usTb, 100 * usTb / budget);
-            CHECK(usDesk + usEq + usTb < budget);
+            std::printf("  %3.0f kHz, %3u frames (%.2f ms): desk 13ch all-on %.1f us (%.2f%%) | step EQ %.1f us (%.2f%%) | twin bus %.1f us (%.2f%%) | colour stage %.1f us (%.2f%%)\n",
+                        fs / 1000, frames, budget / 1000, usDesk, 100 * usDesk / budget, usEq, 100 * usEq / budget, usTb, 100 * usTb / budget, usCs, 100 * usCs / budget);
+            CHECK(usDesk + usEq + usTb + usCs < budget);
         }
     }
 }

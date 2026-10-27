@@ -19,6 +19,7 @@
 // =============================================================================
 #include "hybrid/console/ConsoleSpecs.hpp"
 #include "hybrid/console/Filters.hpp"
+#include "hybrid/console/InsertSlot.hpp"
 #include "hybrid/core/Config.hpp"
 #include "hybrid/fx/Fx.hpp"
 
@@ -58,12 +59,8 @@ public:
     [[nodiscard]] static std::span<const fx::ParamInfo> channelParams() noexcept;
     [[nodiscard]] static std::span<const fx::ParamInfo> masterParams() noexcept;
 
-    // A plug-in slot behind an INSERT switch (Phase 4 tools). Stereo, in place, real-time safe.
-    class InsertSlot {
-    public:
-        virtual ~InsertSlot() = default;
-        virtual void process(float* left, float* right, std::uint32_t frames) noexcept = 0;
-    };
+    // A plug-in slot behind an INSERT switch (Phase 4 tools). Shared by every console engine.
+    using InsertSlot = console::InsertSlot;
 
     struct Inputs {
         // Stem audio per channel. right == nullptr: mono source (left feeds both). left == nullptr: silence.
