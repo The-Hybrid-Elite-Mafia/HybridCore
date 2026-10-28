@@ -1,0 +1,62 @@
+name: Hiss Tamer
+
+# Builds ONLY the Hiss module (no app, no UI, no audio devices), runs its tests, runs the demo
+# files through AUTO FIX, checks the results again with separately written Python measurements,
+# and uploads the before / after / removed WAVs, pictures, and the plain-words report.
+on:
+  push:
+    branches: ['hiss-tamer-*']
+    paths: ['hiss/**', '.github/workflows/hiss-tamer.yml', 'cmake/**']
+  workflow_dispatch:
+
+jobs:
+  hiss:
+    name: Hiss Tamer (Windows, MSVC Release)
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Branding check (no other company's names in the Hiss files)
+        shell: pwsh
+        run: |
+          $bad = Select-String -Path (Get-ChildItem hiss -Recurse -File | ForEach-Object FullName) -Pattern '\b(ssl|waves|soundtoys|api)\b|solid state logic' -CaseSensitive:$false
+          if ($bad) { $bad | ForEach-Object { Write-Host "$($_.Path):$($_.LineNumber): $($_.Line)" }; throw "Another company's name was found." }
+          Write-Host "clean"
+
+      - name: Configure
+        run: cmake -S hiss -B build/hiss -G "Visual Studio 17 2022" -A x64
+
+      - name: Build Release
+        run: cmake --build build/hiss --config Release --parallel
+
+      - name: Tests
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force out | Out-Null
+          & .\build\hiss\Release\hc_hiss_tests.exe 2>&1 | Tee-Object -FilePath out\test_log.txt
+          if ($LASTEXITCODE -ne 0) { throw "tests failed ($LASTEXITCODE)" }
+
+      - name: Demo files through AUTO FIX
+        shell: pwsh
+        run: |
+          & .\build\hiss\Release\hc_hiss_cli.exe demo out\demo 2>&1 | Tee-Object -FilePath out\demo_log.txt
+          if ($LASTEXITCODE -ne 0) { throw "demo failed ($LASTEXITCODE)" }
+
+      - name: Python check (separately written measurements)
+        shell: pwsh
+        run: |
+          python -m pip install --quiet numpy matplotlib
+          Push-Location hiss\python
+          python hiss_compare.py ..\..\out\demo 2>&1 | Tee-Object -FilePath ..\..\out\python_compare.txt
+          $code = $LASTEXITCODE
+          python hiss_report.py ..\..\out\demo ..\..\out\test_log.txt ..\include\hybrid\hiss\HissConfig.hpp ..\..\out\report
+          Pop-Location
+          if ($code -ne 0) { throw "python check found a problem" }
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hiss-tamer-results
+          path: out
+          if-no-files-found: warn
