@@ -57,7 +57,8 @@ def lag_samples(a, b, fs):
     if len(m) <= n:
         i0 = 0
     else:
-        e = np.convolve(m ** 2, np.ones(n), "valid")
+        c = np.concatenate([[0.0], np.cumsum(m ** 2)])
+        e = c[n:] - c[:-n]
         i0 = int(np.argmax(e))
     x = a[i0:i0 + n].mean(axis=1)
     y = b[i0:i0 + n].mean(axis=1)

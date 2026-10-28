@@ -128,6 +128,7 @@ inline constexpr double kCombAgreeMinSeconds  = 0.25;     // ASSUMED: a time chu
 inline constexpr double kCombMinLines         = 12;       // ASSUMED: AUTO needs at least this many lines on the grid
 inline constexpr double kCombMinGridShare     = 0.60;     // ASSUMED: ... and at least this share of all strong lines on the grid (chance level is about 0.12)
 inline constexpr double kCombMinFall         = 0.30;     // ASSUMED: AUTO keeps the fix only if at least this share of the on-grid lines is gone afterwards
+inline constexpr double kCombMinFallDb       = 6.0;      // ASSUMED: ... or, for a very strong comb whose lines stay countable after the cut, the total comb strength must fall by at least this many dB
 inline constexpr double kCombMaxLowShare      = 0.001;    // ASSUMED: ... and at most this share of what was taken out may sit below 2.5 kHz
 inline constexpr double kCombLineMinDb        = 10.0;     // ASSUMED: a line must stand this far above its neighbourhood to count
 

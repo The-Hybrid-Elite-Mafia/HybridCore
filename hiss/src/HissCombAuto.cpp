@@ -182,11 +182,17 @@ CombResult autoFixComb(const float* left, const float* right, std::size_t frames
         c.linesBefore = r.before.lines; c.onGridBefore = r.before.onGrid; c.depthBeforeDb = r.before.depthDb;
         c.linesAfter = after.lines; c.onGridAfter = after.onGrid; c.depthAfterDb = after.depthDb;
         const double fell = r.before.onGrid > 0 ? 1.0 - static_cast<double>(after.onGrid) / r.before.onGrid : 0.0;
+        const double fellDb = r.before.depthDb - after.depthDb;
         if (opt.force) c.failReason.clear();
-        else if (fell < cfg::kCombMinFall) c.failReason = "the comb did not get clearly shallower";
+        else if (fell < cfg::kCombMinFall && fellDb < cfg::kCombMinFallDb) c.failReason = "the comb did not get clearly shallower";
         else if (c.removedRmsDb > cfg::kCombMaxPatternDb) c.failReason = "the part taken out is too loud to be the comb";
         else if (c.lowBandShare > cfg::kCombMaxLowShare) c.failReason = "something below 2.5 kHz was changed";
         c.passed = c.failReason.empty();
+        {
+            char t[200];
+            std::snprintf(t, sizeof t, "   cut %.1f dB: grid lines %d -> %d, comb strength %.1f -> %.1f dB%s", red, c.onGridBefore, c.onGridAfter, c.depthBeforeDb, c.depthAfterDb, c.passed ? "" : (std::string(" (rejected: ") + c.failReason + ")").c_str());
+            say(t);
+        }
         if (c.passed) {
             r.touched = true;
             r.reductionDb = red;
@@ -196,7 +202,7 @@ CombResult autoFixComb(const float* left, const float* right, std::size_t frames
             r.right = std::move(oR);
             r.removedLeft = std::move(dL);
             r.removedRight = std::move(dR);
-            r.confidence = fell >= 0.70 ? Confidence::High : (fell >= 0.40 ? Confidence::Medium : Confidence::Low);
+            r.confidence = (fell >= 0.70 || fellDb >= 12.0) ? Confidence::High : ((fell >= 0.40 || fellDb >= 9.0) ? Confidence::Medium : Confidence::Low);
             std::snprintf(b, sizeof b,
                 "%s: comb found (%s). Removed it with a %.1f dB cut.\n"
                 "   comb lines on the grid: %d -> %d   (comb strength: %.1f dB -> %.1f dB)\n"

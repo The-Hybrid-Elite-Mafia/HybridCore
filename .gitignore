@@ -5,3 +5,4 @@
 # Steinberg ASIO SDK is licensed; never commit it.
 /external/asiosdk/*
 !/external/asiosdk/README.md
+hiss/python/analized

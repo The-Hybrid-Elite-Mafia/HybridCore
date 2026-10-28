@@ -16,6 +16,9 @@ import soundfile as sf
 from hiss_knownanswer import band_rms_db, fingerprint, run_cli, synth
 
 
+REPEAT = int(os.environ.get("KA_REPEAT", "5"))
+
+
 def main():
     cli, fp_wav, outdir, level = sys.argv[1], sys.argv[2], sys.argv[3], float(sys.argv[4])
     songs = sys.argv[5:]
@@ -27,8 +30,8 @@ def main():
         for f in sorted(glob.glob(os.path.join(folder, "*.wav"))):
             stem = os.path.splitext(os.path.basename(f))[0]
             x, fs = sf.read(f, always_2d=True, dtype="float64")
-            x = x.mean(axis=1)
-            st = np.stack([x, x], axis=1).astype(np.float32)
+            x = np.tile(x.mean(axis=1), REPEAT)          # 29 s stems are too short for the tool to find enough quiet material; repeat to song length
+            st = np.stack([x, np.roll(x, 7)], axis=1).astype(np.float32)     # not identical channels: a mono-doubled stem has a silent side channel, which the comb detector cannot judge
             work = os.path.join(outdir, song, stem)
             os.makedirs(work, exist_ok=True)
             cin = os.path.join(work, "clean.wav")

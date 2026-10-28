@@ -68,6 +68,9 @@ void writeCombResult(const fs::path& dir, const std::string& name, const wav::Fi
     wav::File fixed = in;
     fixed.left = r.left;
     fixed.right = r.right;
+    // The comb sits near the 16-bit step size. A 16-bit file would round most of the correction away again, so a fixed file
+    // is stored with 24 bits. A file the tool left alone keeps its original format and its exact samples.
+    if (r.touched && !fixed.isFloat && fixed.bits < 24) fixed.bits = 24;
     wav::File removed = in;
     removed.isFloat = true;
     removed.bits = 32;
