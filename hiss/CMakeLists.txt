@@ -25,6 +25,7 @@ if(HC_BUILD_HISS_TOOLS)
   add_executable(hc_hiss_cli tools/hiss_cli.cpp)
   target_include_directories(hc_hiss_cli PRIVATE tools tests)
   target_link_libraries(hc_hiss_cli PRIVATE hc::hiss)
+  target_compile_definitions(hc_hiss_cli PRIVATE _CRT_SECURE_NO_WARNINGS)
 
   # Tests (their own small harness + a heap-allocation counter to prove the audio path never allocates)
   add_executable(hc_hiss_tests tests/hiss_tests.cpp tests/HissAllocTracker.cpp)
