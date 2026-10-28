@@ -88,5 +88,15 @@
   "'No Brakes - ... test export.wav' (exports from our own tools)",
   "all other zips/folders in Downloads (not named by Steven)"
  ],
- "note": "Cosmic Abyss is in TUNING because the MP3-vs-WAV question needs it during characterisation. HOLD_OUT is one song (7 stems); the 240-days full mix is not a Suno original, so a stem-sum stands in for it and is labelled as such."
+ "note": "Cosmic Abyss is in TUNING because the MP3-vs-WAV question needs it during characterisation. HOLD_OUT is one song (7 stems); the 240-days full mix is not a Suno original, so a stem-sum stands in for it and is labelled as such.",
+ "extra_not_used_for_tuning": {
+  "note": "Added by Steven after tuning was frozen. Measured only; nothing was tuned on these.",
+  "Steady Whistle (Suno test tone)": "no comb found",
+  "Room Tone (Suno test)": "comb found, same line pattern",
+  "Circle Jerk Boys": "12 stems are empty (all zeros); mix only, comb hidden by music",
+  "Inspired by Sound only": "1 of 6 files shows a comb (Keyboard); fix refused (no quiet floor)",
+  "Reading the Same Letter": "0 of 6 files with a clear comb",
+  "There's a Difference": "0 of 6 files with a clear comb",
+  "metronome track": "not received, dropped by Steven"
+ }
 }
