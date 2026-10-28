@@ -60,7 +60,7 @@ def config_lines(header):
     in_unknown = False
     for ln in txt:
         s = ln.strip()
-        if "// ASSUMED" in s:
+        if "// ASSUMED" in s and not s.startswith("//"):
             m = re.search(r"constexpr\s+\w+\s+(\w+)\s*=\s*([^;]+);", s)
             note = s.split("// ASSUMED", 1)[1].lstrip(": ").strip()
             assumed.append(("%s = %s" % (m.group(1), m.group(2).strip()) if m else s) + ("  - " + note if note else ""))
