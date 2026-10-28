@@ -1,12 +1,15 @@
 // hc_hiss_cli — fix a file, a folder of stems, or run the built-in demo scenes.
 //   hc_hiss_cli auto  <in.wav>  <outdir>
 //   hc_hiss_cli stems <indir>   <outdir>
+//   hc_hiss_cli comb  <in.wav>  <outdir>        (the 25 Hz comb remover, one file)
+//   hc_hiss_cli combstems <indir> <outdir>      (the comb remover, every stem on its own)
 //   hc_hiss_cli demo            <outdir>
 // For every file it writes: <name>_fixed.wav, <name>_removed.wav, <name>_report.txt, <name>_result.json
 // A file the tool leaves alone is written back with exactly the same samples.
 #include "HissTestSignals.hpp"
 #include "HissWav.hpp"
 #include "hybrid/hiss/HissAuto.hpp"
+#include "hybrid/hiss/HissCombAuto.hpp"
 
 #include <algorithm>
 #include <cstdio>
@@ -59,6 +62,71 @@ AutoOptions options() {
     AutoOptions o;
     o.progress = [](const std::string& s) { std::cout << "   - " << s << "\n" << std::flush; };
     return o;
+}
+
+void writeCombResult(const fs::path& dir, const std::string& name, const wav::File& in, const CombResult& r) {
+    wav::File fixed = in;
+    fixed.left = r.left;
+    fixed.right = r.right;
+    wav::File removed = in;
+    removed.isFloat = true;
+    removed.bits = 32;
+    removed.left = r.removedLeft;
+    removed.right = r.removedRight;
+    std::string err;
+    if (!wav::write((dir / (name + "_fixed.wav")).string(), fixed, err)) std::cerr << err << "\n";
+    if (!wav::write((dir / (name + "_removed.wav")).string(), removed, err)) std::cerr << err << "\n";
+    writeText(dir / (name + "_report.txt"), r.report);
+    const auto& c = r.check;
+    char b[1200];
+    std::snprintf(b, sizeof b,
+        "{\"name\":%s,\"sampleRate\":%d,\"touched\":%s,\"confidence\":%s,\"found\":%s,\"linesBefore\":%d,\"onGridBefore\":%d,\"gridShare\":%.3f,"
+        "\"reductionDb\":%.2f,\"backOffSteps\":%d,\"linesAfter\":%d,\"onGridAfter\":%d,\"depthBeforeDb\":%.2f,\"depthAfterDb\":%.2f,"
+        "\"removedRmsDb\":%.2f,\"lowBandShare\":%.5f,\"peakChangeDb\":%.2f,\"failReason\":%s}\n",
+        jsonStr(name).c_str(), in.sampleRate, r.touched ? "true" : "false", jsonStr(confidenceName(r.confidence)).c_str(), r.before.found ? "true" : "false",
+        r.before.lines, r.before.onGrid, r.before.gridShare, r.reductionDb, r.backOffSteps, c.linesAfter, c.onGridAfter, c.depthBeforeDb, c.depthAfterDb,
+        c.removedRmsDb, c.lowBandShare, c.peakChangeDb, jsonStr(c.failReason).c_str());
+    writeText(dir / (name + "_result.json"), b);
+}
+
+int cmdComb(const fs::path& in, const fs::path& out, bool force) {
+    wav::File f;
+    std::string err;
+    if (!wav::read(in.string(), f, err)) { std::cerr << err << "\n"; return 2; }
+    fs::create_directories(out);
+    const std::string name = in.stem().string();
+    std::cout << name << "\n";
+    CombOptions o;
+    o.progress = [](const std::string& s) { std::cout << "   - " << s << "\n" << std::flush; };
+    o.force = force;
+    const auto r = autoFixComb(f.left.data(), f.right.data(), f.left.size(), f.sampleRate, o, name);
+    writeCombResult(out, name, f, r);
+    std::cout << r.report;
+    return 0;
+}
+
+int cmdCombStems(const fs::path& in, const fs::path& out) {
+    std::vector<fs::path> files;
+    for (const auto& e : fs::directory_iterator(in))
+        if (e.is_regular_file() && (e.path().extension() == ".wav" || e.path().extension() == ".WAV")) files.push_back(e.path());
+    std::sort(files.begin(), files.end());
+    if (files.empty()) { std::cerr << "no .wav files in " << in << "\n"; return 2; }
+    int rc = 0;
+    std::string all;
+    for (const auto& p : files) {
+        wav::File f;
+        std::string err;
+        if (!wav::read(p.string(), f, err)) { std::cerr << err << "\n"; rc = 2; continue; }
+        fs::create_directories(out);
+        const std::string name = p.stem().string();
+        CombOptions o;
+        const auto r = autoFixComb(f.left.data(), f.right.data(), f.left.size(), f.sampleRate, o, name);
+        writeCombResult(out, name, f, r);
+        std::cout << r.report << std::flush;
+        all += r.report + "\n";
+    }
+    writeText(out / "comb_report.txt", all);
+    return rc;
 }
 
 int cmdAuto(const fs::path& in, const fs::path& out) {
@@ -141,7 +209,9 @@ int cmdDemo(const fs::path& out) {
 int main(int argc, char** argv) {
     if (argc >= 4 && std::string(argv[1]) == "auto") return cmdAuto(argv[2], argv[3]);
     if (argc >= 4 && std::string(argv[1]) == "stems") return cmdStems(argv[2], argv[3]);
+    if (argc >= 4 && std::string(argv[1]) == "comb") return cmdComb(argv[2], argv[3], argc >= 5 && std::string(argv[4]) == "force");
+    if (argc >= 4 && std::string(argv[1]) == "combstems") return cmdCombStems(argv[2], argv[3]);
     if (argc >= 3 && std::string(argv[1]) == "demo") return cmdDemo(argv[2]);
-    std::cerr << "usage:\n  hc_hiss_cli auto  <in.wav> <outdir>\n  hc_hiss_cli stems <indir> <outdir>\n  hc_hiss_cli demo  <outdir>\n";
+    std::cerr << "usage:\n  hc_hiss_cli auto  <in.wav> <outdir>\n  hc_hiss_cli stems <indir> <outdir>\n  hc_hiss_cli comb  <in.wav> <outdir>\n  hc_hiss_cli combstems <indir> <outdir>\n  hc_hiss_cli demo  <outdir>\n";
     return 1;
 }

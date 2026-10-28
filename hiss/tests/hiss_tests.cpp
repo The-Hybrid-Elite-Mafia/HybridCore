@@ -4,6 +4,8 @@
 #include "HissHarness.hpp"
 #include "HissTestSignals.hpp"
 #include "hybrid/hiss/HissAuto.hpp"
+#include "hybrid/hiss/HissCombAuto.hpp"
+#include "hybrid/hiss/HissCombEngine.hpp"
 #include "hybrid/hiss/HissFft.hpp"
 #include "hybrid/hiss/HissMetrics.hpp"
 
@@ -14,6 +16,7 @@
 #include <cstdio>
 #include <cstring>
 #include <limits>
+#include <string>
 
 using namespace hc::hiss;
 namespace M = hc::hiss::metrics;
@@ -456,10 +459,207 @@ void testStems() {
     HCHECK(text.find("13 stem(s)") != std::string::npos, "the stem report is written");
 }
 
+
+// ---------------------------------------------------------------------------------------------
+//  The 25 Hz comb remover (Phase 1B)
+// ---------------------------------------------------------------------------------------------
+struct CombScene { std::vector<float> L, R, cL, cR, bedL, bedR; };
+
+// quiet floor + a 25 Hz line comb (lines 3-20 kHz, random phase and size) + loud bursts (fake music) + a stretch of digital silence
+CombScene makeCombScene(double fs, double seconds, double combRmsDb, bool withComb, bool withSilence, std::uint64_t seed) {
+    const auto n = static_cast<std::size_t>(seconds * fs);
+    CombScene s;
+    auto mask = [](double f) { return f < 20000.0 ? 1.0 : 0.0; };
+    s.bedL = T::shapedNoise(n, fs, mask, -75.0, seed);
+    s.bedR = T::shapedNoise(n, fs, mask, -75.0, seed + 1);
+    // loud bursts every 2 s (broadband, -20 dBFS, 0.4 s): music-like, non-repeating
+    const auto burst = T::shapedNoise(static_cast<std::size_t>(0.4 * fs), fs, [](double) { return 1.0; }, -20.0, seed + 2);
+    for (double t = 1.0; t + 0.4 < seconds; t += 2.0) {
+        const auto at = static_cast<std::size_t>(t * fs);
+        for (std::size_t i = 0; i < burst.size(); ++i) { s.bedL[at + i] += burst[i]; s.bedR[at + i] += 0.8f * burst[i]; }
+    }
+    if (withSilence) {
+        const auto a = static_cast<std::size_t>(seconds * 0.8 * fs), b = a + static_cast<std::size_t>(1.5 * fs);
+        for (std::size_t i = a; i < b && i < n; ++i) s.bedL[i] = s.bedR[i] = 0.0f;
+    }
+    s.cL.assign(n, 0.0f);
+    s.cR.assign(n, 0.0f);
+    if (withComb) {
+        T::Rng rng(seed + 9);
+        const int jHi = static_cast<int>(std::min(20000.0, 0.5 * fs - 500.0) / 25.0);
+        const int lines = jHi - 120 + 1;
+        const double a = T::dbToLin(combRmsDb) * std::sqrt(2.0 / lines);
+        for (int j = 120; j <= jHi; ++j) {
+            const double amp = a * std::pow(10.0, (-4.0 + 8.0 * rng.uniform()) / 20.0), p1 = 6.2831853 * rng.uniform(), p2 = 6.2831853 * rng.uniform();
+            for (std::size_t i = 0; i < n; ++i) {
+                const double th = 2.0 * 3.14159265358979323846 * j * 25.0 * static_cast<double>(i) / fs;
+                s.cL[i] += static_cast<float>(amp * std::sin(th + p1));
+                s.cR[i] += static_cast<float>(amp * std::sin(th + p2));
+            }
+        }
+    }
+    s.L = s.bedL;
+    s.R = s.bedR;
+    for (std::size_t i = 0; i < n; ++i) { s.L[i] += s.cL[i]; s.R[i] += s.cR[i]; }
+    if (withSilence) {
+        const auto a = static_cast<std::size_t>(seconds * 0.8 * fs), b = a + static_cast<std::size_t>(1.5 * fs);
+        for (std::size_t i = a; i < b && i < n; ++i) s.L[i] = s.R[i] = 0.0f;
+    }
+    return s;
+}
+
+double combRemovedDb(const CombScene& sc, const std::vector<float>& outL, std::size_t skip) {
+    double e0 = 0.0, e1 = 0.0;
+    for (std::size_t i = skip; i < sc.L.size(); ++i) {
+        const double d0 = static_cast<double>(sc.L[i]) - sc.bedL[i], d1 = static_cast<double>(outL[i]) - sc.bedL[i];
+        e0 += d0 * d0;
+        e1 += d1 * d1;
+    }
+    return 10.0 * std::log10(e0 / std::max(e1, 1e-30));
+}
+
+std::vector<float> runCombEngine(HissCombEngine& e, const CombScene& sc, std::vector<float>* outR = nullptr) {
+    auto oL = sc.L;
+    auto oR = sc.R;
+    e.prime(sc.L.data(), sc.R.data(), static_cast<std::uint32_t>(sc.L.size()));
+    for (std::size_t i = 0; i < oL.size(); i += 512)
+        e.process(oL.data() + i, oR.data() + i, static_cast<std::uint32_t>(std::min<std::size_t>(512, oL.size() - i)));
+    if (outR) *outR = oR;
+    return oL;
+}
+
+void testComb() {
+    std::printf("\n== 25 Hz comb remover ==\n");
+    const double fs = 48000.0;
+    const auto sc = makeCombScene(fs, 30.0, -68.0, true, true, 5);
+    {
+        HissCombEngine e;
+        e.prepare(fs);
+        HCHECK(e.supported() && e.periodSamples() == 1920 && e.latency() == 0, "48 kHz: whole-sample period of 1920 samples, no latency");
+        CombParams p;
+        p.reductionDb = 18.0f;
+        e.setParams(p);
+        const auto out = runCombEngine(e, sc);
+        const double rem = combRemovedDb(sc, out, static_cast<std::size_t>(2 * fs));
+        HMEASURED("comb removed (known answer, 18 dB cut)", rem, "dB");
+        HCHECK(rem >= 10.0, "the added comb is mostly gone (>= 10 dB)");
+        HCHECK(e.linesKept() > 400, "the engine found most of the %d lines (kept %d)", 681, e.linesKept());
+        // below the band nothing changes: the difference has no content under 2 kHz
+        double lowIn = 0.0, lowDiff = 0.0;
+        const auto lpIn = M::bandFloor(sc.L.data(), sc.L.size(), fs, 100.0, 2000.0, 0.5);
+        std::vector<float> diff(out.size());
+        for (std::size_t i = 0; i < out.size(); ++i) diff[i] = sc.L[i] - out[i];
+        const auto lpDiff = M::bandFloor(diff.data(), diff.size(), fs, 100.0, 2000.0, 0.5);
+        lowIn = lpIn.meanDb;
+        lowDiff = lpDiff.meanDb;
+        HMEASURED("level below 2 kHz: input", lowIn, "dB");
+        HMEASURED("level below 2 kHz: what was taken out", lowDiff, "dB");
+        HCHECK(lowDiff < lowIn - 60.0, "what was taken out has nothing below 2 kHz (60 dB under the music there)");
+        // digital silence stays exactly silent after the Auto brain's silence restore, and the engine itself leaves it near silent
+        const auto a = static_cast<std::size_t>(30.0 * 0.8 * fs) + 4800, b = a + static_cast<std::size_t>(1.0 * fs);
+        double peakInSilence = 0.0;
+        for (std::size_t i = a; i < b; ++i) peakInSilence = std::max(peakInSilence, static_cast<double>(std::abs(out[i])));
+        HMEASURED("peak inside the digital silence (engine alone)", T::linToDb(peakInSilence), "dBFS");
+        HCHECK(peakInSilence < 1e-5, "engine alone: nothing audible is written into silence (< -100 dBFS)");
+    }
+    {   // pass-through settings are bit exact
+        const auto s2 = makeCombScene(fs, 8.0, -68.0, true, false, 6);
+        for (int mode = 0; mode < 3; ++mode) {
+            HissCombEngine e;
+            e.prepare(fs);
+            CombParams p;
+            if (mode == 0) p.bypass = true;
+            if (mode == 1) p.mix = 0.0f;
+            if (mode == 2) p.reductionDb = 0.0f;
+            e.setParams(p);
+            std::vector<float> oR;
+            const auto oL = runCombEngine(e, s2, &oR);
+            HCHECK(sameBits(oL, s2.L) && sameBits(oR, s2.R), "%s: output is bit-exact with the input", mode == 0 ? "bypass" : (mode == 1 ? "mix 0" : "cut 0 dB"));
+        }
+    }
+    {   // no allocation on the audio thread, live learning included
+        const auto s3 = makeCombScene(fs, 6.0, -68.0, true, false, 7);
+        HissCombEngine e;
+        e.prepare(fs);
+        auto oL = s3.L;
+        auto oR = s3.R;
+        T::AllocScope scope;
+        for (std::size_t i = 0; i < oL.size(); i += 480)
+            e.process(oL.data() + i, oR.data() + i, static_cast<std::uint32_t>(std::min<std::size_t>(480, oL.size() - i)));
+        HCHECK(scope.count() == 0, "no memory allocation while processing (6 s live, with refreshes): %llu", static_cast<unsigned long long>(scope.count()));
+        HCHECK(e.linesKept() > 0, "live mode learned something from 6 s");
+    }
+    {   // stress: NaN, Inf, huge values, random parameters, odd block sizes
+        HissCombEngine e;
+        e.prepare(fs);
+        T::Rng rng(77);
+        std::vector<float> l(4096), r(4096);
+        bool finite = true;
+        for (int round = 0; round < 200; ++round) {
+            for (auto& v : l) v = static_cast<float>(rng.uniform() * 2.0 - 1.0) * (round % 17 == 0 ? 1e6f : 0.1f);
+            for (auto& v : r) v = static_cast<float>(rng.uniform() * 2.0 - 1.0) * 0.1f;
+            if (round % 11 == 0) { l[5] = std::numeric_limits<float>::quiet_NaN(); r[9] = std::numeric_limits<float>::infinity(); }
+            CombParams p;
+            p.reductionDb = static_cast<float>(rng.uniform() * 40.0 - 5.0);
+            p.loHz = static_cast<float>(rng.uniform() * 30000.0);
+            p.hiHz = static_cast<float>(rng.uniform() * 50000.0);
+            p.mix = static_cast<float>(rng.uniform() * 1.4 - 0.2);
+            p.adaptSeconds = static_cast<float>(rng.uniform() * 40.0 - 5.0);
+            p.sensitivity = static_cast<float>(rng.uniform() * 2.0 - 0.5);
+            p.bypass = (round % 7 == 0);
+            p.listenRemoved = (round % 5 == 0);
+            e.setParams(p);
+            const std::uint32_t blk = 1 + static_cast<std::uint32_t>(rng.uniform() * 4095.0);
+            e.process(l.data(), r.data(), blk);
+            for (std::uint32_t i = 0; i < blk; ++i) if (!std::isfinite(l[i]) || !std::isfinite(r[i])) finite = false;
+        }
+        HCHECK(finite, "200 rounds of random settings, NaN and Inf input, odd block sizes: every output sample is finite");
+    }
+    for (double rate : {44100.0, 96000.0}) {
+        const auto s4 = makeCombScene(rate, 24.0, -68.0, true, false, 8);
+        HissCombEngine e;
+        e.prepare(rate);
+        CombParams p;
+        p.reductionDb = 18.0f;
+        e.setParams(p);
+        const auto out = runCombEngine(e, s4);
+        const double rem = combRemovedDb(s4, out, static_cast<std::size_t>(2 * rate));
+        HMEASURED(rate < 50000.0 ? "comb removed at 44.1 kHz" : "comb removed at 96 kHz", rem, "dB");
+        HCHECK(e.supported() && e.periodSamples() == static_cast<int>(rate / 25.0) && rem >= 8.0, "%.0f Hz: period %d samples, comb mostly gone", rate, e.periodSamples());
+    }
+    {   // the Auto brain
+        const auto good = makeCombScene(fs, 30.0, -74.0, true, true, 5);
+        const auto r = autoFixComb(good.L.data(), good.R.data(), good.L.size(), fs, {}, "synthetic comb");
+        std::printf("%s", r.report.c_str());
+        HCHECK(r.before.found && r.touched, "Auto finds the comb and fixes it");
+        HCHECK(r.touched && r.check.onGridAfter < r.check.onGridBefore * 0.5, "Auto: on-grid lines %d -> %d", r.check.onGridBefore, r.check.onGridAfter);
+        const auto a = static_cast<std::size_t>(30.0 * 0.8 * fs) + 100, b = a + static_cast<std::size_t>(1.0 * fs);
+        bool exact = true;
+        for (std::size_t i = a; i < b; ++i) if (r.left[i] != 0.0f || r.right[i] != 0.0f) exact = false;
+        HCHECK(exact, "Auto: digital silence stays exactly zero");
+
+        const auto clean = makeCombScene(fs, 30.0, -68.0, false, true, 5);
+        const auto rc = autoFixComb(clean.L.data(), clean.R.data(), clean.L.size(), fs, {}, "no comb");
+        HCHECK(!rc.before.found && !rc.touched && sameBits(rc.left, clean.L) && sameBits(rc.right, clean.R), "Auto: a file without a comb comes back bit for bit (lines %d, on grid %d)", rc.before.lines, rc.before.onGrid);
+
+        // a single steady tone is not a comb
+        auto tone = clean;
+        const auto t = T::sine(tone.L.size(), fs, 11775.0, -70.0);
+        for (std::size_t i = 0; i < tone.L.size(); ++i) { tone.L[i] += t[i]; tone.R[i] += t[i]; }
+        const auto rt = autoFixComb(tone.L.data(), tone.R.data(), tone.L.size(), fs, {}, "one tone");
+        HCHECK(!rt.touched && sameBits(rt.left, tone.L), "Auto: one steady tone is not taken for the comb");
+    }
+}
+
 } // namespace
 
-int main() {
+int main(int argc, char** argv) {
     std::printf("HEM HISS TAMER + HISS AUTO — tests\n\n");
+    if (argc > 1 && std::string(argv[1]) == "comb") {     // quick run of the comb tests only
+        testComb();
+        std::printf("\n%d checks, %d failed\n", T::gChecks, T::gFails);
+        return T::gFails == 0 ? 0 : 1;
+    }
     testBuildingBlocks();
     testPassThrough();
     testEngineBehaviour();
@@ -468,6 +668,7 @@ int main() {
     testAutoKnownAnswers();
     testAutoDoNoHarm();
     testStems();
+    testComb();
     std::printf("\n%d checks, %d failed\n", T::gChecks, T::gFails);
     return T::gFails == 0 ? 0 : 1;
 }

@@ -83,7 +83,7 @@ private:
         std::array<double, 256> minRing{};        // lowest short-term power of each 0.25 s block, last 64 s
         int    ringFill = 0, ringPos = 0, blockCount = 0;
         double permMin = 1e300;                   // lowest ever (offline learning pass: the quiet floor of the whole file)
-        int    warm = 0;
+        int    warm = 0, zeroRun = 0;
         double pref = 1e300;
         std::uint64_t gated = 0, gatedTotal = 0;   // offline: quiet samples seen so far / in total
     };
@@ -130,7 +130,7 @@ private:
     double kappa_ = 2.0;
     float  lo_ = 0.0f, hi_ = 0.0f;                  // band used by the refresh under way
 
-    std::atomic<float> red_{12.0f}, lo_p_{0.0f}, hi_p_{0.0f}, mix_p_{1.0f}, adapt_p_{3.0f}, sens_p_{0.5f};
+    std::atomic<float> red_{12.0f}, lo_p_{cfg::kCombLoDefaultHz}, hi_p_{cfg::kCombHiDefaultHz}, mix_p_{1.0f}, adapt_p_{cfg::kCombAdaptDefaultSeconds}, sens_p_{0.5f};   // same as CombParams{}
     std::atomic<bool>  bypass_{false}, listen_{false};
     std::atomic<float> levelDb_{-200.0f};
     std::atomic<int>   linesKept_{0};

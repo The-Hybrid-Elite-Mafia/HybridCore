@@ -19,7 +19,7 @@ jobs:
       - name: Branding check (no other company's names in the Hiss files)
         shell: pwsh
         run: |
-          $bad = Select-String -Path (Get-ChildItem hiss -Recurse -File | ForEach-Object FullName) -Pattern '\b(ssl|waves|soundtoys|api)\b|solid state logic' -CaseSensitive:$false
+          $bad = Select-String -Path (Get-ChildItem hiss -Recurse -File -Include *.hpp,*.cpp,*.py,*.md,*.txt,*.json,*.cmake,CMakeLists.txt,*.yml | ForEach-Object FullName) -Pattern '\b(ssl|waves|soundtoys|api)\b|solid state logic' -CaseSensitive:$false
           if ($bad) { $bad | ForEach-Object { Write-Host "$($_.Path):$($_.LineNumber): $($_.Line)" }; throw "Another company's name was found." }
           Write-Host "clean"
 

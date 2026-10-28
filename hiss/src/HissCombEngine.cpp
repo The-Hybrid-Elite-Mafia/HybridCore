@@ -95,6 +95,7 @@ void HissCombEngine::clearState() noexcept {
         c.permMin = 1e300;
         c.pref = 1e300;
         c.warm = 0;
+        c.zeroRun = 0;
     }
     m1_ = 0; m2_ = 0;
     stage_ = 0; lineIdx_ = 0; synthIdx_ = 0; chIdx_ = 0;
@@ -374,8 +375,10 @@ void HissCombEngine::processOne(float& l, float& r) noexcept {
         c.p += pAlpha_ * (y * y - c.p);
         if (supported_) {
             // lowest power seen lately (blocks of 0.25 s, last 4 s); digital silence is ignored
-            if (c.warm < warmN_) ++c.warm;                  // the power meter starts from zero: ignore its first 50 ms
-            else if (c.p < c.blockMin && c.p > cfg::kCombSilencePower) c.blockMin = c.p;
+            c.zeroRun = (x == 0.0f) ? c.zeroRun + 1 : 0;
+            if (c.p <= cfg::kCombSilencePower || c.zeroRun >= 16) c.warm = 0;      // also while exact zeros run: the meter is then only coasting down through the quiet levels      // silence: when sound comes back the meter climbs from zero, so its first 50 ms must not count as "quiet"
+            else if (c.warm < warmN_) ++c.warm;
+            else if (c.p < c.blockMin) c.blockMin = c.p;
             if (++c.blockCount >= static_cast<int>(0.25 * fs_)) {
                 c.blockCount = 0;
                 if (c.blockMin < 1e299) {
@@ -463,13 +466,13 @@ void HissCombEngine::prime(const float* left, const float* right, std::uint32_t 
     }
     for (auto& lg : floorLog_) { lg.clear(); lg.shrink_to_fit(); }
     // pass A2: count how much quiet material there is, so it can be cut into equal chunks for the agreement test
-    for (auto& c : ch_) { for (int i = 0; i < 2; ++i) { c.hpS1[i] = 0.0; c.hpS2[i] = 0.0; } c.p = 0.0; c.warm = 0; c.blockCount = 0; c.blockMin = 1e300; c.gated = 0; }
+    for (auto& c : ch_) { for (int i = 0; i < 2; ++i) { c.hpS1[i] = 0.0; c.hpS2[i] = 0.0; } c.p = 0.0; c.warm = 0; c.zeroRun = 0; c.blockCount = 0; c.blockMin = 1e300; c.gated = 0; }
     m1_ = 0; m2_ = 0;
     freezeFloor_ = true; hardGate_ = true;
     for (std::uint32_t i = 0; i < frames; i += kBlock) process(l.data() + i, r.data() + i, std::min(kBlock, frames - i));
     for (auto& c : ch_) { c.gatedTotal = c.gated; c.gated = 0; }
     // pass B: learn only from moments close to that floor; louder moments are ignored completely
-    for (auto& c : ch_) { for (int i = 0; i < 2; ++i) { c.hpS1[i] = 0.0; c.hpS2[i] = 0.0; } c.p = 0.0; c.warm = 0; c.blockCount = 0; c.blockMin = 1e300; }
+    for (auto& c : ch_) { for (int i = 0; i < 2; ++i) { c.hpS1[i] = 0.0; c.hpS2[i] = 0.0; } c.p = 0.0; c.warm = 0; c.zeroRun = 0; c.blockCount = 0; c.blockMin = 1e300; }
     m1_ = 0; m2_ = 0;
     std::copy(left, left + frames, l.begin()); std::copy(right, right + frames, r.begin());
     freezeFloor_ = true; hardGate_ = true;
@@ -484,7 +487,7 @@ void HissCombEngine::prime(const float* left, const float* right, std::uint32_t 
     learning_.store(false);          // offline use: the pattern stays exactly as learned from the quiet material (setLearning(true) re-enables)
     // rewind the clock and the audio path, keep what was learned
     m1_ = 0; m2_ = 0;
-    for (auto& c : ch_) { for (int i = 0; i < 2; ++i) { c.hpS1[i] = 0.0; c.hpS2[i] = 0.0; } c.p = 0.0; c.warm = 0; c.blockCount = 0; c.blockMin = 1e300; }
+    for (auto& c : ch_) { for (int i = 0; i < 2; ++i) { c.hpS1[i] = 0.0; c.hpS2[i] = 0.0; } c.p = 0.0; c.warm = 0; c.zeroRun = 0; c.blockCount = 0; c.blockMin = 1e300; }
     stage_ = 0; workCredit_ = 0.0; sinceRefresh_ = 0;
     snap_ = snapshot();
     mixR_.cur = mixR_.target = snap_.mix;
