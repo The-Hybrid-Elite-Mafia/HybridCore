@@ -105,6 +105,30 @@ inline constexpr double kBackOffFactor     = 0.5;     // ASSUMED: each back-off 
 inline constexpr int    kBackOffSteps      = 2;       // ASSUMED: then the file is left untouched
 inline constexpr double kMinUsefulDropDb = 1.5;   // ASSUMED: a fix that lowers the always-there level by less than this is not worth touching the file for
 
+// ---- Comb method (hem_hiss_comb_engine) -------------------------------------------------------------
+inline constexpr double kCombSpacingHz        = 25.0;     // MEASURED: 90-100 % of the strong lines in 5 Suno stems sit on a 25 Hz grid (chance: 12 %). ASSUMED to hold for other Suno files: UNKNOWN
+inline constexpr float  kCombLoDefaultHz      = 3000.0f;  // ASSUMED: lowest line touched by default (lines were seen from about 3 kHz up)
+inline constexpr float  kCombHiDefaultHz      = 20000.0f; // ASSUMED: highest line touched by default (the files are low-passed at 20 kHz)
+inline constexpr float  kCombAdaptDefaultSeconds = 6.0f;  // ASSUMED: memory of the pattern (about 75 visits of each point of the 80 ms fold)
+inline constexpr float  kCombAdaptMinSeconds  = 0.5f;
+inline constexpr float  kCombAdaptMaxSeconds  = 20.0f;
+inline constexpr double kCombHighPassHz       = 1500.0;   // ASSUMED: 4th-order high-pass in front of the learner, so bass cannot leak in
+inline constexpr double kCombPowerSmoothMs    = 5.0;      // ASSUMED: short-term power used to judge how quiet a moment is
+inline constexpr double kCombQuietFactor        = 16;      // ASSUMED: a moment counts as "quiet" up to 4 x the lowest power seen in the last 4 s
+inline constexpr double kCombPriorWeight      = 1.0;      // ASSUMED: shrinks a pattern point towards 0 until it has been seen often enough
+inline constexpr double kCombRefreshSeconds   = 1.0;      // ASSUMED: how often the pattern is rebuilt
+inline constexpr double kCombWienerBase       = 3.0;      // ASSUMED: a line must be this many times stronger than the noise between the lines (sensitivity 0) ...
+inline constexpr double kCombWienerSlope      = 2.0;      // ... minus this x sensitivity (so 1.0 at sensitivity 1)
+inline constexpr double kCombEdgeHz           = 300.0;    // ASSUMED: soft edge of the band
+inline constexpr double kCombMaxPatternDb     = -60.0;    // ASSUMED: a learned pattern louder than this (RMS, dBFS) is not believed and is not subtracted: real patterns measured here were about -91 dBFS
+inline constexpr double kCombFloorPercentile  = 0.0;      // ASSUMED: offline, the quiet floor is the 10th percentile of the 0.25 s block minima (silence excluded)
+inline constexpr double kCombSilencePower     = 1e-10;    // ASSUMED: quieter than this (power, about -100 dBFS: an artifact below that is inaudible anyway) counts as silence: not used to find the quiet floor, and nothing is subtracted there
+inline constexpr double kCombAgreeMax         = 0.6;      // ASSUMED: offline learning keeps a line only if every time chunk of the quiet material agrees with the average (each within 0.6 x the average size)
+inline constexpr double kCombAgreeMinSeconds  = 0.25;     // ASSUMED: a time chunk needs at least this much quiet material to vote
+inline constexpr double kCombMinLines         = 12;       // ASSUMED: AUTO needs at least this many lines on the grid
+inline constexpr double kCombMinGridShare     = 0.60;     // ASSUMED: ... and at least this share of all strong lines on the grid (chance level is about 0.12)
+inline constexpr double kCombLineMinDb        = 10.0;     // ASSUMED: a line must stand this far above its neighbourhood to count
+
 // ---- Self-check scoring -------------------------------------------------------------
 inline constexpr double kHighConfidenceDropShare = 0.8;  // ASSUMED: "High" needs the floor to fall by at least 80 % of the target cut
 inline constexpr double kHighConfidenceBumpDb    = 5.0;  // ASSUMED: ... and the artifact to have been at least this loud
