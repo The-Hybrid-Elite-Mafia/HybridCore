@@ -27,7 +27,11 @@ jobs:
         run: cmake -S hiss -B build/hiss -G "Visual Studio 17 2022" -A x64
 
       - name: Build Release
-        run: cmake --build build/hiss --config Release --parallel
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force out | Out-Null
+          cmake --build build/hiss --config Release --parallel 2>&1 | Tee-Object -FilePath out\build_log.txt
+          if ($LASTEXITCODE -ne 0) { throw "build failed" }
 
       - name: Tests
         shell: pwsh
@@ -52,6 +56,26 @@ jobs:
           python hiss_report.py ..\..\out\demo ..\..\out\test_log.txt ..\include\hybrid\hiss\HissConfig.hpp ..\..\out\report
           Pop-Location
           if ($code -ne 0) { throw "python check found a problem" }
+
+      - name: Summary (also published as a notice so it can be read without downloading)
+        if: always()
+        shell: pwsh
+        run: |
+          function Notice($title, $lines) {
+            $t = ($lines -join "`n"); if ($t.Length -gt 3800) { $t = $t.Substring(0, 3800) }
+            $enc = $t.Replace('%', '%25').Replace("`r", '').Replace("`n", '%0A')
+            Write-Host "::notice title=$title::$enc"
+          }
+          $warn = @(); if (Test-Path out\build_log.txt) { $warn = Select-String -Path out\build_log.txt -Pattern 'warning C\d+' | ForEach-Object { $_.Line.Trim() } | Sort-Object -Unique }
+          Notice "hiss: compiler warnings ($($warn.Count) unique)" ($warn | Select-Object -First 25)
+          if (Test-Path out\test_log.txt) {
+            $t = Get-Content out\test_log.txt
+            Notice "hiss: tests" (@($t | Select-String -Pattern 'FAIL|checks,|latency') | ForEach-Object { $_.Line })
+            Notice "hiss: measured" (@($t | Select-String -Pattern 'MEASURED') | ForEach-Object { $_.Line.Trim() })
+          }
+          if (Test-Path out\python_compare.txt) { Notice "hiss: python check" (Get-Content out\python_compare.txt) }
+          if (Test-Path out\demo\stems_report.txt) { }
+          Get-ChildItem out\demo -Filter *_report.txt -ErrorAction SilentlyContinue | ForEach-Object { Notice ("hiss: " + $_.Name) (Get-Content $_.FullName) }
 
       - name: Upload results
         if: always()
