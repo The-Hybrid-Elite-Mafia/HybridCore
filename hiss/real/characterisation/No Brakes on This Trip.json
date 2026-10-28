@@ -1,0 +1,42 @@
+{
+ "file": "No Brakes on This Trip.wav",
+ "rate": 48000,
+ "seconds": 152.8,
+ "mid": {
+  "bump_hz": 10804.6875,
+  "bump_db_over_3k_median": 4.8775798767929075,
+  "q10_level_db_at_bump": -58.32951263169893,
+  "quiet_level_db_at_bump": -36.47247098959759,
+  "avg_level_db_at_bump": -29.62230171059348,
+  "tones": [],
+  "spectral_cutoff_hz": 20132.8125,
+  "quiet_frames": 268,
+  "live_frames": 1789
+ },
+ "band_env": {
+  "rate_hz": 2.2516250610351562,
+  "prominence_db": 41.34066463122005,
+  "depth_db_5_95": 20.282287982051233,
+  "steadiness_q10_over_median": 0.001429619624489359
+ },
+ "side": {
+  "bump_hz": 16001.953125,
+  "bump_db_over_3k_median": 8.002840056382013,
+  "q10_level_db_at_bump": -83.8538567352663,
+  "quiet_level_db_at_bump": -64.40007669022856,
+  "avg_level_db_at_bump": -50.83088947613547,
+  "tones": [
+   [
+    16001.953125,
+    7.667594154977266
+   ],
+   [
+    14402.34375,
+    6.679212625020199
+   ]
+  ],
+  "spectral_cutoff_hz": 20085.9375,
+  "quiet_frames": 268,
+  "live_frames": 1789
+ }
+}
