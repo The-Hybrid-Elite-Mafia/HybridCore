@@ -87,6 +87,12 @@ struct GlWindow::Impl {
             return 0;
         case WM_ERASEBKGND:
             return 1;   // GL paints everything
+        case WM_SYSCOMMAND:
+            // ALT (or F10) pressed alone would put the window in "menu mode": a modal loop inside Windows that stops
+            // the app's frame loop (nothing redraws or answers) until another key or a click. No menu here: ignore it.
+            // Alt+F4, Alt+Space (the window menu) and the title-bar buttons still work.
+            if ((wp & 0xFFF0) == SC_KEYMENU && lp == 0) return 0;
+            return ::DefWindowProcW(h, msg, wp, lp);
         case WM_TIMER:
             if (onTimer) onTimer();
             return 0;

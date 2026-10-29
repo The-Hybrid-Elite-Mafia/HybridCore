@@ -287,6 +287,18 @@ Options parseOptions() {
 
 using Clock = std::chrono::steady_clock;
 
+// --test-hooks only: a running log of what the app did (start-up steps, keys, actions, commands), flushed line by
+// line, so a UI test can say where the app was when something went wrong.
+fs::path gTraceFile;
+void trace(const std::string& line) {
+    if (gTraceFile.empty()) return;
+    static const auto t0 = Clock::now();
+    std::ofstream f(gTraceFile, std::ios::app | std::ios::binary);
+    char b[32];
+    std::snprintf(b, sizeof b, "%9.3f  ", std::chrono::duration<double>(Clock::now() - t0).count());
+    f << b << line << "\n";
+}
+
 std::wstring listNames(const std::vector<fs::path>& files, std::size_t most = 20) {
     std::wstring s;
     for (std::size_t i = 0; i < files.size() && i < most; ++i) s += L"\n  \x2022 " + files[i].filename().wstring();
@@ -1089,6 +1101,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     auto app = std::make_unique<App>(opts.dataDir);
     App& a = *app;
     a.testHooks = opts.testHooks;
+    if (opts.testHooks) { gTraceFile = a.data / L"trace.log"; trace("start, data " + u8(a.data)); }
     a.settings.load(a.data / L"settings.ini");
     a.loadRecent();
 
@@ -1102,6 +1115,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     std::string err;
     if (!window.create(L"HEM Digital Console", 1389, 868, false, &err)) { fatal("Could not start the GPU display: " + err + "\nUpdate your graphics driver (OpenGL 3.3 is required)."); return 3; }
     a.hwnd = static_cast<HWND>(window.nativeHandle());
+    trace("window created");
     window.setMinClientSize(kMinClientDipW, kMinClientDipH);
     window.setAppHandlesClose(opts.exitAfter <= 0.0 && opts.clickTest.empty());
     if (opts.winW > 0 && opts.winH > 0) {   // tests: an exact client size
@@ -1121,7 +1135,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     a.st.zoom = 1.0f;   // the faceplate always fits the window
     U::ConsoleScreen screen(a.rig, a.st, [&actions](const U::ActionEvent& e) { actions.push_back(e); });
     const fs::path assets = exeDir() / "assets";
-    if (!screen.init(assets, kMsaa, &err)) { fatal("The console could not load its art: " + err + "\nReinstall the HEM Digital Console (assets: " + u8(assets) + ")."); return 3; }
+    if (!screen.init(assets, kMsaa, &err)) { trace("screen init failed: " + err); fatal("The console could not load its art: " + err + "\nReinstall the HEM Digital Console (assets: " + u8(assets) + ")."); return 3; }
+    trace("screen ready");
 
     // audio device: the saved one, else the default output
     a.devices = ConsoleHost::listDevices();
@@ -1133,6 +1148,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             if ((a.devices[i].kind == Device::Kind::Asio ? "asio" : "wasapi") == kind && toUtf8(a.devices[i].id) == id && a.devices[i].kind != Device::Kind::Offline) want = static_cast<int>(i);
     }
     a.openDevice(want);
+    trace("device: " + a.host.status().line);
 
     // session: from the command line; else after a crash the recovery copy (if wanted); else everything as it was
     // when the console was last closed
@@ -1220,6 +1236,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     };
     auto command = [&](const std::string& c) {
         if (!opts.testHooks) return;
+        trace("command: " + c);
         const auto sp = c.find(' ');
         const std::string verb = c.substr(0, sp), arg = sp == std::string::npos ? std::string() : c.substr(sp + 1);
         if (verb == "report") writeReport(a, screen, window, fromU8(arg));
@@ -1253,6 +1270,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         case ui::InputEvent::Type::Close: closing = true; break;
         case ui::InputEvent::Type::Command: command(e.text); break;
         case ui::InputEvent::Type::Key:
+            trace("key " + std::to_string(e.key) + (e.ctrl ? " ctrl" : "") + (e.shift ? " shift" : ""));
             if (e.key == VK_F11) {
                 window.setFullscreen(!window.fullscreen());
                 a.settings.set("fullscreen", window.fullscreen() ? "1" : "0");
@@ -1283,11 +1301,12 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     if (!opts.clickTest.empty()) return runClickTest(window, screen, a, actions, dispatch, opts.clickTest);
 
     refreshTitle(true);
+    trace("main loop");
     while (window.pump()) {
         const int fbW = window.pixelWidth(), fbH = window.pixelHeight();
         if (fbW > 0 && fbH > 0 && !window.minimized() && !screen.resize(fbW, fbH, &err)) { fatal("GPU error: " + err); break; }
         for (const auto& e : window.takeEvents()) dispatch(e);
-        for (const auto& e : actions) a.handle(e, screen);
+        for (const auto& e : actions) { trace("action " + std::to_string(static_cast<int>(e.act)) + " arg " + std::to_string(e.arg)); a.handle(e, screen); }
         const bool acted = !actions.empty();
         actions.clear();
         if (closing) {
@@ -1322,6 +1341,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         refreshTitle(false);
         if (Clock::now() - lastRecovery > kRecoveryEvery) { a.writeRecovery(); lastRecovery = Clock::now(); }
 
+        if (frame % 300 == 0) trace("frame " + std::to_string(frame) + ", window " + std::to_string(fbW) + "x" + std::to_string(fbH));
         if (window.minimized()) { ::Sleep(50); continue; }
         screen.render(0);
         window.swap();

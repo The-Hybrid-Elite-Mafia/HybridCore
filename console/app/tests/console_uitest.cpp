@@ -123,12 +123,17 @@ void clickAt(long x, long y) {
     mouseButton(false);
     std::this_thread::sleep_for(150ms);
 }
+// The app's window to the front with a click on its title bar (a click activates a window; no keys involved - a lone
+// ALT tap would put the window in menu mode).
 void bringToFront(HWND h) {
-    // The foreground lock lets the process that got the last input change the foreground: tap ALT first.
-    sendKey(VK_MENU, false); sendKey(VK_MENU, true);
-    ::ShowWindow(h, ::IsZoomed(h) ? SW_SHOWMAXIMIZED : SW_SHOW);
+    if (::GetForegroundWindow() == h) return;
+    TITLEBARINFO ti{};
+    ti.cbSize = sizeof(ti);
+    if (::GetTitleBarInfo(h, &ti) && ti.rcTitleBar.right - ti.rcTitleBar.left > 300) {
+        clickAt(ti.rcTitleBar.left + 160, (ti.rcTitleBar.top + ti.rcTitleBar.bottom) / 2);
+    }
     ::SetForegroundWindow(h);
-    std::this_thread::sleep_for(200ms);
+    std::this_thread::sleep_for(250ms);
 }
 
 // ---- the app process ----
@@ -421,6 +426,15 @@ bool screenshot(const fs::path& file) {
     return hc::ui::writePng(file, img);
 }
 
+// The last lines of the app's own trace (--test-hooks writes it).
+void logTrace(App& app, int lines) {
+    std::istringstream in(readText(app.data / "trace.log"));
+    std::vector<std::string> all;
+    std::string l;
+    while (std::getline(in, l)) all.push_back(l);
+    log("     app trace (last " + std::to_string(std::min<std::size_t>(all.size(), static_cast<std::size_t>(lines))) + " of " + std::to_string(all.size()) + " lines):");
+    for (std::size_t i = all.size() > static_cast<std::size_t>(lines) ? all.size() - static_cast<std::size_t>(lines) : 0; i < all.size(); ++i) log("       " + all[i]);
+}
 // No dialog of the app may be open before a step starts. One still there (from an earlier step) is named in the report
 // and closed, so the next step can't mistake it for its own.
 void waitNoDialog(App& app, const std::string& where) {
@@ -443,6 +457,7 @@ void whyNoAnswer(App& app, const std::string& tag) {
         log(std::string("     no dialog; app ") + (app.running() ? "running but not answering" : "not running"));
     }
     screenshot(gOut / ("uitest-noanswer-" + std::to_string(++app.n) + ".png"));
+    logTrace(app, 12);
     (void)tag;
 }
 
@@ -744,7 +759,7 @@ int wmain(int argc, wchar_t** argv) {
     waitNoDialog(app, "SAVE");
     bringToFront(app.hwnd);
     chord({VK_CONTROL, 'S'});
-    check(fileDialogPick(app, L"", {sessionFile.wstring()}, &dlgTitle), "save dialog (\"" + narrow(dlgTitle) + "\"), name typed, Save pressed");
+    if (!check(fileDialogPick(app, L"", {sessionFile.wstring()}, &dlgTitle), "save dialog (\"" + narrow(dlgTitle) + "\"), name typed, Save pressed")) logTrace(app, 15);
     check(waitFor([&] { return fs::exists(sessionFile, ec); }, 10s), "session file written: " + u8(sessionFile.filename()));
     std::this_thread::sleep_for(1500ms);
     app.report(r);
