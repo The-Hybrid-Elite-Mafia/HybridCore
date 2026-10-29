@@ -109,6 +109,19 @@ void chord(std::initializer_list<WORD> keys) {
     for (auto it = std::rbegin(keys); it != std::rend(keys); ++it) sendKey(*it, true);
     std::this_thread::sleep_for(150ms);
 }
+// Types text as real key presses (Unicode), into whatever has the keyboard focus.
+void typeText(const std::wstring& t) {
+    for (wchar_t c : t) {
+        INPUT in[2]{};
+        in[0].type = in[1].type = INPUT_KEYBOARD;
+        in[0].ki.wScan = in[1].ki.wScan = c;
+        in[0].ki.dwFlags = KEYEVENTF_UNICODE;
+        in[1].ki.dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP;
+        ::SendInput(2, in, sizeof(INPUT));
+        std::this_thread::sleep_for(4ms);
+    }
+    std::this_thread::sleep_for(150ms);
+}
 void mouseAt(long x, long y) { ::SetCursorPos(static_cast<int>(x), static_cast<int>(y)); std::this_thread::sleep_for(40ms); }
 void mouseButton(bool down) {
     INPUT in{};
@@ -375,17 +388,23 @@ bool fileDialogPick(App& app, const std::wstring& title, const std::wstring& fol
     if (!edit) edit = findIn(root, UIA_NamePropertyId, L"Folder:", UIA_EditControlTypeId);
     IUIAutomationElement* okBtn = findIn(root, UIA_AutomationIdPropertyId, L"1", UIA_ButtonControlTypeId);
     bool ok = edit && okBtn;
-    if (ok && !folder.empty() && names.size() != 1) {   // go to the folder first
-        ok = setValue(edit, folder);
+    // real typing into the "File name:" box (as a person would): focus it, select what is there, type, Enter
+    auto typeInto = [&](const std::wstring& v) {
         ::SetForegroundWindow(dlg);
-        if (ok) { invoke(okBtn); std::this_thread::sleep_for(900ms); }
+        edit->SetFocus();
+        std::this_thread::sleep_for(150ms);
+        chord({VK_CONTROL, 'A'});
+        typeText(v);
+        chord({VK_RETURN});
+    };
+    if (ok && !folder.empty() && names.size() != 1) {   // go to the folder first
+        typeInto(folder);
+        std::this_thread::sleep_for(1200ms);
     }
     std::wstring value;
     if (names.size() == 1) value = folder.empty() ? names[0] : (fs::path(folder) / names[0]).wstring();
     else for (const auto& n : names) value += L"\"" + n + L"\" ";
-    if (ok) ok = setValue(edit, value);
-    std::this_thread::sleep_for(200ms);
-    if (ok) ok = invoke(okBtn);
+    if (ok) typeInto(value);
     if (edit) edit->Release();
     if (okBtn) okBtn->Release();
     if (root) root->Release();
@@ -830,7 +849,8 @@ int wmain(int argc, wchar_t** argv) {
     waitNoDialog(app, "SAVE");
     bringToFront(app.hwnd);
     chord({VK_CONTROL, 'S'});
-    if (!check(fileDialogPick(app, L"Save the session", L"", {sessionFile.wstring()}, &dlgTitle), "save dialog (\"" + narrow(dlgTitle) + "\"), name typed, Save pressed")) logTrace(app, 15);
+    const bool savedByDialog = fileDialogPick(app, L"Save the session", L"", {sessionFile.wstring()}, &dlgTitle);
+    if (!check(savedByDialog, "save dialog (\"" + narrow(dlgTitle) + "\"), name typed, Save pressed")) logTrace(app, 15);
     check(waitFor([&] { return fs::exists(sessionFile, ec); }, 10s), "session file written: " + u8(sessionFile.filename()));
     std::this_thread::sleep_for(1500ms);
     app.report(r);
@@ -960,7 +980,8 @@ int wmain(int argc, wchar_t** argv) {
     const fs::path copyFile = work / "Reading the Same Letter v2.hemc";
     bringToFront(app.hwnd);
     chord({VK_CONTROL, VK_SHIFT, 'S'});
-    check(fileDialogPick(app, L"Save the session as", L"", {copyFile.wstring()}, &dlgTitle), "SAVE AS dialog (\"" + narrow(dlgTitle) + "\"), new name");
+    const bool savedAs = fileDialogPick(app, L"Save the session as", L"", {copyFile.wstring()}, &dlgTitle);
+    check(savedAs, "SAVE AS dialog (\"" + narrow(dlgTitle) + "\"), new name");
     std::this_thread::sleep_for(1500ms);
     app.report(r);
     check(fs::exists(copyFile, ec) && r.get("session") == u8(copyFile) && r.get("title").find("v2") != std::string::npos, "saved as a new file; the title names it");

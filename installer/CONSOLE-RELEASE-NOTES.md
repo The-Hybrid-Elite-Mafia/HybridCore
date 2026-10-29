@@ -25,6 +25,11 @@ New in 0.4.0 (screen fit, OPEN, SAVE, stems):
 - Saving is safe: the file is written beside the old one, flushed, then swapped in. A recovery copy is kept every
   3 minutes and offered if the console ever closes by surprise. "Save changes?" before NEW, OPEN and closing.
   Moved stems: the console asks where they are and finds them by name.
+- Tested in 0.4.0: everything fits with every control on screen and not covered at 1366x768 and 1920x1080 (100 %,
+  125 % where offered, 150 %), Suno stems on the right channels, a crash in the middle of a save leaves the last save
+  untouched and recovery is offered, window size and place remembered (automatic UI test on a Windows machine).
+  NOT yet passed by the automatic test: SAVE / SAVE AS / OPEN typed into the Windows file dialogs and the moved-stems
+  folder picker - the test robot itself is still being fixed, so treat those as untested in this build.
 
 In 0.3.0: the METER page has the reference meter's own controls from its manual: RUN / PAUSE, RESET, the
 RADAR / RTA / SCOPE views, AUTO, PEAK and LOUD lamps, the whole EDIT menu (radar, RTA, scope, general: layouts,
