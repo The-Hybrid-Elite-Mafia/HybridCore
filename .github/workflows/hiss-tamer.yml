@@ -7,9 +7,27 @@ on:
   push:
     branches: ['hiss-tamer-*']
     paths: ['hiss/**', '.github/workflows/hiss-tamer.yml', 'cmake/**']
+  pull_request:
+    branches: ['**']
+    paths: ['hiss/**', '.github/workflows/hiss-tamer.yml']
   workflow_dispatch:
 
 jobs:
+  not-main:
+    name: Guard (fails if this is main)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail on main
+        shell: bash
+        run: |
+          ref="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          base="${GITHUB_BASE_REF:-}"
+          echo "branch=$ref base=$base"
+          if [ "$ref" = "main" ] || [ "$base" = "main" ]; then
+            echo "Hiss Tamer work must stay on a hiss-tamer-* branch and must never merge to main."
+            exit 1
+          fi
+
   hiss:
     name: Hiss Tamer (Windows, MSVC Release)
     runs-on: windows-2022
