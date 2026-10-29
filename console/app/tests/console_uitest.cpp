@@ -368,8 +368,9 @@ bool fileDialogPick(App& app, const std::wstring& title, const std::wstring& fol
     if (titleOut) *titleOut = shown;
     if (textOut) *textOut = dialogText(dlg);
     IUIAutomationElement* root = elementOf(dlg);
-    IUIAutomationElement* edit = findIn(root, UIA_AutomationIdPropertyId, L"1148", UIA_EditControlTypeId);   // open dialogs
-    if (!edit) edit = findIn(root, UIA_AutomationIdPropertyId, L"1001", UIA_EditControlTypeId);          // save dialogs
+    // the "File name:" box: 1001 in save dialogs (they can also hold a hidden 1148), 1148 in open dialogs
+    IUIAutomationElement* edit = findIn(root, UIA_AutomationIdPropertyId, L"1001", UIA_EditControlTypeId);
+    if (!edit) edit = findIn(root, UIA_AutomationIdPropertyId, L"1148", UIA_EditControlTypeId);
     if (!edit) edit = findIn(root, UIA_NamePropertyId, L"File name:", UIA_EditControlTypeId);
     if (!edit) edit = findIn(root, UIA_NamePropertyId, L"Folder:", UIA_EditControlTypeId);
     IUIAutomationElement* okBtn = findIn(root, UIA_AutomationIdPropertyId, L"1", UIA_ButtonControlTypeId);
@@ -441,6 +442,16 @@ bool pressDialogButton(App& app, const std::wstring& button, std::wstring* textO
 bool closeApp(App& app, bool* asked = nullptr) {
     if (asked) *asked = false;
     if (!app.running()) { app.close(); return true; }
+    // a file dialog left open by a failed step: close it first (the console can't close under it)
+    for (int k = 0; k < 3; ++k) {
+        HWND d = app.findDialog();
+        wchar_t t[256] = {};
+        if (d) ::GetWindowTextW(d, t, 256);
+        if (!d || std::wstring(t) == L"HEM Digital Console") break;
+        log("     closing a dialog left open: \"" + narrow(t) + "\"");
+        ::PostMessageW(d, WM_CLOSE, 0, 0);
+        std::this_thread::sleep_for(1s);
+    }
     ::PostMessageW(app.hwnd, WM_CLOSE, 0, 0);
     bool exited = app.waitExit(4s);
     if (!exited && app.findDialog(L"#32770", L"HEM Digital Console")) {
