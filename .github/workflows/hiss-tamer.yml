@@ -75,6 +75,19 @@ jobs:
           Pop-Location
           if ($code -ne 0) { throw "python check found a problem" }
 
+      - name: Phase 1C synthetic checks (the parts that need no audio files)
+        shell: pwsh
+        run: |
+          python -m pip install --quiet numpy scipy pyloudnorm
+          if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) { choco install ffmpeg -y --no-progress | Out-Null }
+          $out = New-Object System.Collections.Generic.List[string]
+          foreach ($n in 1,2,3) {
+            $r = python -I hiss\python\phase1c\check$n.py $env:TEMP $env:TEMP synthetic 2>&1 | Select-Object -Last 1
+            Write-Host $r; $out.Add([string]$r)
+            if ($LASTEXITCODE -ne 0) { throw "Phase 1C synthetic check $n failed" }
+          }
+          Write-Host "::notice title=hiss: phase 1C synthetic checks::$($out -join '%0A')"
+
       - name: Summary (also published as a notice so it can be read without downloading)
         if: always()
         shell: pwsh

@@ -1,0 +1,242 @@
+{
+ "detection_rule": "A change counts as detected when it is larger than the 95th percentile of the metric's own repeatability (how much it moves when only the analysis start is shifted by 197-1500 samples), over 10 excerpts x 5 shifts. Floor = smallest rung detected in >= 9 of 10 trials.",
+ "repeatability_thresholds": {
+  "air_16_20k_db": 0.154,
+  "post_onset_P_db": 1.516,
+  "flutter_v1_depth": 0.0178,
+  "flutter_v2_depth": 7608.604
+ },
+ "ladders": {
+  "air_db": {
+   "rungs": [
+    {
+     "rung": 0.25,
+     "detected_of_10": 7
+    },
+    {
+     "rung": 0.5,
+     "detected_of_10": 7
+    },
+    {
+     "rung": 1.0,
+     "detected_of_10": 7
+    },
+    {
+     "rung": 2.0,
+     "detected_of_10": 8
+    },
+    {
+     "rung": 3.0,
+     "detected_of_10": 10
+    },
+    {
+     "rung": 6.0,
+     "detected_of_10": 10
+    }
+   ],
+   "floor": 3.0
+  },
+  "smear_q_(energy fraction of the original HF energy in the 5-50 ms window)": {
+   "rungs": [
+    {
+     "rung": 0.05,
+     "detected_of_10": 0
+    },
+    {
+     "rung": 0.1,
+     "detected_of_10": 0
+    },
+    {
+     "rung": 0.25,
+     "detected_of_10": 0
+    },
+    {
+     "rung": 0.5,
+     "detected_of_10": 7
+    },
+    {
+     "rung": 1.0,
+     "detected_of_10": 9
+    },
+    {
+     "rung": 2.0,
+     "detected_of_10": 10
+    }
+   ],
+   "floor": 1.0
+  },
+  "flutter_v1_depth": {
+   "rungs": [
+    {
+     "rung": 0.02,
+     "detected_of_10": 1
+    },
+    {
+     "rung": 0.05,
+     "detected_of_10": 6
+    },
+    {
+     "rung": 0.1,
+     "detected_of_10": 6
+    },
+    {
+     "rung": 0.2,
+     "detected_of_10": 10
+    },
+    {
+     "rung": 0.3,
+     "detected_of_10": 10
+    },
+    {
+     "rung": 0.5,
+     "detected_of_10": 10
+    }
+   ],
+   "floor": 0.2
+  },
+  "flutter_v2_depth": {
+   "rungs": [
+    {
+     "rung": 0.02,
+     "detected_of_10": 0
+    },
+    {
+     "rung": 0.05,
+     "detected_of_10": 0
+    },
+    {
+     "rung": 0.1,
+     "detected_of_10": 1
+    },
+    {
+     "rung": 0.2,
+     "detected_of_10": 2
+    },
+    {
+     "rung": 0.3,
+     "detected_of_10": 2
+    },
+    {
+     "rung": 0.5,
+     "detected_of_10": 1
+    }
+   ],
+   "floor": null
+  },
+  "moving_notch_g_(1.0 = full notch at its centre)": {
+   "rungs": [
+    {
+     "rung": 0.1,
+     "detected_of_10": 0
+    },
+    {
+     "rung": 0.2,
+     "detected_of_10": 1
+    },
+    {
+     "rung": 0.3,
+     "detected_of_10": 1
+    },
+    {
+     "rung": 0.5,
+     "detected_of_10": 3
+    },
+    {
+     "rung": 0.8,
+     "detected_of_10": 9
+    },
+    {
+     "rung": 1.0,
+     "detected_of_10": 9
+    }
+   ],
+   "floor": 0.8
+  }
+ },
+ "comb_floor": {
+  "silence_16bit_TPDF_floor_20s_48k": {
+   "rungs": [
+    {
+     "line_dbfs": -130,
+     "detected_of_10": 10
+    },
+    {
+     "line_dbfs": -125,
+     "detected_of_10": 10
+    },
+    {
+     "line_dbfs": -120,
+     "detected_of_10": 10
+    },
+    {
+     "line_dbfs": -115,
+     "detected_of_10": 10
+    },
+    {
+     "line_dbfs": -110,
+     "detected_of_10": 10
+    },
+    {
+     "line_dbfs": -105,
+     "detected_of_10": 10
+    },
+    {
+     "line_dbfs": -100,
+     "detected_of_10": 10
+    },
+    {
+     "line_dbfs": -95,
+     "detected_of_10": 10
+    },
+    {
+     "line_dbfs": -90,
+     "detected_of_10": 10
+    }
+   ],
+   "floor_line_dbfs": -130
+  },
+  "under_loud_human_cymbals_8s": {
+   "rungs": [
+    {
+     "line_dbfs": -130,
+     "detected_of_10": 1
+    },
+    {
+     "line_dbfs": -125,
+     "detected_of_10": 1
+    },
+    {
+     "line_dbfs": -120,
+     "detected_of_10": 3
+    },
+    {
+     "line_dbfs": -115,
+     "detected_of_10": 6
+    },
+    {
+     "line_dbfs": -110,
+     "detected_of_10": 7
+    },
+    {
+     "line_dbfs": -105,
+     "detected_of_10": 10
+    },
+    {
+     "line_dbfs": -100,
+     "detected_of_10": 10
+    },
+    {
+     "line_dbfs": -95,
+     "detected_of_10": 10
+    },
+    {
+     "line_dbfs": -90,
+     "detected_of_10": 10
+    }
+   ],
+   "floor_line_dbfs": -105
+  }
+ },
+ "comb_note": "Floors scale with listening time: longer files lower the floor by about 5 dB per 10x in length (averaging gain). 20 s and 8 s are used here; a 3-minute song would do about 4 dB (vs 20 s) / 7 dB (vs 8 s) better. ASSUMED scaling, not measured.",
+ "gate_pass": false
+}
