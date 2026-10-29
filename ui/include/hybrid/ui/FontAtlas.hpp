@@ -40,6 +40,10 @@ enum class TextStyle : std::uint8_t {
     BodyBold,     // emphasised running text
 };
 inline constexpr std::size_t kTextStyleCount = 17;
+// The console's own styles (Caption .. DisplayCap) are always baked. The five after them (Micro ..
+// BodyBold) are for dense app pages and only baked when asked for (FontAtlas::bake(..., true)); in an
+// atlas baked without them they fall back to the nearest console style, so the console's atlas stays small.
+inline constexpr std::size_t kConsoleTextStyles = 12;
 
 struct TextStyleSpec {
     Face  face;
@@ -85,7 +89,7 @@ public:
 
     // Bakes every style at em × canvasScale pixels into the smallest square atlas (512..4096)
     // that fits. Returns false if a font can't be parsed or nothing fits.
-    bool bake(const FontSet& fonts, float canvasScale);
+    bool bake(const FontSet& fonts, float canvasScale, bool appStyles = false);
 
     [[nodiscard]] float measure(TextStyle style, std::string_view utf8) const;   // design units
     [[nodiscard]] float capHeight(TextStyle style) const noexcept;                // design units
@@ -112,6 +116,7 @@ private:
     bool bakeAt(std::uint32_t size);
     bool initInfos();
     [[nodiscard]] const Packed* glyph(std::size_t style, std::uint32_t cp) const noexcept;
+    [[nodiscard]] std::size_t resolved(TextStyle style) const noexcept;   // a style that was baked
 
     FontSet                                        fonts_;
     std::array<std::vector<std::uint8_t>, kFaceCount> infoStorage_;   // stbtt_fontinfo blobs
@@ -120,6 +125,7 @@ private:
     float         scale_ = 1.0f;
     std::uint32_t size_  = 0;
     bool          valid_ = false;
+    bool          appStyles_ = false;
 };
 
 // Decodes one UTF-8 code point; advances `i`. Invalid bytes yield '?'.

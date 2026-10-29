@@ -477,6 +477,14 @@ void testUiFont() {
     CHECK(lap.bake(*fonts, 1389.0f / 3840.0f));
     std::printf("  Poppins atlas: %u px at 4K (bake %.0f ms), %u px at 1389 wide\n", big.atlasSize(), ms, lap.atlasSize());
     CHECK(big.atlasSize() <= 2048 && lap.atlasSize() <= 1024);
+    {   // apps with dense pages bake five smaller styles on top; without them those styles fall back
+        ui::FontAtlas withApp;
+        CHECK(withApp.bake(*fonts, 1.0f, true));
+        CHECK(withApp.atlasSize() <= 2048);
+        const float small = withApp.measure(ui::TextStyle::Micro, "STEM 13"), fallback = big.measure(ui::TextStyle::Micro, "STEM 13");
+        CHECK(small > 10.0f && small < fallback);
+        CHECK(std::fabs(withApp.measure(ui::TextStyle::Title, "STEM 13") - big.measure(ui::TextStyle::Title, "STEM 13")) < 0.5f);
+    }
     const float w1 = big.measure(ui::TextStyle::Title, "STEM 13"), w2 = lap.measure(ui::TextStyle::Title, "STEM 13");
     CHECK(w1 > 50.0f && std::fabs(w1 - w2) / w1 < 0.08f);     // same design width at any scale
     const float cap = big.capHeight(ui::TextStyle::Label);

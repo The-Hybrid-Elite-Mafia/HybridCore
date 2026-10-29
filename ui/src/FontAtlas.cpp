@@ -71,13 +71,15 @@ std::optional<FontSet> FontSet::load(const std::filesystem::path& dir, std::stri
     return f;
 }
 
-FontAtlas::FontAtlas(const FontAtlas& o) : fonts_(o.fonts_), styles_(o.styles_), pixels_(o.pixels_), scale_(o.scale_), size_(o.size_), valid_(o.valid_) {
+FontAtlas::FontAtlas(const FontAtlas& o)
+    : fonts_(o.fonts_), styles_(o.styles_), pixels_(o.pixels_), scale_(o.scale_), size_(o.size_), valid_(o.valid_), appStyles_(o.appStyles_) {
     initInfos();
 }
 
 FontAtlas& FontAtlas::operator=(const FontAtlas& o) {
     if (this != &o) {
         fonts_ = o.fonts_; styles_ = o.styles_; pixels_ = o.pixels_; scale_ = o.scale_; size_ = o.size_; valid_ = o.valid_;
+        appStyles_ = o.appStyles_;
         initInfos();
     }
     return *this;
@@ -93,8 +95,9 @@ bool FontAtlas::initInfos() {
     return true;
 }
 
-bool FontAtlas::bake(const FontSet& fonts, float canvasScale) {
+bool FontAtlas::bake(const FontSet& fonts, float canvasScale, bool appStyles) {
     valid_ = false;
+    appStyles_ = appStyles;
     if (!(canvasScale > 0.0f)) return false;
     fonts_ = fonts;
     scale_ = canvasScale;
@@ -113,6 +116,7 @@ bool FontAtlas::bakeAt(std::uint32_t atlas) {
     std::array<std::vector<stbtt_packedchar>, kTextStyleCount> packed;
     bool ok = true;
     for (std::size_t s = 0; s < kTextStyleCount && ok; ++s) {
+        if (s >= kConsoleTextStyles && !appStyles_) { styles_[s] = {}; continue; }
         const TextStyleSpec& spec = kTextStyles[s];
         const float px = std::max(6.0f, spec.em * scale_);
         stbtt_PackSetOversampling(&pc, px < 24.0f ? 2 : 1, 1);
@@ -146,6 +150,16 @@ bool FontAtlas::bakeAt(std::uint32_t atlas) {
     return true;
 }
 
+std::size_t FontAtlas::resolved(TextStyle style) const noexcept {
+    const auto s = static_cast<std::size_t>(style);
+    if (s < kConsoleTextStyles || appStyles_) return s;
+    switch (style) {
+    case TextStyle::BodyBold: return static_cast<std::size_t>(TextStyle::Value);
+    case TextStyle::Body:     return static_cast<std::size_t>(TextStyle::Caption);
+    default:                  return static_cast<std::size_t>(TextStyle::Caption);
+    }
+}
+
 const FontAtlas::Packed* FontAtlas::glyph(std::size_t style, std::uint32_t cp) const noexcept {
     const auto& g = styles_[style].glyphs;
     if (cp < kFirst || cp - kFirst >= g.size()) cp = '?';
@@ -154,20 +168,20 @@ const FontAtlas::Packed* FontAtlas::glyph(std::size_t style, std::uint32_t cp) c
 
 float FontAtlas::measure(TextStyle style, std::string_view s) const {
     if (!valid_) return 0.0f;
-    const auto st = static_cast<std::size_t>(style);
+    const auto st = resolved(style);
     float w = 0.0f;
     for (std::size_t i = 0; i < s.size();) w += glyph(st, nextCodepoint(s, i))->xadvance;
     return w / scale_;
 }
 
 float FontAtlas::capHeight(TextStyle style) const noexcept {
-    return valid_ ? styles_[static_cast<std::size_t>(style)].capPx / scale_ : kTextStyles[static_cast<std::size_t>(style)].em * 0.7f;
+    return valid_ ? styles_[resolved(style)].capPx / scale_ : kTextStyles[static_cast<std::size_t>(style)].em * 0.7f;
 }
 
 void FontAtlas::layout(TextStyle style, std::string_view s, float x, float baselineY, float pad,
                        const std::function<void(const GlyphQuad&)>& emit) const {
     if (!valid_) return;
-    const auto st = static_cast<std::size_t>(style);
+    const auto st = resolved(style);
     const float inv = 1.0f / static_cast<float>(size_);
     const float padPx = pad * scale_;
     float pen = x * scale_;

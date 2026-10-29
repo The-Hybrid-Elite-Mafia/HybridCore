@@ -13,6 +13,7 @@ struct GlWindow::Impl {
     HDC                     hdc  = nullptr;
     HGLRC                   rc   = nullptr;
     bool                    closed = false;
+    bool                    closeAsks = false;   // WM_CLOSE only reports Close; the app decides (unsaved work)
     bool                    mouseDown = false;
     // While a drag holds the mouse, the cursor that reaches the edge of the screen jumps to the other side and the
     // drag goes on (as in a DAW: a knob never runs out of room); the jump is added back so the app sees one smooth move.
@@ -56,10 +57,12 @@ struct GlWindow::Impl {
 
     LRESULT handle(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         InputEvent e;
-        e.fine = fineKeys();
+        e.fine  = fineKeys();
+        e.ctrl  = (::GetKeyState(VK_CONTROL) & 0x8000) != 0;
+        e.shift = (::GetKeyState(VK_SHIFT) & 0x8000) != 0;
         switch (msg) {
         case WM_CLOSE:
-            closed = true;
+            if (!closeAsks) closed = true;
             events.push_back({InputEvent::Type::Close});
             return 0;
         case WM_SIZE:
@@ -124,6 +127,7 @@ struct GlWindow::Impl {
             events.push_back(e);
             return 0;
         case WM_RBUTTONDOWN:
+            if (child) ::SetFocus(h);
             e.type = InputEvent::Type::RightDown;
             e.x = static_cast<float>(GET_X_LPARAM(lp));
             e.y = static_cast<float>(GET_Y_LPARAM(lp));
@@ -381,6 +385,9 @@ std::vector<InputEvent> GlWindow::takeEvents() {
     out.swap(impl_->events);
     return out;
 }
+
+void GlWindow::setCloseAsks(bool on) noexcept { impl_->closeAsks = on; }
+void GlWindow::requestClose() noexcept { impl_->closed = true; }
 
 void GlWindow::swap() noexcept { if (impl_->hdc) ::SwapBuffers(impl_->hdc); }
 void GlWindow::setVsync(bool on) noexcept { if (impl_->swapInterval) impl_->swapInterval(on ? 1 : 0); }

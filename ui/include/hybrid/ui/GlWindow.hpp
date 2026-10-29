@@ -21,7 +21,8 @@ struct InputEvent {
     float wheel       = 0.0f;   // notches (+ = away from user)
     bool  doubleClick = false;
     bool  fine        = false;  // Shift or Ctrl held
-    bool  ctrl        = false;  // Ctrl held (Key)
+    bool  ctrl        = false;  // Ctrl held
+    bool  shift       = false;  // Shift held
     std::uint32_t key = 0;      // Key: Windows virtual-key code
     std::vector<std::filesystem::path> files;   // Drop: files dragged in from Explorer; OpenFile: path sent by a second instance
 };
@@ -56,6 +57,10 @@ public:
     void swap() noexcept;
     void setVsync(bool on) noexcept;
     void setTitle(const std::wstring& title) noexcept;
+    // On: the close box (and Alt+F4) only queue a Close event and pump() keeps returning true, so the
+    // app can ask about unsaved work first; requestClose() then ends the window's life (pump() -> false).
+    void setCloseAsks(bool on) noexcept;
+    void requestClose() noexcept;
     // Window class of every GlWindow (used to find a running instance).
     [[nodiscard]] static const wchar_t* className() noexcept;
     // WM_COPYDATA tag: the payload is a UTF-16 file path to open (InputEvent::Type::OpenFile).
