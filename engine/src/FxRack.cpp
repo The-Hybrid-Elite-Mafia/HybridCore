@@ -2,9 +2,11 @@
 #include "hybrid/fx/Effects.hpp"
 
 #include <algorithm>
+#include <charconv>
 #include <cstdio>
 #include <cstdlib>
 #include <sstream>
+#include <string_view>
 
 namespace hc::engine {
 namespace {
@@ -140,9 +142,24 @@ std::string FxRack::fromText(const std::string& text) {
     std::string line;
     while (std::getline(in, line)) {
         if (line.rfind("tempo=", 0) == 0) { setSongTempo(std::strtof(line.c_str() + 6, nullptr)); continue; }
-        unsigned stem = 0;
-        int slot = 0;
-        if (std::sscanf(line.c_str(), "stem%u.fx%d=", &stem, &slot) != 2 || stem < 1 || stem > kStems || slot < 1 || slot > kSlots) continue;
+        // "stem<N>.fx<M>=..." (whole numbers, no sign)
+        unsigned stem = 0, slotNumber = 0;
+        const char* const end = line.data() + line.size();
+        const char* c = line.data();
+        auto number = [&](unsigned& out) {
+            const auto r = std::from_chars(c, end, out);
+            if (r.ec != std::errc() || r.ptr == c) return false;
+            c = r.ptr;
+            return true;
+        };
+        auto literal = [&](std::string_view w) {
+            if (static_cast<std::size_t>(end - c) < w.size() || std::string_view(c, w.size()) != w) return false;
+            c += w.size();
+            return true;
+        };
+        if (!literal("stem") || !number(stem) || !literal(".fx") || !number(slotNumber) || !literal("=")) continue;
+        if (stem < 1 || stem > static_cast<unsigned>(kStems) || slotNumber < 1 || slotNumber > static_cast<unsigned>(kSlots)) continue;
+        const int slot = static_cast<int>(slotNumber);
         const auto eq = line.find('=');
         std::vector<std::string> parts;
         std::string cur;

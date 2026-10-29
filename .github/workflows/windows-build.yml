@@ -113,7 +113,7 @@ jobs:
           tools\ci\run-and-report.ps1 -Title "installer: verify" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\verify-installer.ps1','-Installer',"$env:HC_INSTALLER"
 
       - name: Upload installer artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: HybridCore-Setup-${{ env.HC_VERSION }}
           path: installer/output/*.exe
