@@ -1,0 +1,18 @@
+{
+ "_what_this_is": "A new dated rule file. SPLIT.json is NOT edited. Written and committed BEFORE the flutter meter v4 is run on its test clips. The original check 4 result (flutter FAIL) stays on the record.",
+ "written": "2026-10-29",
+ "why": "Check 4 flutter failed three times on 8 s clips (4/10, 3-4/10 with a bug, 2/10). Development on the already-used clips (not the test set) showed the reading wobbles about 0.08 on 8 s clips and about 0.04 on 20 s clips, and that subtracting a 'baseline' reading adds noise because the baseline wobble has a random phase.",
+ "check_4b_flutter_meter_v4": {
+  "meter": "Band 5-15 kHz (4th-order Butterworth, zero-phase). Envelope = |Hilbert|, low-passed at 200 Hz (4th order, zero-phase). Depth = amplitude of the Hann-windowed spectrum of the mean-removed envelope at 25 Hz (largest of the 3 bins around 25 Hz), divided by the mean envelope. No baseline subtraction. No neighbour-bin subtraction.",
+  "refuses_when": ["clip shorter than 20.0 s", "5-15 kHz band rms below -90 dBFS (nothing to measure)"],
+  "test_clips": "Human reference files ranked by 8-20 kHz share minus 5-10 kHz share (the same ranking as check 4). Indices 0-23 were used to develop the meter and are NOT test clips. Test clips = the first 10 files from index 24 onward that are at least 20 s long and are not refused. First 20.0 s of each file. Never run before this file was committed.",
+  "injection": "x + 0.30 * sin(2 pi 25 t + random phase) * band(x), band = 5-15 kHz. Seed 4242.",
+  "pass": "measured depth within +/-20 % of 0.30 (0.24 to 0.36) in at least 9 of 10 test clips",
+  "if_it_fails": "Flutter is reported 'detect-only' (option 2) and the C++ meter keeps only the yes/no flutter flag. The failure is added to FAILURES.md. The meter is not changed again on these test clips.",
+  "sensitivity": "Also report the smallest injected depth (0.05, 0.1, 0.2, 0.3, 0.5) read as 'present' in at least 9 of 10 clips, where present = reading above the 95th percentile of |reading(x shifted by 197-1500 samples) - reading(x)| over the 10 clips"
+ },
+ "c_plus_plus_meters": {
+  "rule": "The C++ meter engine (hiss/include/hybrid/hiss/HissMeters.hpp) must agree with the Python meters on the same real files within 0.05 dB for band levels and ratios, 0.005 for flutter depth, and 0.1 LU for loudness. libebur128 (separately written, MIT licence) is used as a third loudness reference.",
+  "scope": "pure C++23, no JUCE, no allocation in the measuring loops after prepare() where a block API exists; offline functions may allocate"
+ }
+}
