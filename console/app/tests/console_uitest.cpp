@@ -363,9 +363,9 @@ bool fileDialogPick(App& app, const std::wstring& title, const std::wstring& fol
         return false;
     }
     std::this_thread::sleep_for(700ms);
-    wchar_t title[256] = {};
-    ::GetWindowTextW(dlg, title, 256);
-    if (titleOut) *titleOut = title;
+    wchar_t shown[256] = {};
+    ::GetWindowTextW(dlg, shown, 256);
+    if (titleOut) *titleOut = shown;
     if (textOut) *textOut = dialogText(dlg);
     IUIAutomationElement* root = elementOf(dlg);
     IUIAutomationElement* edit = findIn(root, UIA_AutomationIdPropertyId, L"1148", UIA_EditControlTypeId);   // open dialogs
