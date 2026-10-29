@@ -246,6 +246,7 @@ int main(int argc, char** argv) {
     testConsoleUi();
     testConsoleReadings();
     testConsolePlayer();
+    testConsoleSessionFiles();
     testUiImage();
     testUiLayout();
     testUiFaceplate();

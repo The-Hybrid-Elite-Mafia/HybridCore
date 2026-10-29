@@ -14,7 +14,7 @@
 namespace hc::ui {
 
 struct InputEvent {
-    enum class Type : std::uint8_t { MouseDown, MouseUp, MouseMove, Wheel, Resize, Close, RightDown, Drop, Key, OpenFile, MiddleDown, MiddleUp };
+    enum class Type : std::uint8_t { MouseDown, MouseUp, MouseMove, Wheel, Resize, Close, RightDown, Drop, Key, OpenFile, MiddleDown, MiddleUp, Command };
     Type  type        = Type::MouseMove;
     float x           = 0.0f;   // client pixels
     float y           = 0.0f;
@@ -26,6 +26,7 @@ struct InputEvent {
     bool  shift       = false;  // Shift held (Key, Wheel)
     std::uint32_t key = 0;      // Key: Windows virtual-key code
     std::vector<std::filesystem::path> files;   // Drop: files dragged in from Explorer; OpenFile: path sent by a second instance
+    std::string text;                           // Command: UTF-8 text sent with kCommandTag (test automation)
 };
 
 class GlWindow {
@@ -65,6 +66,16 @@ public:
     [[nodiscard]] static const wchar_t* className() noexcept;
     // WM_COPYDATA tag: the payload is a UTF-16 file path to open (InputEvent::Type::OpenFile).
     static constexpr unsigned long kOpenFileTag = 0x48435331;   // 'HCS1'
+    // WM_COPYDATA tag: a UTF-8 command line for the app (InputEvent::Type::Command). Apps act on it only when they
+    // were started for test automation.
+    static constexpr unsigned long kCommandTag = 0x48434D44;    // 'HCMD'
+
+    // The close box / Alt+F4 normally ends pump() at once. With this on, they only queue a Close event and the
+    // app decides (e.g. "Save changes?"), then calls requestClose().
+    void setAppHandlesClose(bool on) noexcept;
+    void requestClose() noexcept;
+    // Smallest client area the user can drag the window to, in DIPs (scaled by the window's monitor DPI).
+    void setMinClientSize(int dipW, int dipH) noexcept;
 
     [[nodiscard]] int   pixelWidth() const noexcept;
     [[nodiscard]] int   pixelHeight() const noexcept;

@@ -59,7 +59,7 @@ target_link_libraries(hc_console_rig PUBLIC hc::console_desk hc::console_stepeq 
                                             hc::console_meter hc::console_tools)
 
 # The player (engine processor, offline export, session file) and the GPU screen.
-add_library(hc_console_player STATIC player/src/ConsolePlayer.cpp)
+add_library(hc_console_player STATIC player/src/ConsolePlayer.cpp player/src/SessionFiles.cpp)
 add_library(hc::console_player ALIAS hc_console_player)
 target_include_directories(hc_console_player PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/player/include")
 target_link_libraries(hc_console_player PUBLIC hc::console_rig hc::engine hc::media)

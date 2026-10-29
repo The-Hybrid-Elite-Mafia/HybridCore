@@ -34,9 +34,9 @@ inline constexpr int kStemSlots = ConsoleRig::kChannels + 2;   // 13 channels + 
 inline constexpr int kExt1Slot = ConsoleRig::kChannels, kExt2Slot = ConsoleRig::kChannels + 1;
 inline constexpr int kColourToolTarget = ConsoleRig::kChannels;   // TOOLS page: 0..12 = channel, 13 = colour stage insert
 inline constexpr int kBigChannels = 5;                             // BIG DESK page: channels on screen at a time
-// View zoom (1 = the whole faceplate fits the window). The largest zoom is also limited so the plate is never shown
-// above 1 window pixel per design unit (its routed texture stops there).
-inline constexpr float kZoomMin = 1.0f, kZoomMax = 3.0f;
+// View zoom: 1 = the whole faceplate fits the window, one scale for everything, never scrolled. Since 0.4 the
+// console always fits (every button stays on screen); BIG DESK is the way to see the desk bigger.
+inline constexpr float kZoomMin = 1.0f, kZoomMax = 1.0f;
 inline constexpr float kMinTextPx = 13.0f;   // no text is drawn smaller than this many screen pixels
 
 namespace colours {
@@ -71,7 +71,7 @@ struct AppState {
     int listen = 0;                            // 0 MONITOR, 1 CUE 1, 2 CUE 2 (what the output device plays)
     int toolTarget = 0;                        // TOOLS page: which slot is shown
     int resetStage = 0;                        // RESET button: 0 idle, 1 asking "SURE?", 2 offering UNDO
-    float zoom = 1.0f;                         // view zoom (kZoomMin..kZoomMax), saved in the settings
+    float zoom = 1.0f;                         // view zoom (always 1 since 0.4: the faceplate fits the window)
     int bigFirst = 0;                          // BIG DESK: first channel shown (0 .. kChannels - kBigChannels)
     int meterTab = 0;                          // METER page EDIT panel: 0 RADAR, 1 RTA, 2 SCOPE, 3 GENERAL, 4 LIBRARY
     int meterLibSlot = 0;                      // LIBRARY: preset picked (factory presets first, then the user slots)
@@ -89,6 +89,8 @@ enum class Act : std::uint8_t {
     MeterAuto,  // METER: RTA AUTO scale
     MeterRecall,// METER: LIBRARY recall (AppState::meterLibSlot)
     MeterStore, // METER: LIBRARY store into a user slot (AppState::meterLibSlot)
+    SaveAs,     // SAVE AS: save under a new name
+    Recent,     // RECENT: the recent-sessions list
 };
 struct ActionEvent {
     Act act = Act::None;
@@ -105,6 +107,9 @@ inline constexpr std::array<PageId, kPageCount> kTabOrder{PageId::Desk, PageId::
                                                           PageId::Colour, PageId::Meter, PageId::Tools};
 // First channel the BIG DESK shows after moving by `delta` (or jumping to show `channel` when jump >= 0).
 [[nodiscard]] int bigDeskFirst(int first, int delta, int jumpTo = -1) noexcept;
+// The desk channel (0..12) whose strip is at design point x, y on the DESK or BIG DESK page; -1 = none (a file
+// dropped there loads into that channel only).
+[[nodiscard]] int channelAt(PageId page, int bigFirst, float x, float y) noexcept;
 
 // One control binding: the control's description plus its getter / setter (plain values).
 struct Ctl {

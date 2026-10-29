@@ -13,6 +13,8 @@ struct GlWindow::Impl {
     HDC                     hdc  = nullptr;
     HGLRC                   rc   = nullptr;
     bool                    closed = false;
+    bool                    appHandlesClose = false;
+    int                     minDipW = 0, minDipH = 0;
     bool                    mouseDown = false;
     // While a drag holds the mouse, the cursor that reaches the edge of the screen jumps to the other side and the
     // drag goes on (as in a DAW: a knob never runs out of room); the jump is added back so the app sees one smooth move.
@@ -64,9 +66,22 @@ struct GlWindow::Impl {
         e.shift = (::GetKeyState(VK_SHIFT) & 0x8000) != 0;
         switch (msg) {
         case WM_CLOSE:
-            closed = true;
+            if (!appHandlesClose) closed = true;
             events.push_back({InputEvent::Type::Close});
             return 0;
+        case WM_GETMINMAXINFO: {
+            if (minDipW > 0 && minDipH > 0) {
+                const UINT dpi = ::GetDpiForWindow(h);
+                RECT r{0, 0, ::MulDiv(minDipW, static_cast<int>(dpi), 96), ::MulDiv(minDipH, static_cast<int>(dpi), 96)};
+                ::AdjustWindowRectExForDpi(&r, static_cast<DWORD>(::GetWindowLongPtrW(h, GWL_STYLE)), FALSE,
+                                           static_cast<DWORD>(::GetWindowLongPtrW(h, GWL_EXSTYLE)), dpi);
+                auto* mmi = reinterpret_cast<MINMAXINFO*>(lp);
+                mmi->ptMinTrackSize.x = r.right - r.left;
+                mmi->ptMinTrackSize.y = r.bottom - r.top;
+                return 0;
+            }
+            return ::DefWindowProcW(h, msg, wp, lp);
+        }
         case WM_SIZE:
             events.push_back({InputEvent::Type::Resize});
             return 0;
@@ -164,6 +179,13 @@ struct GlWindow::Impl {
             return 0;
         case WM_COPYDATA: {   // a second HybridCore.exe hands over a session to open
             const auto* cd = reinterpret_cast<const COPYDATASTRUCT*>(lp);
+            if (cd && cd->dwData == GlWindow::kCommandTag && cd->lpData && cd->cbData > 0 && cd->cbData <= 65536) {
+                e.type = InputEvent::Type::Command;
+                e.text.assign(static_cast<const char*>(cd->lpData), cd->cbData);
+                while (!e.text.empty() && e.text.back() == '\0') e.text.pop_back();
+                events.push_back(std::move(e));
+                return TRUE;
+            }
             if (!cd || cd->dwData != GlWindow::kOpenFileTag || !cd->lpData || cd->cbData < sizeof(wchar_t) || cd->cbData > 65536) return FALSE;
             e.type = InputEvent::Type::OpenFile;
             e.files.emplace_back(std::wstring(static_cast<const wchar_t*>(cd->lpData), cd->cbData / sizeof(wchar_t)).c_str());
@@ -426,6 +448,9 @@ std::vector<InputEvent> GlWindow::takeEvents() {
 void GlWindow::swap() noexcept { if (impl_->hdc) ::SwapBuffers(impl_->hdc); }
 void GlWindow::setVsync(bool on) noexcept { if (impl_->swapInterval) impl_->swapInterval(on ? 1 : 0); }
 const wchar_t* GlWindow::className() noexcept { return kClassName; }
+void GlWindow::setAppHandlesClose(bool on) noexcept { impl_->appHandlesClose = on; }
+void GlWindow::requestClose() noexcept { impl_->closed = true; }
+void GlWindow::setMinClientSize(int dipW, int dipH) noexcept { impl_->minDipW = dipW; impl_->minDipH = dipH; }
 void GlWindow::setTitle(const std::wstring& t) noexcept { if (impl_->hwnd) ::SetWindowTextW(impl_->hwnd, t.c_str()); }
 
 void GlWindow::setFullscreen(bool on) noexcept {

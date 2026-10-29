@@ -412,7 +412,7 @@ std::filesystem::path fromU8(const std::string& s) { return std::filesystem::pat
 
 std::string writeSession(const SessionData& s, const std::filesystem::path& file) {
     std::ostringstream o;
-    o << "[hem-digital-console]\nformat=HEM Digital Console Session\nversion=1\n[stems]\n";
+    o << "[hem-digital-console]\nformat=HEM Digital Console Session\nversion=" << kSessionVersion << "\n[stems]\n";
     const auto dir = file.parent_path();
     for (int k = 0; k < kPlayerSlots; ++k) {
         const auto& f = s.files[static_cast<std::size_t>(k)];
@@ -440,6 +440,8 @@ std::expected<SessionData, std::string> readSession(const std::string& text, con
         const auto eq = line.find('=');
         if (eq == std::string::npos) continue;
         const std::string k = line.substr(0, eq), v = line.substr(eq + 1);
+        if (section == "[hem-digital-console]" && k == "version" && std::atoi(v.c_str()) > kSessionVersion)
+            return std::unexpected(std::string("made by a newer HEM Digital Console (session version ") + v + "): update the console to open it");
         if (section == "[rig]") { rigText += line; rigText += '\n'; continue; }
         if (section == "[app]") {
             if (k == "listen") s.listen = std::clamp(std::atoi(v.c_str()), 0, 2);
@@ -456,6 +458,7 @@ std::expected<SessionData, std::string> readSession(const std::string& text, con
     for (int slot = 0; slot < kPlayerSlots; ++slot) {
         const auto i = static_cast<std::size_t>(slot);
         if (abs[i].empty() && rel[i].empty()) continue;
+        s.wanted[i] = !abs[i].empty() ? abs[i] : (file.parent_path() / rel[i]).lexically_normal();
         std::error_code ec;
         if (!abs[i].empty() && std::filesystem::exists(abs[i], ec)) s.files[i] = abs[i];
         else if (!rel[i].empty() && std::filesystem::exists(file.parent_path() / rel[i], ec)) s.files[i] = file.parent_path() / rel[i];

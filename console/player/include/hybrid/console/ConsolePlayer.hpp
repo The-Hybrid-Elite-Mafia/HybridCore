@@ -137,14 +137,17 @@ private:
 };
 
 // ---- session file (.hemc) --------------------------------------------------------------------------
+inline constexpr int kSessionVersion = 2;   // 1: consoles 0.1 .. 0.3; 2: 0.4 on (same keys; from 0.4 a console refuses a newer version)
 struct SessionData {
-    std::array<std::filesystem::path, kPlayerSlots> files{};
+    std::array<std::filesystem::path, kPlayerSlots> files{};    // found on disk (empty = no file, or not found)
+    std::array<std::filesystem::path, kPlayerSlots> wanted{};   // read: what the session asked for (for relinking moved stems)
     int listen = 0;
     bool loop = false;
     std::string rigState;   // ConsoleRig::saveText()
 };
 [[nodiscard]] std::string writeSession(const SessionData& s, const std::filesystem::path& sessionFile);
-// Missing files are reported in `missing` (slot numbers); relative paths are tried when absolute ones are gone.
+// Missing files are reported in `missing` (slot numbers; `wanted` keeps their old paths); relative paths (from the
+// session's folder) are tried when absolute ones are gone. Sessions written by a newer console are refused.
 [[nodiscard]] std::expected<SessionData, std::string> readSession(const std::string& text, const std::filesystem::path& sessionFile,
                                                                  std::vector<int>* missing = nullptr);
 inline constexpr const char* kSessionExtension = ".hemc";

@@ -4,6 +4,7 @@
 
 #include "hybrid/console/ColourStage.hpp"
 #include "hybrid/console/ConsolePlayer.hpp"
+#include "hybrid/console/SessionFiles.hpp"
 #include "hybrid/console/StepEq.hpp"
 #include "hybrid/console/TwinBus.hpp"
 #include "hybrid/console/ui/ConsoleUi.hpp"
@@ -14,6 +15,7 @@
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
+#include <fstream>
 #include <map>
 #include <memory>
 #include <numbers>
@@ -503,4 +505,152 @@ void testConsolePlayer() {
     fs::remove_all(moved, ec);
 }
 
+// Files around a session: Suno stems to fixed channels, more than 13 files, moved stems, recent list, newer sessions.
+void testConsoleSessionFiles() {
+    std::printf("\n[console] session files: stem channels, relink, recent list, session version\n");
+    namespace fs = std::filesystem;
+    // The real Suno stem folders on the rig (names copied from Steven's Downloads, Oct 2026), in Explorer's order.
+    struct Folder { const char* dir; std::vector<const char*> files; std::vector<std::pair<int, const char*>> want; const char* mix; };
+    const Folder real[] = {
+        {"Two hundred forty days Stems",
+         {"Two hundred forty days - HEM Master.wav", "Two hundred forty days (Bass).wav", "Two hundred forty days (Drums).wav", "Two hundred forty days (Guitar).wav",
+          "Two hundred forty days (Keyboard) - HEM MTwo hundred forty days - HEM Masteraster.wav", "Two hundred forty days (Keyboard).wav",
+          "Two hundred forty days (Percussion).wav", "Two hundred forty days (Synth).wav", "Two hundred forty days (Vocals).wav"},
+         {{1, "Two hundred forty days (Vocals).wav"}, {3, "Two hundred forty days (Drums).wav"}, {4, "Two hundred forty days (Percussion).wav"},
+          {5, "Two hundred forty days (Bass).wav"}, {6, "Two hundred forty days (Guitar).wav"}, {7, "Two hundred forty days (Keyboard).wav"},
+          {8, "Two hundred forty days (Synth).wav"}},
+         "Two hundred forty days - HEM Master.wav"},
+        {"No Brakes on This Trip Stems",
+         {"0 Lead Vocals.wav", "1 Backing Vocals.wav", "2 Drums.wav", "3 Bass.wav", "4 Guitar.wav", "5 Percussion.wav", "6 Synth.wav"},
+         {{1, "0 Lead Vocals.wav"}, {2, "1 Backing Vocals.wav"}, {3, "2 Drums.wav"}, {4, "5 Percussion.wav"}, {5, "3 Bass.wav"}, {6, "4 Guitar.wav"}, {8, "6 Synth.wav"}},
+         nullptr},
+        {"There's a Difference",
+         {"0 There's a Difference.wav", "1 FX.wav", "2 Synth.wav", "3 Percussion.wav", "4 Keyboard.wav", "5 Guitar.wav", "6 Bass.wav", "7 Drums.wav",
+          "8 Backing_Vocals.wav", "9 Vocals.wav"},
+         {{1, "9 Vocals.wav"}, {2, "8 Backing_Vocals.wav"}, {3, "7 Drums.wav"}, {4, "3 Percussion.wav"}, {5, "6 Bass.wav"}, {6, "5 Guitar.wav"},
+          {7, "4 Keyboard.wav"}, {8, "2 Synth.wav"}, {12, "1 FX.wav"}},
+         "0 There's a Difference.wav"},
+        {"reading the same letter",
+         {"0 Reading the Same Letter.wav", "1 Woodwinds.wav", "10 Drums.wav", "11 Backing_Vocals.wav", "12 Vocals.wav", "2 Brass.wav", "3 FX.wav",
+          "4 Synth.wav", "5 Strings.wav", "6 Percussion.wav", "7 Keyboard.wav", "8 Guitar.wav", "9 Bass.wav"},
+         {{1, "12 Vocals.wav"}, {2, "11 Backing_Vocals.wav"}, {3, "10 Drums.wav"}, {4, "6 Percussion.wav"}, {5, "9 Bass.wav"}, {6, "8 Guitar.wav"},
+          {7, "7 Keyboard.wav"}, {8, "4 Synth.wav"}, {9, "5 Strings.wav"}, {10, "2 Brass.wav"}, {11, "1 Woodwinds.wav"}, {12, "3 FX.wav"}},
+         "0 Reading the Same Letter.wav"},
+    };
+    for (const Folder& f : real) {
+        std::vector<fs::path> files;
+        for (const char* n : f.files) files.push_back(fs::path("C:/Users/steve/Downloads") / f.dir / n);
+        const StemPlan p = planStems(files);
+        int right = 0, used = 0;
+        for (const auto& [ch, name] : f.want) right += p.channel[static_cast<std::size_t>(ch - 1)].filename() == name ? 1 : 0;
+        for (const auto& c : p.channel) used += c.empty() ? 0 : 1;
+        const bool mixOk = f.mix ? (!p.fullMix.empty() && p.fullMix.front().filename() == f.mix && p.fullMix.size() == (std::string(f.dir).starts_with("Two") ? 2u : 1u))
+                                 : p.fullMix.empty();
+        const std::size_t mixes = p.fullMix.size();
+        std::printf("  \"%s\" (%zu files): %d of %zu stems on their channel, %d channels used, %zu full mix/master set aside%s%s, %zu left out\n", f.dir,
+                    f.files.size(), right, f.want.size(), used, mixes, mixes ? ": " : "", mixes ? p.fullMix.front().filename().string().c_str() : "", p.leftOut.size());
+        CHECK(right == static_cast<int>(f.want.size()) && used == static_cast<int>(f.want.size()) && mixOk && p.leftOut.empty());
+    }
+    // the same with underscores and no song name (another Suno spelling): each to its own channel
+    const fs::path d = "song stems";
+    const char* suno[] = {"11_Woodwinds.wav", "3_Bass.wav", "0_Lead_Vocals.wav", "9_FX.wav", "1_Backing_Vocals.wav", "2_Drums.wav",
+                          "5_Keyboard.wav", "4_Guitar.wav", "7_Strings.wav", "6_Percussion.wav", "8_Synth.wav", "10_Brass.wav"};
+    std::vector<fs::path> files;
+    for (const char* n : suno) files.push_back(d / n);
+    const StemPlan p = planStems(files);
+    const char* want[] = {"0_Lead_Vocals.wav", "1_Backing_Vocals.wav", "2_Drums.wav", "6_Percussion.wav", "3_Bass.wav", "4_Guitar.wav",
+                          "5_Keyboard.wav", "8_Synth.wav", "7_Strings.wav", "10_Brass.wav", "11_Woodwinds.wav", "9_FX.wav"};
+    int right = 0;
+    for (int ch = 0; ch < 12; ++ch) right += p.channel[static_cast<std::size_t>(ch)].filename() == want[ch] ? 1 : 0;
+    std::printf("  12 stems named 0_Lead_Vocals .. 11_Woodwinds, scrambled: %d of 12 on their own channel, channel 13 %s\n", right, p.channel[12].empty() ? "empty" : "USED");
+    CHECK(right == 12 && p.channel[12].empty() && p.byName == 12 && p.leftOut.empty());
+
+    // spellings Suno and others use
+    struct Case { const char* name; int ch; };
+    const Case cases[] = {{"Lead Vocals.wav", 0}, {"vocals.mp3", 0}, {"Backing Vocals (Suno).wav", 1}, {"BGV.flac", 1}, {"12 - Drums.wav", 2},
+                          {"Kick Drum.wav", 2}, {"perc.wav", 3}, {"Bass Guitar.wav", 4}, {"Lead Guitar.wav", 5}, {"keys.wav", 6},
+                          {"Piano.wav", 6}, {"Lead Synth.wav", 7}, {"Strings.wav", 8}, {"FX.wav", 11}, {"SFX riser.wav", 11},
+                          {"Other.wav", 12}, {"Lead.wav", 0}, {"My Hook.wav", -1}, {"effex.wav", -1}};
+    int ok = 0;
+    for (const Case& c : cases) {
+        const int r = stemRoleOf(c.name);
+        const int ch = r >= 0 ? stemRoles()[static_cast<std::size_t>(r)].channel : -1;
+        if (ch == c.ch) ++ok; else std::printf("    %-28s -> channel %d (expected %d)\n", c.name, ch + 1, c.ch + 1);
+    }
+    std::printf("  stem names matched to channels: %d of %zu as expected\n", ok, std::size(cases));
+    CHECK(ok == static_cast<int>(std::size(cases)));
+
+    // a song whose name has an instrument word in it: only the part after the song's name counts
+    const StemPlan bassSong = planStems({"Bass in the Night Stems/0 Bass in the Night.wav", "Bass in the Night Stems/1 Vocals.wav",
+                                         "Bass in the Night Stems/Bass in the Night (Drums).wav"});
+    const bool bs = bassSong.fullMix.size() == 1 && bassSong.channel[0].filename() == "1 Vocals.wav" && bassSong.channel[2].filename() == "Bass in the Night (Drums).wav" &&
+                    bassSong.channel[4].empty();
+    std::printf("  song called \"Bass in the Night\": its drums go to DRUMS, the bass channel stays free, the whole song set aside: %s\n", bs ? "yes" : "NO");
+    CHECK(bs);
+
+    // other names: name order (natural: 2 before 10), on the free channels
+    const StemPlan q = planStems({"b/10 Hook.wav", "b/2 Pad.wav", "b/1 Kick.wav", "b/Vocals.wav"});
+    const bool order = q.channel[0].filename() == "Vocals.wav" && q.channel[1].filename() == "1 Kick.wav" && q.channel[2].filename() == "2 Pad.wav" &&
+                       q.channel[3].filename() == "10 Hook.wav";
+    std::printf("  unknown names fill the free channels in name order: %s\n", order ? "yes" : "NO");
+    CHECK(order);
+    // drums twice: the second takes the first free channel; 16 files: 3 left out, the 13 used are all different
+    std::vector<fs::path> many;
+    for (int k = 1; k <= 16; ++k) many.push_back("m/" + std::to_string(k) + " take.wav");
+    const StemPlan m = planStems(many);
+    std::set<fs::path> used(m.channel.begin(), m.channel.end());
+    std::printf("  16 files: %zu left out (%s .. %s), 13 different files used: %s\n", m.leftOut.size(),
+                m.leftOut.empty() ? "-" : m.leftOut.front().filename().string().c_str(), m.leftOut.empty() ? "-" : m.leftOut.back().filename().string().c_str(),
+                used.size() == 13 && !used.count(fs::path()) ? "yes" : "NO");
+    CHECK(m.leftOut.size() == 3 && m.leftOut.front().filename() == "14 take.wav" && used.size() == 13);
+    const StemPlan two = planStems({"x/Drums.wav", "x/Drums 2.wav", "x/Bass.wav"});
+    std::printf("  a second drum stem goes to the first free channel: %s\n", two.channel[2].filename() == "Drums.wav" && two.channel[0].filename() == "Drums 2.wav" ? "yes" : "NO");
+    CHECK(two.channel[2].filename() == "Drums.wav" && two.channel[0].filename() == "Drums 2.wav" && two.channel[4].filename() == "Bass.wav");
+
+    // a file dropped on a channel strip: which channel is under the mouse (DESK: 13 strips, BIG DESK: the 5 shown)
+    const bool drop = U::channelAt(U::PageId::Desk, 0, 30 + 202 * 4 + 90, 1000) == 4 && U::channelAt(U::PageId::Desk, 0, 30 + 202 * 4 + 198, 1000) == -1 &&
+                      U::channelAt(U::PageId::Desk, 0, 2900, 1000) == -1 && U::channelAt(U::PageId::DeskBig, 6, 30 + 692 * 2 + 300, 900) == 8 &&
+                      U::channelAt(U::PageId::StepEq, 0, 500, 900) == -1;
+    std::printf("  drop target: DESK strip 5 -> channel 5, the gap and the master section -> none, BIG DESK 3rd strip from 7 -> channel 9, other pages -> none: %s\n", drop ? "yes" : "NO");
+    CHECK(drop);
+
+    // moved stems: found by name in the picked folder or below it
+    std::error_code ec;
+    const fs::path root = fs::temp_directory_path() / "hem_relink_test";
+    fs::remove_all(root, ec);
+    fs::create_directories(root / "new place" / "sub", ec);
+    { std::ofstream(root / "new place" / "0_Lead_Vocals.wav") << "x"; std::ofstream(root / "new place" / "sub" / "2_Drums.WAV") << "x"; }
+    const auto found = relinkStems({"C:/old/0_Lead_Vocals.wav", "", "C:/old/2_Drums.wav", "C:/old/9_FX.wav"}, root / "new place");
+    const bool rl = found.size() == 4 && found[0] == root / "new place" / "0_Lead_Vocals.wav" && found[1].empty() &&
+                    found[2] == root / "new place" / "sub" / "2_Drums.WAV" && found[3].empty();
+    std::printf("  relink: found in the folder, found one level down (any letter case), a missing one stays missing: %s\n", rl ? "yes" : "NO");
+    CHECK(rl);
+    fs::remove_all(root, ec);
+
+    // recent list: newest first, no doubles, 10 at most
+    std::vector<fs::path> recent;
+    for (int k = 0; k < 14; ++k) pushRecent(recent, "s/" + std::to_string(k) + ".hemc");
+    pushRecent(recent, "S/5.HEMC");
+    const bool rc = recent.size() == 10 && recent[0] == "S/5.HEMC" && recent[1] == "s/13.hemc" &&
+                    std::count_if(recent.begin(), recent.end(), [](const fs::path& f) { return f.filename() == "5.hemc" || f.filename() == "5.HEMC"; }) == 1;
+    std::printf("  recent sessions: %zu kept, newest first, re-opened one moves to the top once: %s\n", recent.size(), rc ? "yes" : "NO");
+    CHECK(rc);
+
+    // session version: written as the current one; a newer one is refused with a plain reason; a missing stem keeps its wanted path
+    SessionData sd;
+    sd.files[2] = "C:/gone/2_Drums.wav";
+    const std::string text = writeSession(sd, "C:/s/song.hemc");
+    std::vector<int> missing;
+    auto back = readSession(text, "C:/s/song.hemc", &missing);
+    std::string newer = text;
+    newer.replace(newer.find("version=" + std::to_string(kSessionVersion)), 9, "version=99");
+    auto refused = readSession(newer, "C:/s/song.hemc");
+    const bool v = text.find("version=" + std::to_string(kSessionVersion) + "\n") != std::string::npos && back && missing.size() == 1 &&
+                   back->wanted[2].filename() == "2_Drums.wav" && !refused && refused.error().find("newer") != std::string::npos;
+    std::printf("  session version %d written; missing stem keeps its path for relinking; a newer session refused (\"%s\"): %s\n", kSessionVersion,
+                refused ? "" : refused.error().c_str(), v ? "yes" : "NO");
+    CHECK(v);
+}
+
 } // namespace hc::test
+

@@ -199,18 +199,7 @@ int wmain(int argc, wchar_t** argv) {
         screen.renderToCapture();
         hc::ui::writePng(out / "HEM-Console-1-DESK-hover-1389x868.png", screen.capture());
         std::printf("HEM-Console-1-DESK-hover-1389x868.png saved (HF knob of channel 1 under the mouse)\n");
-        // ZOOM 200 %: Ctrl + wheel around channel 1's EQ, then the view moved with the wheel
-        screen.mouseMove(-100, -100, false);
-        const float ax = screen.canvas().toPixelX(300), ay = screen.canvas().toPixelY(900);
-        for (int k = 0; k < 8; ++k) screen.wheel(ax, ay, 1.0f, false, true, false, 0.0f);
-        const float z = screen.zoom();
-        screen.waitForPlate(60);
-        screen.renderToCapture();
-        const bool zok = hc::ui::writePng(out / "HEM-Console-1-DESK-zoom-1389x868.png", screen.capture());
-        std::printf("HEM-Console-1-DESK-zoom-1389x868.png %s (zoom %.0f %%, 1 design unit = %.2f px, smallest text %.0f px)\n", zok ? "saved" : "FAILED",
-                    100.0 * z, static_cast<double>(screen.canvas().scale), static_cast<double>(std::max(U::kMinTextPx, 24.0f * screen.canvas().scale)));
-        if (!zok || z < 2.0f) ++failures;
-        app.zoom = 1.0f;
+        screen.mouseMove(-100, -100, false);   // the hover bubble away
         screen.resize(1920, 1080, &err);
         // the METER page's other two views and two EDIT pages
         screen.setPage(U::PageId::Meter);

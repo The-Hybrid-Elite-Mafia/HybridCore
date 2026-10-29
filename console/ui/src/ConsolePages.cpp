@@ -32,9 +32,6 @@ const OrderNames kOrderN;
 const ParamInfo kRackOrderInfo{"rack_order", "Rack Order", "", 0, ConsoleRig::kOrderCount - 1, 0, Taper::Choice, kOrderN.p.data()};
 const char* const kEqModelN[] = {"STANDARD", "SPECIAL EDITION"};
 const ParamInfo kEqModelInfo{"eq_model", "Step EQ Model", "", 0, 1, 1, Taper::Choice, kEqModelN};
-constexpr float kZoomSteps[] = {1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.5f, 3.0f};
-const char* const kZoomN[] = {"FIT", "125 %", "150 %", "175 %", "200 %", "250 %", "300 %"};
-const ParamInfo kZoomInfo{"zoom", "Zoom", "", 0, 6, 0, Taper::Choice, kZoomN};
 
 // ---- bindings ------------------------------------------------------------------------------------
 Ctl deskCh(ConsoleRig& rig, int ch, int p) {
@@ -59,15 +56,6 @@ Ctl deskBig(ConsoleRig& rig, const AppState& app, int slot, int p) {
     return {&StudioDesk::channelParams()[static_cast<std::size_t>(p)],
             [&rig, &app, slot, p] { return rig.desk().channel(app.bigFirst + slot, p); },
             [&rig, &app, slot, p](float v) { rig.desk().setChannel(app.bigFirst + slot, p, v); }};
-}
-Ctl zoomCtl(AppState& app) {
-    return {&kZoomInfo,
-            [&app] {
-                int best = 0;
-                for (int i = 1; i < 7; ++i) if (std::fabs(kZoomSteps[i] - app.zoom) < std::fabs(kZoomSteps[best] - app.zoom)) best = i;
-                return static_cast<float>(best);
-            },
-            [&app](float v) { app.zoom = kZoomSteps[std::clamp(static_cast<int>(std::lround(v)), 0, 6)]; }};
 }
 Ctl toolType(ToolSlot& slot) {
     return {&kToolTypeInfo, [&slot] { return static_cast<float>(slot.type()); }, [&slot](float v) { slot.setType(static_cast<int>(std::lround(v))); }};
@@ -169,10 +157,7 @@ void topBar(B& b, ConsoleRig& rig, AppState& app, PageId id) {
     (void)id;
     Widget& ord = b.sel({x + 8, 38, 460, 84}, "", rackOrder(rig));
     ord.tip = "Order of the three rack units behind the desk's MAIN INSERT";
-    Widget& zm = b.sel({x + 484, 38, 280, 84}, "", zoomCtl(app));
-    zm.text = [&app] { return app.zoom <= 1.001f ? std::string("ZOOM  FIT") : fmt("ZOOM  %.0f %%", 100.0 * app.zoom); };
-    zm.tip = "ZOOM: everything bigger (also Ctrl + mouse wheel; Ctrl + 0 = fit). Drag the plate or use the wheel to move around";
-    b.readout({x + 780, 38, kWidth - 30 - (x + 780), 84}, [&app] {
+    b.readout({x + 484, 38, kWidth - 30 - (x + 484), 84}, [&app] {
         std::string s = fmt("DSP %.1f %%", 100.0 * app.dspLoad);
         if (!app.status.empty()) s += "  " + app.status;
         return s;
@@ -184,7 +169,7 @@ void bottomBar(B& b, const AppState& app) {
     const float y = 2026, h = 108;
     float x = 30;
     auto next = [&](float w) { const Rect r{x, y, w, h}; x += w + 10; return r; };
-    b.button(next(250), "LOAD STEMS", Act::LoadStems).tip = "Load up to 13 stems (WAV, MP3, FLAC) in name order";
+    b.button(next(250), "LOAD STEMS", Act::LoadStems).tip = "Load up to 13 stems (WAV, MP3, FLAC): Suno stems go to their own channels, others in name order";
     b.button(next(110), "|<", Act::Rewind).tip = "Back to the start";
     Widget& play = b.button(next(170), "PLAY", Act::Play, 0, C::green);
     play.text = [&app] { return std::string(app.playing ? "PAUSE" : "PLAY"); };
@@ -192,21 +177,24 @@ void bottomBar(B& b, const AppState& app) {
     b.button(next(140), "STOP", Act::Stop);
     Widget& loop = b.button(next(140), "LOOP", Act::Loop, 0, C::amber);
     loop.value = [&app] { return app.loop ? 1.0f : 0.0f; };
-    b.readout(next(330), [&app] { return timeText(app.position) + " / " + timeText(app.length); });
-    Widget& seek = b.add([&] { Widget w; w.kind = Kind::Seek; w.r = next(690); w.act = Act::Seek; return w; }());
+    b.readout(next(300), [&app] { return timeText(app.position) + " / " + timeText(app.length); });
+    Widget& seek = b.add([&] { Widget w; w.kind = Kind::Seek; w.r = next(440); w.act = Act::Seek; return w; }());
     seek.value = [&app] { return app.length > 0 ? static_cast<float>(app.position / app.length) : 0.0f; };
     seek.tip = "Song position: click or drag to jump";
     Widget& listen = b.button(next(330), "LISTEN", Act::Listen, 0, C::cyan);
     listen.text = [&app] { static const char* n[] = {"HEAR: MONITOR", "HEAR: CUE 1", "HEAR: CUE 2"}; return std::string(n[std::clamp(app.listen, 0, 2)]); };
     listen.tip = "What your speakers / headset play: the MONITOR section, or a cue mix (the PHONES source)";
-    Widget& ex = b.button(next(220), "EXPORT", Act::Export, 0, C::lime);
+    Widget& ex = b.button(next(210), "EXPORT", Act::Export, 0, C::lime);
     ex.text = [&app] { return app.exportProgress >= 0 ? fmt("%.0f %%", 100.0 * app.exportProgress) : std::string("EXPORT"); };
     ex.tip = "Render the MAIN OUT to a WAV file (offline, the same sound as playback)";
     b.button(next(240), "PRINT STEMS", Act::PrintStems).tip = "Write each channel's DIRECT OUT to its own WAV file";
-    b.button(next(120), "NEW", Act::NewSession);
-    b.button(next(130), "OPEN", Act::OpenSession);
+    b.button(next(120), "NEW", Act::NewSession).tip = "New session (Ctrl+N)";
+    b.button(next(130), "OPEN", Act::OpenSession).tip = "Open a session or audio files (Ctrl+O)";
+    b.button(next(170), "RECENT", Act::Recent).tip = "The last 10 sessions";
     Widget& save = b.button(next(130), "SAVE", Act::SaveSession);
     save.value = [&app] { return app.dirty ? 1.0f : 0.0f; };
+    save.tip = "Save the session (Ctrl+S). Lit = changes not saved yet";
+    b.button(next(190), "SAVE AS", Act::SaveAs).tip = "Save the session under a new name (Ctrl+Shift+S)";
     Widget& reset = b.button(next(170), "RESET", Act::ResetAll, 0, C::red);
     reset.tip = "Every control back to its starting position (press twice; UNDO for 15 s after)";
     reset.text = [&app] { return std::string(app.resetStage == 1 ? "SURE?" : app.resetStage == 2 ? "UNDO" : "RESET"); };
@@ -954,6 +942,23 @@ int meterLibCount() noexcept { return MeterBridge::factoryPresetCount() + kMeter
 const char* meterLibName(int k) noexcept { return libNames().p[static_cast<std::size_t>(std::clamp(k, 0, meterLibCount() - 1))]; }
 bool meterLibIsUser(int k) noexcept { return k >= MeterBridge::factoryPresetCount(); }
 int widgetArg(const Widget& w) { return w.argFn ? w.argFn() : w.kind == Kind::Custom ? w.customArg : w.arg; }
+int channelAt(PageId page, int bigFirst, float x, float y) noexcept {
+    // the strip rectangles of deskPage() and bigDeskPage()
+    if (page == PageId::Desk) {
+        constexpr float kTop = 165, kPitch = 202, kW = 194;
+        if (y < kTop || y > kTop + 1830 || x < 30) return -1;
+        const int ch = static_cast<int>((x - 30) / kPitch);
+        return ch < ConsoleRig::kChannels && x - 30 - kPitch * static_cast<float>(ch) <= kW ? ch : -1;
+    }
+    if (page == PageId::DeskBig) {
+        constexpr float kTop = 262, kPitch = 692, kW = 676;
+        if (y < kTop || y > 2000 || x < 30) return -1;
+        const int s = static_cast<int>((x - 30) / kPitch);
+        return s < kBigChannels && x - 30 - kPitch * static_cast<float>(s) <= kW ? std::clamp(bigFirst, 0, ConsoleRig::kChannels - kBigChannels) + s : -1;
+    }
+    return -1;
+}
+
 int bigDeskFirst(int first, int delta, int jumpTo) noexcept {
     constexpr int kLast = ConsoleRig::kChannels - kBigChannels;
     if (jumpTo >= 0) {

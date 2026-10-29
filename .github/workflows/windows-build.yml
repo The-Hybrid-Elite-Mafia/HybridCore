@@ -152,7 +152,7 @@ jobs:
 
       - name: Build the console app, snapshot tool, tests
         run: |
-          tools\ci\run-and-report.ps1 -Title "console: build" -Exe cmake -ArgList '--build','--preset','rig-asio-release','--target','HEMDigitalConsole','hem_console_snapshot','hc_tests','hc_device_probe' -WarningSummary
+          tools\ci\run-and-report.ps1 -Title "console: build" -Exe cmake -ArgList '--build','--preset','rig-asio-release','--target','HEMDigitalConsole','hem_console_snapshot','hem_console_uitest','hc_tests','hc_device_probe' -WarningSummary
 
       - name: Unit tests (whole suite)
         run: |
@@ -183,6 +183,12 @@ jobs:
           GALLIUM_DRIVER: llvmpipe
         run: |
           tools\ci\run-and-report.ps1 -Title "console: click test" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\run-console-click-test.ps1','-Exe','build\rig-asio\console\app\Release\HEMDigitalConsole.exe','-Report','console-shots\control-check.txt'
+
+      - name: UI automation test (real clicks + keys, Windows dialogs, screen sizes and scales, save / open / crash / moved stems)
+        env:
+          GALLIUM_DRIVER: llvmpipe
+        run: |
+          tools\ci\run-and-report.ps1 -Title "console: UI automation test" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\run-console-uitest.ps1','-Exe','build\rig-asio\console\app\Release\HEMDigitalConsole.exe','-Test','build\rig-asio\console\app\Release\hem_console_uitest.exe','-Out','console-shots'
 
       - name: Publish screenshots to the console-screenshots branch
         if: always()
