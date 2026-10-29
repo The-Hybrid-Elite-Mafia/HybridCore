@@ -99,8 +99,9 @@ public:
     void colorQuad(const float xs[4], const float ys[4], const Rgba cols[4], Blend blend = Blend::Over, bool emissive = false);
     // Connected line through n points, `width` design units wide, one colour.
     void polyline(const float* xs, const float* ys, int n, float width, Rgba c, Blend blend = Blend::Over, bool emissive = false);
+    // maxWidth > 0: text wider than that is narrowed (letters squeezed sideways) to fit it exactly.
     void text(TextStyle style, std::string_view utf8, float x, float baseline, Rgba c, Align align = Align::Left,
-              TextFx fx = TextFx::Plain);
+              TextFx fx = TextFx::Plain, float maxWidth = 0.0f);
     [[nodiscard]] float textWidth(TextStyle style, std::string_view utf8) const;
     // Clip rectangle (design units): everything drawn until popClip() is cut to it (intersected
     // with the clip already in force). Done per pixel in the shader, so the frame stays one batch.

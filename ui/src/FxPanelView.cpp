@@ -110,11 +110,11 @@ void FxPanelView::drawButton(Renderer& r, Rect b, const std::string& text, bool 
         r.glow(b.inset(4 * z), 10 * z, 12.0f * z, colour.withAlpha(0.40f), true);
         r.fillRound(b.inset(2 * z), 10 * z, colour.withAlpha(0.92f), Blend::Over, false);
         r.fillRound({b.x + 8 * z, b.y + 5 * z, b.w - 16 * z, b.h * 0.35f}, 8 * z, {1, 1, 1, 0.16f}, Blend::Add);
-        r.text(bs, text, b.cx(), b.cy() + r.capHeight(bs) * 0.5f, rgb8(0x0A0812), Align::Center, TextFx::Plain);
+        r.text(bs, text, b.cx(), b.cy() + r.capHeight(bs) * 0.5f, rgb8(0x0A0812), Align::Center, TextFx::Plain, b.w - 14 * z);
     } else {
         r.fillRound(b.inset(2 * z), 10 * z, kGlass, Blend::Over);
         r.fillRound({b.x + 2 * z, b.y + 2 * z, b.w - 4 * z, 2 * z}, 1 * z, colour.withAlpha(hot ? 0.8f : 0.35f), Blend::Over, true);
-        r.text(bs, text, b.cx(), b.cy() + r.capHeight(bs) * 0.5f, hot ? kText : kTextDim, Align::Center, TextFx::Shadowed);
+        r.text(bs, text, b.cx(), b.cy() + r.capHeight(bs) * 0.5f, hot ? kText : kTextDim, Align::Center, TextFx::Shadowed, b.w - 14 * z);
     }
 }
 

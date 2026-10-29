@@ -708,12 +708,15 @@ void Renderer::polyline(const float* xs, const float* ys, int n, float width, Rg
 float Renderer::textWidth(TextStyle style, std::string_view s) const { return font_ ? font_->measure(style, s) : 0.0f; }
 float Renderer::capHeight(TextStyle style) const { return font_ ? font_->capHeight(style) : 0.0f; }
 
-void Renderer::text(TextStyle style, std::string_view s, float x, float baseline, Rgba col, Align align, TextFx fx) {
+void Renderer::text(TextStyle style, std::string_view s, float x, float baseline, Rgba col, Align align, TextFx fx, float maxWidth) {
     if (!font_ || !font_->valid() || s.empty()) return;
+    const float natural = font_->measure(style, s);
+    const float sx = (maxWidth > 0.0f && natural > maxWidth) ? maxWidth / natural : 1.0f;
     if (align != Align::Left) {
-        const float w = font_->measure(style, s);
+        const float w = natural * sx;
         x -= (align == Align::Center) ? w * 0.5f : w;
     }
+    const float x0 = x;
     const float onePx = 1.0f / canvas_.scale;
     const float pad   = static_cast<float>(FontAtlas::kBlurRadius) * onePx;
     const float p[2] = {0, 0}, q[4] = {0, 0, 0, 0};
@@ -721,7 +724,8 @@ void Renderer::text(TextStyle style, std::string_view s, float x, float baseline
         float lc[4];
         premul(c, b, lc);
         font_->layout(style, s, x + dx, baseline + dy, padding, [&](const GlyphQuad& g) {
-            rectQuad({px(g.x0), py(g.y0), (g.x1 - g.x0) * canvas_.scale, (g.y1 - g.y0) * canvas_.scale}, g.s0, g.t0, g.s1, g.t1, lc, mode,
+            const float gx0 = x0 + dx + (g.x0 - x0 - dx) * sx, gx1 = x0 + dx + (g.x1 - x0 - dx) * sx;
+            rectQuad({px(gx0), py(g.y0), (gx1 - gx0) * canvas_.scale, (g.y1 - g.y0) * canvas_.scale}, g.s0, g.t0, g.s1, g.t1, lc, mode,
                      kTexParts, p, q, emissive);
         });
     };
