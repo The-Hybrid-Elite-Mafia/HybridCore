@@ -293,8 +293,8 @@ void drawScope(Renderer& r, Rect a, const ViewState& v) {
 
     // ---- axis labels ----
     {
-        const std::array<std::pair<float, const char*>, 8> marks{{{50, "50"}, {100, "100"}, {200, "200"}, {500, "500"}, {1000, "1k"},
-                                                                  {2000, "2k"}, {5000, "5k"}, {10000, "10k"}}};
+        const std::array<std::pair<float, const char*>, 8> marks{{{50.0f, "50"}, {100.0f, "100"}, {200.0f, "200"}, {500.0f, "500"}, {1000.0f, "1k"},
+                                                                  {2000.0f, "2k"}, {5000.0f, "5k"}, {10000.0f, "10k"}}};
         for (const auto& [hz, name] : marks) {
             float sx, sy;
             P(freqX(hz), 0, -0.12f, sx, sy);
@@ -330,7 +330,7 @@ void drawScope(Renderer& r, Rect a, const ViewState& v) {
         const double whole = an ? an->integratedLufs() : Analyzer::kSilentLufs;
         r.text(TextStyle::Sub, "Whole play: " + lufsText(whole) + " LUFS   \xC2\xB7   finished songs: about -14", c.x + 26, c.y + 184, kDim, Align::Left,
                TextFx::Shadowed);
-        const std::array<std::pair<float, Rgba>, 5> zones{{{-20, rgb8(0x2F7DFF)}, {-16, rgb8(0x3FD0FF)}, {-12, kGood}, {-9, kWarn}, {0, rgb8(0xFF7A1A)}}};
+        const std::array<std::pair<float, Rgba>, 5> zones{{{-20.0f, rgb8(0x2F7DFF)}, {-16.0f, rgb8(0x3FD0FF)}, {-12.0f, kGood}, {-9.0f, kWarn}, {0.0f, rgb8(0xFF7A1A)}}};
         hbar(r, {c.x + 26, c.y + 206, c.w - 52, 22}, -36, -6, static_cast<float>(st), static_cast<float>(whole), zones);
         float tx = c.x + 26 + (c.w - 52) * (-14.0f + 36.0f) / 30.0f;
         r.text(TextStyle::Caption, "-14", tx, c.y + 248, kGood.withAlpha(0.9f), Align::Center, TextFx::Shadowed);
@@ -348,7 +348,7 @@ void drawScope(Renderer& r, Rect a, const ViewState& v) {
         const std::string sub = "Highest: " + (most > -100.0f ? fmtNum("%.1f dB", most) : std::string("--")) +
                                 "   \xC2\xB7   clipped: " + std::to_string(an ? an->clippedSamples() : 0);
         r.text(TextStyle::Sub, sub, c.x + c.w - 26, c.y + 44, hot ? kBad : kDim, Align::Right, TextFx::Shadowed);
-        const std::array<std::pair<float, Rgba>, 5> zones{{{-18, kGood}, {-6, rgb8(0x9BE33C)}, {-3, kWarn}, {-1, rgb8(0xFF7A1A)}, {0.5f, kBad}}};
+        const std::array<std::pair<float, Rgba>, 5> zones{{{-18.0f, kGood}, {-6.0f, rgb8(0x9BE33C)}, {-3.0f, kWarn}, {-1.0f, rgb8(0xFF7A1A)}, {0.5f, kBad}}};
         hbar(r, {c.x + 26, c.y + 156, c.w - 52, 20}, -48, 0, an ? an->peakDb() : -120.0f, hold, zones);
         y = c.bottom() + 16;
     }

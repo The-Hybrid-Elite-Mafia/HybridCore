@@ -146,6 +146,12 @@ void testFxPanel() {
     CHECK(ui::formatPanelMeter(note, 69.0f) == "A4" && ui::formatPanelMeter(note, 0.0f) == "--");
     CHECK(ui::formatPanelMeter(cents, -31.3f) == "-31" && std::fabs(ui::panelMeterFraction(cents, -50.0f) + 0.5f) < 1e-6f);
     CHECK(std::fabs(ui::panelMeterFraction(gr, -12.0f) - 0.5f) < 1e-6f);
+    // zero never shows a sign; silence shows "--" on loudness meters
+    const ui::PanelMeter lufs{"I", "LUFS", -36, 0}, tp{"TP", "dBTP", -24, 3}, centred{"S", "dB", -15, 15, true};
+    CHECK(ui::formatPanelMeter(gr, -0.0f) == "0.0" && ui::formatPanelMeter(gr, -0.04f) == "0.0" && ui::formatPanelMeter(gr, -0.06f) == "-0.1");
+    CHECK(ui::formatPanelMeter(centred, 0.0f) == "0.0" && ui::formatPanelMeter(centred, 1.0f) == "+1.0");
+    CHECK(ui::formatPanelMeter(cents, -0.2f) == "0");
+    CHECK(ui::formatPanelMeter(lufs, -120.0f) == "--" && ui::formatPanelMeter(lufs, -14.04f) == "-14.0" && ui::formatPanelMeter(tp, -120.0f) == "--");
 
     // the obsidian plate: right size, opaque, not flat, pockets darker than the slab
     const ui::Image img = ui::renderFxPlate(L, ui::FxPalette{}, 0.5f);

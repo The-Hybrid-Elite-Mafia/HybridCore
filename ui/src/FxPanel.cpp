@@ -452,6 +452,11 @@ namespace {
 std::string fmt(const char* f, double v) {
     char b[48];
     std::snprintf(b, sizeof b, f, v);
+    // a value that rounds to zero is shown without a sign ("0.0", not "-0.0" or "+0.0")
+    bool zero = true;
+    for (const char* c = b; *c != '\0'; ++c)
+        if (*c >= '1' && *c <= '9') { zero = false; break; }
+    if (zero && (b[0] == '-' || b[0] == '+')) return std::string(b + 1);
     return b;
 }
 } // namespace
@@ -472,6 +477,7 @@ std::string formatPanelMeter(const PanelMeter& m, float v) {
     if (u == "cents") return fmt("%+.0f", v);
     if (u == "%" || u == "ms") return fmt("%.0f", v);
     if (u == "dBFS") return v <= -95.0f ? "--" : fmt("%.1f", v);
+    if (u == "LUFS" || u == "dBTP") return v <= -70.0f ? "--" : fmt("%.1f", v);   // nothing measured yet (silence)
     if (m.centred) return fmt("%+.1f", v);
     return fmt("%.1f", v);
 }
