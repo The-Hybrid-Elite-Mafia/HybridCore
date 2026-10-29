@@ -22,10 +22,12 @@ layout(location = 2) in vec2 aLocal;
 layout(location = 3) in vec4 aColor;
 layout(location = 4) in vec4 aP;
 layout(location = 5) in vec4 aQ;
+layout(location = 6) in vec4 aClip;
 uniform vec2 uScale;
 out vec2 vUv; out vec2 vLocal; out vec4 vColor; out vec4 vP; out vec4 vQ;
+out vec2 vPos; flat out vec4 vClip;
 void main() {
-    vUv = aUv; vLocal = aLocal; vColor = aColor; vP = aP; vQ = aQ;
+    vUv = aUv; vLocal = aLocal; vColor = aColor; vP = aP; vQ = aQ; vPos = aPos; vClip = aClip;
     gl_Position = vec4(aPos.x * uScale.x - 1.0, 1.0 - aPos.y * uScale.y, 0.0, 1.0);
 }
 )";
@@ -33,6 +35,7 @@ void main() {
 // Colours are linear and premultiplied; textures are sRGB (decoded to linear by the GPU).
 constexpr const char* kFragmentSrc = R"(#version 330 core
 in vec2 vUv; in vec2 vLocal; in vec4 vColor; in vec4 vP; in vec4 vQ;
+in vec2 vPos; flat in vec4 vClip;
 uniform sampler2D uChassis;
 uniform sampler2D uParts;
 uniform sampler2D uStatic;
@@ -45,6 +48,7 @@ float sdRoundRect(vec2 p, vec2 hs, float r) {
     return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
 }
 void main() {
+    if (vPos.x < vClip.x || vPos.y < vClip.y || vPos.x >= vClip.z || vPos.y >= vClip.w) discard;   // clip rectangle
     int mode = int(vP.x + 0.5);
     int tex  = int(vP.y + 0.5);
     vec2 gx = dFdx(vUv), gy = dFdy(vUv);
@@ -222,7 +226,8 @@ bool Renderer::init(int wantSamples, std::string* error) {
     glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<const void*>(offsetof(Vertex, r)));
     glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<const void*>(offsetof(Vertex, mode)));
     glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<const void*>(offsetof(Vertex, q0)));
-    for (GLuint i = 0; i < 6; ++i) glEnableVertexAttribArray(i);
+    glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<const void*>(offsetof(Vertex, c0)));
+    for (GLuint i = 0; i < 7; ++i) glEnableVertexAttribArray(i);
     verts_.reserve(6 * 8192);
     bloomVerts_.reserve(6 * 2048);
     const GLenum err = ::glGetError();
@@ -397,6 +402,8 @@ void Renderer::beginPass(const Canvas& canvas) {
     canvas_ = canvas;
     verts_.clear();
     bloomVerts_.clear();
+    clip_ = {-1e9f, -1e9f, 2e9f, 2e9f};
+    clipStack_.clear();
     glBindFramebuffer(kFramebuffer, msaa_.fbo);
     ::glViewport(0, 0, fbW_, fbH_);
     ::glDisable(GL_SCISSOR_TEST);
@@ -540,12 +547,33 @@ void Renderer::quad(const float xs[4], const float ys[4], const float us[4], con
     auto v = [&](int i) {
         return Vertex{xs[i], ys[i], us[i], vs[i], lx[i], ly[i], c[0], c[1], c[2], c[3], mode, tex, p[0], p[1], q[0], q[1], q[2], q[3]};
     };
-    const Vertex a = v(0), b = v(1), cc = v(2), d = v(3);   // TL TR BR BL
+    Vertex a = v(0), b = v(1), cc = v(2), d = v(3);   // TL TR BR BL
+    for (Vertex* vx : {&a, &b, &cc, &d}) applyClip(*vx);
     if (!bloomOnly_) {
         for (const Vertex* vx : {&a, &b, &cc, &a, &cc, &d}) verts_.push_back(*vx);
         ++stats_.quads;
     }
     if (emissive) for (const Vertex* vx : {&a, &b, &cc, &a, &cc, &d}) bloomVerts_.push_back(*vx);
+}
+
+void Renderer::applyClip(Vertex& v) const noexcept {
+    v.c0 = clip_.x;
+    v.c1 = clip_.y;
+    v.c2 = clip_.x + clip_.w;
+    v.c3 = clip_.y + clip_.h;
+}
+
+void Renderer::pushClip(Rect r) {
+    clipStack_.push_back(clip_);
+    const float x0 = std::max(clip_.x, px(r.x)), y0 = std::max(clip_.y, py(r.y));
+    const float x1 = std::min(clip_.x + clip_.w, px(r.right())), y1 = std::min(clip_.y + clip_.h, py(r.bottom()));
+    clip_ = {x0, y0, std::max(0.0f, x1 - x0), std::max(0.0f, y1 - y0)};
+}
+
+void Renderer::popClip() {
+    if (clipStack_.empty()) return;
+    clip_ = clipStack_.back();
+    clipStack_.pop_back();
 }
 
 void Renderer::rectQuad(Rect r, float u0, float v0, float u1, float v1, const float c[4], float mode, float tex,
@@ -653,6 +681,7 @@ void Renderer::colorQuad(const float xs[4], const float ys[4], const Rgba cols[4
         float c[4];
         premul(cols[i], blend, c);
         v[i] = Vertex{px(xs[i]), py(ys[i]), 0, 0, 0, 0, c[0], c[1], c[2], c[3], kModeFlat, kTexParts, 0, 0, 0, 0, 0, 0};
+        applyClip(v[i]);
     }
     if (!bloomOnly_) {
         for (int i : {0, 1, 2, 0, 2, 3}) verts_.push_back(v[i]);

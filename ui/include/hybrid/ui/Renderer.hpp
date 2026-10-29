@@ -102,6 +102,10 @@ public:
     void text(TextStyle style, std::string_view utf8, float x, float baseline, Rgba c, Align align = Align::Left,
               TextFx fx = TextFx::Plain);
     [[nodiscard]] float textWidth(TextStyle style, std::string_view utf8) const;
+    // Clip rectangle (design units): everything drawn until popClip() is cut to it (intersected
+    // with the clip already in force). Done per pixel in the shader, so the frame stays one batch.
+    void pushClip(Rect r);
+    void popClip();
     [[nodiscard]] float capHeight(TextStyle style) const;
 
     [[nodiscard]] const RenderStats& stats() const noexcept { return stats_; }
@@ -124,6 +128,7 @@ private:
         float r, g, b, a;      // linear premultiplied
         float mode, tex, p0, p1;
         float q0, q1, q2, q3;
+        float c0 = -1e9f, c1 = -1e9f, c2 = 1e9f, c3 = 1e9f;   // clip rectangle, framebuffer pixels
     };
     struct Target {
         unsigned int fbo = 0, tex = 0, rb = 0;
@@ -135,6 +140,7 @@ private:
     void rectQuad(Rect px, float u0, float v0, float u1, float v1, const float color[4], float mode, float tex,
                   const float p[2], const float q[4], bool emissive, float halfW = 0, float halfH = 0);
     void premul(Rgba c, Blend b, float out[4]) const;
+    void applyClip(Vertex& v) const noexcept;
     void spriteUv(Sprite s, float fx0, float fy0, float fx1, float fy1, float& u0, float& v0, float& u1, float& v1) const;
     void flushTo(std::vector<Vertex>& verts);
     void beginPass(const Canvas& canvas);
@@ -159,6 +165,8 @@ private:
     const FontAtlas* font_ = nullptr;
     bool           inStatic_ = false;
     bool           bloomOnly_ = false;
+    Rect           clip_{-1e9f, -1e9f, 2e9f, 2e9f};
+    std::vector<Rect> clipStack_;
     std::string    version_, rendererName_;
 };
 

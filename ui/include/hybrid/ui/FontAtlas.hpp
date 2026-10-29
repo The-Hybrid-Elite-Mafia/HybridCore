@@ -33,8 +33,13 @@ enum class TextStyle : std::uint8_t {
     Status,       // bottom bar
     Display,      // big neon digits in the glass display
     DisplayCap,   // captions in the glass display
+    Micro,        // smallest readable print (table cells, hints)
+    Small,        // small labels
+    SmallBold,    // small headings, buttons in dense rows
+    Body,         // running text
+    BodyBold,     // emphasised running text
 };
-inline constexpr std::size_t kTextStyleCount = 12;
+inline constexpr std::size_t kTextStyleCount = 17;
 
 struct TextStyleSpec {
     Face  face;
@@ -54,6 +59,11 @@ inline constexpr std::array<TextStyleSpec, kTextStyleCount> kTextStyles{{
     {Face::Medium, 32.0f, true},      // Status
     {Face::Bold, 96.0f, false},       // Display
     {Face::SemiBold, 26.0f, false},   // DisplayCap
+    {Face::Medium, 18.0f, true},      // Micro
+    {Face::SemiBold, 20.0f, true},    // Small
+    {Face::Bold, 22.0f, true},        // SmallBold
+    {Face::Medium, 24.0f, true},      // Body
+    {Face::Bold, 26.0f, true},        // BodyBold
 }};
 
 struct FontSet {
