@@ -626,12 +626,12 @@ int wmain(int argc, wchar_t** argv) {
                 ::ShowWindow(app.hwnd, SW_RESTORE);
                 ::SetWindowPos(app.hwnd, nullptr, 20, 20, 300, 200, SWP_NOZORDER);
                 std::this_thread::sleep_for(1500ms);
-                Report small;
-                if (app.report(small)) {
-                    const long cw = small.client.right - small.client.left, ch = small.client.bottom - small.client.top;
-                    const int dpi = std::atoi(small.get("dpi").c_str());
+                Report tiny;
+                if (app.report(tiny)) {
+                    const long cw = tiny.client.right - tiny.client.left, ch = tiny.client.bottom - tiny.client.top;
+                    const int dpi = std::atoi(tiny.get("dpi").c_str());
                     check(cw >= 800 * dpi / 96 - 2 && ch >= 450 * dpi / 96 - 2, tag + ": smallest window " + std::to_string(cw) + "x" + std::to_string(ch) + " px (asked 300x200; minimum 800x450 at 100%)");
-                    checkOnScreen(app, small, tag + " (smallest window)");
+                    checkOnScreen(app, tiny, tag + " (smallest window)");
                     screenshot(out / ("uitest-" + std::to_string(res.w) + "x" + std::to_string(res.h) + "-" + std::to_string(scale) + "pct-small.png"));
                 }
                 ++fitRuns;

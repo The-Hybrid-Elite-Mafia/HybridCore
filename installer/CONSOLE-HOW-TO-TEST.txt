@@ -7,8 +7,12 @@ HEM DIGITAL CONSOLE - HOW TO TEST
    (your speakers, the soundbar on HDMI, your headset). If an output can't play, it says so - click DEVICE again.
 
 2. LOAD YOUR STEMS
-   Click LOAD STEMS (bottom left) and pick up to 13 files (WAV, MP3, FLAC). They go onto channels 1 to 13
-   in name order. You can also drag files from a folder onto the window.
+   Click LOAD STEMS (bottom left) or OPEN and pick the stem files (WAV, MP3, FLAC) - or drag them onto the desk.
+   Suno stems go to their own channels: Vocals 1, Backing Vocals 2, Drums 3, Percussion 4, Bass 5, Guitar 6,
+   Keyboard 7, Synth 8, Strings 9, Brass 10, Woodwinds 11, FX 12. Other names fill the free channels in name order.
+   The whole-song file Suno puts in the folder ("0 <song>.wav") or a master goes to EXT 1 (a reference: press
+   MONITOR SOURCE EXT 1 to hear it; it is not in the mix). More than 13 files: it tells you which were left out.
+   Drop ONE file onto a channel strip to load just that channel.
    Click a channel's name strip (bottom of the channel) to load one file into just that channel.
    Right-click a name strip to empty it.
 
@@ -38,11 +42,9 @@ HEM DIGITAL CONSOLE - HOW TO TEST
    The STEP EQ, TWIN BUS and COLOUR STAGE sit on the desk's MAIN INSERT. Light MAIN INSERT (desk, right side)
    to hear them. RACK at the top picks their order. RACK IN (desk) or RACK IN on each page takes a unit out.
 
-5b. ZOOM (everything bigger)
-   ZOOM at the top: FIT, 125 % ... 300 %. Or hold CTRL and turn the mouse wheel (zooms where the mouse is);
-   CTRL + plus / minus, CTRL + 0 = fit. While zoomed in: drag the bare plate, or use the mouse wheel away from the
-   controls (SHIFT + wheel = sideways), or hold the middle mouse button and drag. The zoom is remembered.
-   The console always opens maximized.
+5b. SCREEN
+   The whole console always fits the window - no scrolling, every button on screen. Want it bigger? The BIG DESK tab.
+   The window opens where you left it (size, place, maximized). F11 = full screen, ESC leaves it.
 
 6. KNOBS
    Drag up / down. Hold SHIFT or CTRL for fine moves. Mouse wheel works too (SHIFT + wheel = fine).
@@ -50,7 +52,12 @@ HEM DIGITAL CONSOLE - HOW TO TEST
    Hover any control to see its name and value.
 
 7. SAVE, OPEN, EXPORT
-   SAVE / OPEN keep a session (.hemc): your stems and every control. NEW starts clean.
+   SAVE (Ctrl+S): the first time it asks for a name (starts in Downloads); after that it saves in place and the "*"
+   in the title bar goes away. SAVE AS (Ctrl+Shift+S): a new name. OPEN (Ctrl+O): a session, or audio files as stems.
+   RECENT: your last 10 sessions. NEW (Ctrl+N) starts clean. Before NEW, OPEN or closing with unsaved changes it asks
+   "Save changes?". Saving is safe (written beside the old file, then swapped in). A recovery copy is kept every
+   3 minutes; if the console ever closes by surprise, the next start offers it. Stems moved to another folder:
+   it asks where they are and finds them by name.
    EXPORT writes the MAIN OUT to a WAV (24-bit, 48 kHz), offline, with the same sound as playback.
    PRINT STEMS writes each channel's direct out to its own WAV (D.POST on a channel = after its fader).
    When you close the console, everything is kept and comes back the next time you open it.

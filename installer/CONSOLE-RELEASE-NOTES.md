@@ -11,11 +11,26 @@ Sound: ASIO (any ASIO driver on your PC) or Windows WASAPI as the fallback. ASIO
 under its GPLv3 option; the HEM Digital Console is free software under the GPLv3 (LICENSE.txt), and the full
 source code of this build is attached below (HEMDigitalConsole-<version>-source.zip).
 
-New in 0.3.0: the METER page has the reference meter's own controls from its manual: RUN / PAUSE, RESET, the
+New in 0.4.0 (screen fit, OPEN, SAVE, stems):
+- The whole console always fits the window: no scrolling, every button on screen, at any window size and Windows
+  scale (Per-Monitor DPI aware). ZOOM is gone (it pushed SAVE off the screen); BIG DESK is the way to see it big.
+  The window opens where you left it (size, place, maximized).
+- OPEN opens sessions or audio files ("Sessions + Audio", "Sessions", "Audio (WAV, MP3, FLAC)"), starting in
+  Downloads or the last folder. RECENT lists the last 10 sessions. SAVE AS and Ctrl+Shift+S are new.
+- Stems go to fixed channels by their Suno names (Vocals 1, Backing Vocals 2, Drums 3, Percussion 4, Bass 5,
+  Guitar 6, Keyboard 7, Synth 8, Strings 9, Brass 10, Woodwinds 11, FX 12), whatever the spelling ("0 Lead Vocals",
+  "9 Backing_Vocals", "Song (Vocals)"); others in name order. The whole-song file Suno adds (or a master) goes to
+  EXT 1 as a reference, not into the mix. More than 13: the console tells you which files were left out.
+  Dropping one file on a channel strip loads only that channel.
+- Saving is safe: the file is written beside the old one, flushed, then swapped in. A recovery copy is kept every
+  3 minutes and offered if the console ever closes by surprise. "Save changes?" before NEW, OPEN and closing.
+  Moved stems: the console asks where they are and finds them by name.
+
+In 0.3.0: the METER page has the reference meter's own controls from its manual: RUN / PAUSE, RESET, the
 RADAR / RTA / SCOPE views, AUTO, PEAK and LOUD lamps, the whole EDIT menu (radar, RTA, scope, general: layouts,
 units, downmix, alerts, peak-meter scales), a preset LIBRARY (factory + 8 of your own) and FOLLOW PLAY / RESET ON PLAY.
 
-In 0.2.0: ZOOM (top bar, or CTRL + mouse wheel; remembered), the BIG DESK page (5 channels at a time, bigger
+In 0.2.0: ZOOM (removed in 0.4.0), the BIG DESK page (5 channels at a time, bigger
 knobs, move across all 13), F11 full screen, text never drawn smaller than 13 screen pixels (except words that
 cannot fit a control at all on a small window - the BIG DESK page or ZOOM shows them big), ASIO, and the STEP EQ
 SPECIAL EDITION model (MODEL on the STEP EQ page; it is the default): 8 frequencies per band (20 Hz LO, 40 kHz HI),

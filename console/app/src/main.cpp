@@ -816,7 +816,9 @@ std::string placementText(HWND h) {
 bool applyPlacement(HWND h, const std::string& s) {
     long l = 0, t = 0, r = 0, b = 0;
     unsigned maxed = 0;
-    if (std::sscanf(s.c_str(), "%ld,%ld,%ld,%ld,%u", &l, &t, &r, &b, &maxed) != 5 || r - l < 200 || b - t < 150) return false;
+    std::istringstream in(s);
+    char c1 = 0, c2 = 0, c3 = 0, c4 = 0;
+    if (!(in >> l >> c1 >> t >> c2 >> r >> c3 >> b >> c4 >> maxed) || c1 != ',' || c4 != ',' || r - l < 200 || b - t < 150) return false;
     RECT rc{l, t, r, b};
     if (!::MonitorFromRect(&rc, MONITOR_DEFAULTTONULL)) return false;   // that monitor is gone
     WINDOWPLACEMENT wp{};
@@ -1230,7 +1232,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             std::istringstream in(arg);
             std::string part;
             std::getline(in, part, '|');
-            std::sscanf(part.c_str(), "%f %f", &e.x, &e.y);
+            std::istringstream xy(part);
+            xy >> e.x >> e.y;
             while (std::getline(in, part, '|')) if (!part.empty()) e.files.push_back(fromU8(part));
             dropFiles(e);
         }
