@@ -421,6 +421,31 @@ bool screenshot(const fs::path& file) {
     return hc::ui::writePng(file, img);
 }
 
+// No dialog of the app may be open before a step starts. One still there (from an earlier step) is named in the report
+// and closed, so the next step can't mistake it for its own.
+void waitNoDialog(App& app, const std::string& where) {
+    if (waitFor([&] { return app.findDialog() == nullptr; }, 8s)) return;
+    HWND d = app.findDialog();
+    wchar_t t[256] = {};
+    ::GetWindowTextW(d, t, 256);
+    log("  NOTE before " + where + ": a dialog was still open: \"" + narrow(t) + "\" - " + narrow(dialogText(d).substr(0, 300)) + " (closed)");
+    ::PostMessageW(d, WM_CLOSE, 0, 0);
+    waitFor([&] { return app.findDialog() == nullptr; }, 5s);
+}
+// When the app stops answering: what it shows (an error box?) goes in the report.
+void whyNoAnswer(App& app, const std::string& tag) {
+    HWND d = app.findDialog();
+    if (d) {
+        wchar_t t[256] = {};
+        ::GetWindowTextW(d, t, 256);
+        log("     the app shows a dialog: \"" + narrow(t) + "\": " + narrow(dialogText(d).substr(0, 400)));
+    } else {
+        log(std::string("     no dialog; app ") + (app.running() ? "running but not answering" : "not running"));
+    }
+    screenshot(gOut / ("uitest-noanswer-" + std::to_string(++app.n) + ".png"));
+    (void)tag;
+}
+
 // Resolution of the main screen (ChangeDisplaySettingsEx: the real Windows setting, for this session).
 bool setResolution(int w, int h) {
     DEVMODEW dm{};
@@ -608,6 +633,7 @@ int wmain(int argc, wchar_t** argv) {
             Report r;
             const bool rep = app.report(r);
             const std::string tag = std::to_string(res.w) + "x" + std::to_string(res.h) + " at " + std::to_string(scale) + "%";
+            if (!rep) whyNoAnswer(app, tag);
             if (check(rep, tag + ": app answered")) {
                 log("     " + clientText(r));
                 check(r.get("maximized") == "1", tag + ": opens maximized the first time");
@@ -637,7 +663,7 @@ int wmain(int argc, wchar_t** argv) {
                 ++fitRuns;
             }
             ::PostMessageW(app.hwnd, WM_CLOSE, 0, 0);
-            if (!app.waitExit(20s)) { check(false, tag + ": closed"); app.kill(); }
+            if (!app.waitExit(20s)) { check(false, tag + ": closed"); whyNoAnswer(app, tag); app.kill(); }
             app.close();
         }
         setScale(100, nullptr);
@@ -715,6 +741,7 @@ int wmain(int argc, wchar_t** argv) {
     // =========================================================================================================
     log("\n[4] SAVE (Ctrl+S on the keyboard): first save asks for a name");
     const fs::path sessionFile = work / "Reading the Same Letter.hemc";
+    waitNoDialog(app, "SAVE");
     bringToFront(app.hwnd);
     chord({VK_CONTROL, 'S'});
     check(fileDialogPick(app, L"", {sessionFile.wstring()}, &dlgTitle), "save dialog (\"" + narrow(dlgTitle) + "\"), name typed, Save pressed");
