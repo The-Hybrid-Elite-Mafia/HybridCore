@@ -1,0 +1,977 @@
+HEM Digital Console 0.4.0 - control check (real window messages)
+window 1024 x 705 pixels, zoom 1.00, 1 design unit = 0.267 px
+
+OK   DESK      -                          selector      TOOL behind this channel's INSERT switch                               click steps
+OK   DESK      -                          button        Open this channel's tool on the TOOLS page                             click sends its action
+OK   DESK      -                          knob          Trim                                                                   drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        Mono                                                                   click toggles
+OK   DESK      -                          switch        Polarity (Ø)                                                          click toggles
+OK   DESK      -                          switch        HPF 75 Hz                                                              click toggles
+OK   DESK      -                          knob          St Cue 1 Level                                                         drag OFF -> moved, wheel moved
+OK   DESK      -                          knob          St Cue 1 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        St Cue 1 On                                                            click toggles
+OK   DESK      -                          switch        St Cue 1 Post                                                          click toggles
+OK   DESK      -                          knob          St Cue 2 Level                                                         drag OFF -> moved, wheel moved
+OK   DESK      -                          knob          St Cue 2 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        St Cue 2 On                                                            click toggles
+OK   DESK      -                          switch        St Cue 2 Post                                                          click toggles
+OK   DESK      -                          knob          HF                                                                     drag +6.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        HF Bell                                                                click toggles
+OK   DESK      -                          knob          MF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        EQ In                                                                  click toggles
+OK   DESK      -                          knob          LF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        LF Bell                                                                click toggles
+OK   DESK      -                          knob          Comp Threshold                                                         drag 10.00 dBu -> moved, wheel moved
+OK   DESK      -                          switch        Comp In                                                                click toggles
+OK   DESK      -                          knob          Pan / Balance                                                          drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        INSERT: run this channel's TOOL                                        click toggles
+OK   DESK      -                          switch        Direct out (PRINT STEMS) after the fader                               click toggles
+OK   DESK      -                          switch        MUTE / BUS B: off the main mix, onto Bus B                             click toggles
+OK   DESK      -                          switch        PFL                                                                    click toggles
+OK   DESK      -                          fader         Fader                                                                  click on the slot, wheel moved
+OK   DESK      -                          name strip    Click: load a file into this channel. Right-click: empty it            click sends its action
+OK   DESK      -                          selector      TOOL behind this channel's INSERT switch                               click steps
+OK   DESK      -                          button        Open this channel's tool on the TOOLS page                             click sends its action
+OK   DESK      -                          knob          Trim                                                                   drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        Mono                                                                   click toggles
+OK   DESK      -                          switch        Polarity (Ø)                                                          click toggles
+OK   DESK      -                          switch        HPF 75 Hz                                                              click toggles
+OK   DESK      -                          knob          St Cue 1 Level                                                         drag OFF -> moved, wheel moved
+OK   DESK      -                          knob          St Cue 1 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        St Cue 1 On                                                            click toggles
+OK   DESK      -                          switch        St Cue 1 Post                                                          click toggles
+OK   DESK      -                          knob          St Cue 2 Level                                                         drag OFF -> moved, wheel moved
+OK   DESK      -                          knob          St Cue 2 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        St Cue 2 On                                                            click toggles
+OK   DESK      -                          switch        St Cue 2 Post                                                          click toggles
+OK   DESK      -                          knob          HF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        HF Bell                                                                click toggles
+OK   DESK      -                          knob          MF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        EQ In                                                                  click toggles
+OK   DESK      -                          knob          LF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        LF Bell                                                                click toggles
+OK   DESK      -                          knob          Comp Threshold                                                         drag 10.00 dBu -> moved, wheel moved
+OK   DESK      -                          switch        Comp In                                                                click toggles
+OK   DESK      -                          knob          Pan / Balance                                                          drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        INSERT: run this channel's TOOL                                        click toggles
+OK   DESK      -                          switch        Direct out (PRINT STEMS) after the fader                               click toggles
+OK   DESK      -                          switch        MUTE / BUS B: off the main mix, onto Bus B                             click toggles
+OK   DESK      -                          switch        PFL                                                                    click toggles
+OK   DESK      -                          fader         Fader                                                                  click on the slot, wheel moved
+OK   DESK      -                          name strip    Click: load a file into this channel. Right-click: empty it            click sends its action
+OK   DESK      -                          selector      TOOL behind this channel's INSERT switch                               click steps
+OK   DESK      -                          button        Open this channel's tool on the TOOLS page                             click sends its action
+OK   DESK      -                          knob          Trim                                                                   drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        Mono                                                                   click toggles
+OK   DESK      -                          switch        Polarity (Ø)                                                          click toggles
+OK   DESK      -                          switch        HPF 75 Hz                                                              click toggles
+OK   DESK      -                          knob          St Cue 1 Level                                                         drag OFF -> moved, wheel moved
+OK   DESK      -                          knob          St Cue 1 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        St Cue 1 On                                                            click toggles
+OK   DESK      -                          switch        St Cue 1 Post                                                          click toggles
+OK   DESK      -                          knob          St Cue 2 Level                                                         drag OFF -> moved, wheel moved
+OK   DESK      -                          knob          St Cue 2 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        St Cue 2 On                                                            click toggles
+OK   DESK      -                          switch        St Cue 2 Post                                                          click toggles
+OK   DESK      -                          knob          HF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        HF Bell                                                                click toggles
+OK   DESK      -                          knob          MF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        EQ In                                                                  click toggles
+OK   DESK      -                          knob          LF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        LF Bell                                                                click toggles
+OK   DESK      -                          knob          Comp Threshold                                                         drag 10.00 dBu -> moved, wheel moved
+OK   DESK      -                          switch        Comp In                                                                click toggles
+OK   DESK      -                          knob          Pan / Balance                                                          drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        INSERT: run this channel's TOOL                                        click toggles
+OK   DESK      -                          switch        Direct out (PRINT STEMS) after the fader                               click toggles
+OK   DESK      -                          switch        MUTE / BUS B: off the main mix, onto Bus B                             click toggles
+OK   DESK      -                          switch        PFL                                                                    click toggles
+OK   DESK      -                          fader         Fader                                                                  click on the slot, wheel moved
+OK   DESK      -                          name strip    Click: load a file into this channel. Right-click: empty it            click sends its action
+OK   DESK      -                          selector      TOOL behind this channel's INSERT switch                               click steps
+OK   DESK      -                          button        Open this channel's tool on the TOOLS page                             click sends its action
+OK   DESK      -                          knob          Trim                                                                   drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        Mono                                                                   click toggles
+OK   DESK      -                          switch        Polarity (Ø)                                                          click toggles
+OK   DESK      -                          switch        HPF 75 Hz                                                              click toggles
+OK   DESK      -                          knob          St Cue 1 Level                                                         drag OFF -> moved, wheel moved
+OK   DESK      -                          knob          St Cue 1 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        St Cue 1 On                                                            click toggles
+OK   DESK      -                          switch        St Cue 1 Post                                                          click toggles
+OK   DESK      -                          knob          St Cue 2 Level                                                         drag OFF -> moved, wheel moved
+OK   DESK      -                          knob          St Cue 2 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        St Cue 2 On                                                            click toggles
+OK   DESK      -                          switch        St Cue 2 Post                                                          click toggles
+OK   DESK      -                          knob          HF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        HF Bell                                                                click toggles
+OK   DESK      -                          knob          MF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        EQ In                                                                  click toggles
+OK   DESK      -                          knob          LF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        LF Bell                                                                click toggles
+OK   DESK      -                          knob          Comp Threshold                                                         drag 10.00 dBu -> moved, wheel moved
+OK   DESK      -                          switch        Comp In                                                                click toggles
+OK   DESK      -                          knob          Pan / Balance                                                          drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        INSERT: run this channel's TOOL                                        click toggles
+OK   DESK      -                          switch        Direct out (PRINT STEMS) after the fader                               click toggles
+OK   DESK      -                          switch        MUTE / BUS B: off the main mix, onto Bus B                             click toggles
+OK   DESK      -                          switch        PFL                                                                    click toggles
+OK   DESK      -                          fader         Fader                                                                  click on the slot, wheel moved
+OK   DESK      -                          name strip    Click: load a file into this channel. Right-click: empty it            click sends its action
+OK   DESK      -                          selector      TOOL behind this channel's INSERT switch                               click steps
+OK   DESK      -                          button        Open this channel's tool on the TOOLS page                             click sends its action
+OK   DESK      -                          knob          Trim                                                                   drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        Mono                                                                   click toggles
+OK   DESK      -                          switch        Polarity (Ø)                                                          click toggles
+OK   DESK      -                          switch        HPF 75 Hz                                                              click toggles
+OK   DESK      -                          knob          St Cue 1 Level                                                         drag OFF -> moved, wheel moved
+OK   DESK      -                          knob          St Cue 1 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        St Cue 1 On                                                            click toggles
+OK   DESK      -                          switch        St Cue 1 Post                                                          click toggles
+OK   DESK      -                          knob          St Cue 2 Level                                                         drag OFF -> moved, wheel moved
+OK   DESK      -                          knob          St Cue 2 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        St Cue 2 On                                                            click toggles
+OK   DESK      -                          switch        St Cue 2 Post                                                          click toggles
+OK   DESK      -                          knob          HF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        HF Bell                                                                click toggles
+OK   DESK      -                          knob          MF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        EQ In                                                                  click toggles
+OK   DESK      -                          knob          LF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        LF Bell                                                                click toggles
+OK   DESK      -                          knob          Comp Threshold                                                         drag 10.00 dBu -> moved, wheel moved
+OK   DESK      -                          switch        Comp In                                                                click toggles
+OK   DESK      -                          knob          Pan / Balance                                                          drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        INSERT: run this channel's TOOL                                        click toggles
+OK   DESK      -                          switch        Direct out (PRINT STEMS) after the fader                               click toggles
+OK   DESK      -                          switch        MUTE / BUS B: off the main mix, onto Bus B                             click toggles
+OK   DESK      -                          switch        PFL                                                                    click toggles
+OK   DESK      -                          fader         Fader                                                                  click on the slot, wheel moved
+OK   DESK      -                          name strip    Click: load a file into this channel. Right-click: empty it            click sends its action
+OK   DESK      -                          selector      TOOL behind this channel's INSERT switch                               click steps
+OK   DESK      -                          button        Open this channel's tool on the TOOLS page                             click sends its action
+OK   DESK      -                          knob          Trim                                                                   drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        Mono                                                                   click toggles
+OK   DESK      -                          switch        Polarity (Ø)                                                          click toggles
+OK   DESK      -                          switch        HPF 75 Hz                                                              click toggles
+OK   DESK      -                          knob          St Cue 1 Level                                                         drag OFF -> moved, wheel moved
+OK   DESK      -                          knob          St Cue 1 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        St Cue 1 On                                                            click toggles
+OK   DESK      -                          switch        St Cue 1 Post                                                          click toggles
+OK   DESK      -                          knob          St Cue 2 Level                                                         drag OFF -> moved, wheel moved
+OK   DESK      -                          knob          St Cue 2 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        St Cue 2 On                                                            click toggles
+OK   DESK      -                          switch        St Cue 2 Post                                                          click toggles
+OK   DESK      -                          knob          HF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        HF Bell                                                                click toggles
+OK   DESK      -                          knob          MF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        EQ In                                                                  click toggles
+OK   DESK      -                          knob          LF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        LF Bell                                                                click toggles
+OK   DESK      -                          knob          Comp Threshold                                                         drag 10.00 dBu -> moved, wheel moved
+OK   DESK      -                          switch        Comp In                                                                click toggles
+OK   DESK      -                          knob          Pan / Balance                                                          drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        INSERT: run this channel's TOOL                                        click toggles
+OK   DESK      -                          switch        Direct out (PRINT STEMS) after the fader                               click toggles
+OK   DESK      -                          switch        MUTE / BUS B: off the main mix, onto Bus B                             click toggles
+OK   DESK      -                          switch        PFL                                                                    click toggles
+OK   DESK      -                          fader         Fader                                                                  click on the slot, wheel moved
+OK   DESK      -                          name strip    Click: load a file into this channel. Right-click: empty it            click sends its action
+OK   DESK      -                          selector      TOOL behind this channel's INSERT switch                               click steps
+OK   DESK      -                          button        Open this channel's tool on the TOOLS page                             click sends its action
+OK   DESK      -                          knob          Trim                                                                   drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        Mono                                                                   click toggles
+OK   DESK      -                          switch        Polarity (Ø)                                                          click toggles
+OK   DESK      -                          switch        HPF 75 Hz                                                              click toggles
+OK   DESK      -                          knob          St Cue 1 Level                                                         drag OFF -> moved, wheel moved
+OK   DESK      -                          knob          St Cue 1 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        St Cue 1 On                                                            click toggles
+OK   DESK      -                          switch        St Cue 1 Post                                                          click toggles
+OK   DESK      -                          knob          St Cue 2 Level                                                         drag OFF -> moved, wheel moved
+OK   DESK      -                          knob          St Cue 2 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        St Cue 2 On                                                            click toggles
+OK   DESK      -                          switch        St Cue 2 Post                                                          click toggles
+OK   DESK      -                          knob          HF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        HF Bell                                                                click toggles
+OK   DESK      -                          knob          MF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        EQ In                                                                  click toggles
+OK   DESK      -                          knob          LF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        LF Bell                                                                click toggles
+OK   DESK      -                          knob          Comp Threshold                                                         drag 10.00 dBu -> moved, wheel moved
+OK   DESK      -                          switch        Comp In                                                                click toggles
+OK   DESK      -                          knob          Pan / Balance                                                          drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        INSERT: run this channel's TOOL                                        click toggles
+OK   DESK      -                          switch        Direct out (PRINT STEMS) after the fader                               click toggles
+OK   DESK      -                          switch        MUTE / BUS B: off the main mix, onto Bus B                             click toggles
+OK   DESK      -                          switch        PFL                                                                    click toggles
+OK   DESK      -                          fader         Fader                                                                  click on the slot, wheel moved
+OK   DESK      -                          name strip    Click: load a file into this channel. Right-click: empty it            click sends its action
+OK   DESK      -                          selector      TOOL behind this channel's INSERT switch                               click steps
+OK   DESK      -                          button        Open this channel's tool on the TOOLS page                             click sends its action
+OK   DESK      -                          knob          Trim                                                                   drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        Mono                                                                   click toggles
+OK   DESK      -                          switch        Polarity (Ø)                                                          click toggles
+OK   DESK      -                          switch        HPF 75 Hz                                                              click toggles
+OK   DESK      -                          knob          St Cue 1 Level                                                         drag OFF -> moved, wheel moved
+OK   DESK      -                          knob          St Cue 1 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        St Cue 1 On                                                            click toggles
+OK   DESK      -                          switch        St Cue 1 Post                                                          click toggles
+OK   DESK      -                          knob          St Cue 2 Level                                                         drag OFF -> moved, wheel moved
+OK   DESK      -                          knob          St Cue 2 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        St Cue 2 On                                                            click toggles
+OK   DESK      -                          switch        St Cue 2 Post                                                          click toggles
+OK   DESK      -                          knob          HF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        HF Bell                                                                click toggles
+OK   DESK      -                          knob          MF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        EQ In                                                                  click toggles
+OK   DESK      -                          knob          LF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        LF Bell                                                                click toggles
+OK   DESK      -                          knob          Comp Threshold                                                         drag 10.00 dBu -> moved, wheel moved
+OK   DESK      -                          switch        Comp In                                                                click toggles
+OK   DESK      -                          knob          Pan / Balance                                                          drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        INSERT: run this channel's TOOL                                        click toggles
+OK   DESK      -                          switch        Direct out (PRINT STEMS) after the fader                               click toggles
+OK   DESK      -                          switch        MUTE / BUS B: off the main mix, onto Bus B                             click toggles
+OK   DESK      -                          switch        PFL                                                                    click toggles
+OK   DESK      -                          fader         Fader                                                                  click on the slot, wheel moved
+OK   DESK      -                          name strip    Click: load a file into this channel. Right-click: empty it            click sends its action
+OK   DESK      -                          selector      TOOL behind this channel's INSERT switch                               click steps
+OK   DESK      -                          button        Open this channel's tool on the TOOLS page                             click sends its action
+OK   DESK      -                          knob          Trim                                                                   drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        Mono                                                                   click toggles
+OK   DESK      -                          switch        Polarity (Ø)                                                          click toggles
+OK   DESK      -                          switch        HPF 75 Hz                                                              click toggles
+OK   DESK      -                          knob          St Cue 1 Level                                                         drag OFF -> moved, wheel moved
+OK   DESK      -                          knob          St Cue 1 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        St Cue 1 On                                                            click toggles
+OK   DESK      -                          switch        St Cue 1 Post                                                          click toggles
+OK   DESK      -                          knob          St Cue 2 Level                                                         drag OFF -> moved, wheel moved
+OK   DESK      -                          knob          St Cue 2 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        St Cue 2 On                                                            click toggles
+OK   DESK      -                          switch        St Cue 2 Post                                                          click toggles
+OK   DESK      -                          knob          HF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        HF Bell                                                                click toggles
+OK   DESK      -                          knob          MF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        EQ In                                                                  click toggles
+OK   DESK      -                          knob          LF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        LF Bell                                                                click toggles
+OK   DESK      -                          knob          Comp Threshold                                                         drag 10.00 dBu -> moved, wheel moved
+OK   DESK      -                          switch        Comp In                                                                click toggles
+OK   DESK      -                          knob          Pan / Balance                                                          drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        INSERT: run this channel's TOOL                                        click toggles
+OK   DESK      -                          switch        Direct out (PRINT STEMS) after the fader                               click toggles
+OK   DESK      -                          switch        MUTE / BUS B: off the main mix, onto Bus B                             click toggles
+OK   DESK      -                          switch        PFL                                                                    click toggles
+OK   DESK      -                          fader         Fader                                                                  click on the slot, wheel moved
+OK   DESK      -                          name strip    Click: load a file into this channel. Right-click: empty it            click sends its action
+OK   DESK      -                          selector      TOOL behind this channel's INSERT switch                               click steps
+OK   DESK      -                          button        Open this channel's tool on the TOOLS page                             click sends its action
+OK   DESK      -                          knob          Trim                                                                   drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        Mono                                                                   click toggles
+OK   DESK      -                          switch        Polarity (Ø)                                                          click toggles
+OK   DESK      -                          switch        HPF 75 Hz                                                              click toggles
+OK   DESK      -                          knob          St Cue 1 Level                                                         drag OFF -> moved, wheel moved
+OK   DESK      -                          knob          St Cue 1 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        St Cue 1 On                                                            click toggles
+OK   DESK      -                          switch        St Cue 1 Post                                                          click toggles
+OK   DESK      -                          knob          St Cue 2 Level                                                         drag OFF -> moved, wheel moved
+OK   DESK      -                          knob          St Cue 2 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        St Cue 2 On                                                            click toggles
+OK   DESK      -                          switch        St Cue 2 Post                                                          click toggles
+OK   DESK      -                          knob          HF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        HF Bell                                                                click toggles
+OK   DESK      -                          knob          MF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        EQ In                                                                  click toggles
+OK   DESK      -                          knob          LF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        LF Bell                                                                click toggles
+OK   DESK      -                          knob          Comp Threshold                                                         drag 10.00 dBu -> moved, wheel moved
+OK   DESK      -                          switch        Comp In                                                                click toggles
+OK   DESK      -                          knob          Pan / Balance                                                          drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        INSERT: run this channel's TOOL                                        click toggles
+OK   DESK      -                          switch        Direct out (PRINT STEMS) after the fader                               click toggles
+OK   DESK      -                          switch        MUTE / BUS B: off the main mix, onto Bus B                             click toggles
+OK   DESK      -                          switch        PFL                                                                    click toggles
+OK   DESK      -                          fader         Fader                                                                  click on the slot, wheel moved
+OK   DESK      -                          name strip    Click: load a file into this channel. Right-click: empty it            click sends its action
+OK   DESK      -                          selector      TOOL behind this channel's INSERT switch                               click steps
+OK   DESK      -                          button        Open this channel's tool on the TOOLS page                             click sends its action
+OK   DESK      -                          knob          Trim                                                                   drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        Mono                                                                   click toggles
+OK   DESK      -                          switch        Polarity (Ø)                                                          click toggles
+OK   DESK      -                          switch        HPF 75 Hz                                                              click toggles
+OK   DESK      -                          knob          St Cue 1 Level                                                         drag OFF -> moved, wheel moved
+OK   DESK      -                          knob          St Cue 1 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        St Cue 1 On                                                            click toggles
+OK   DESK      -                          switch        St Cue 1 Post                                                          click toggles
+OK   DESK      -                          knob          St Cue 2 Level                                                         drag OFF -> moved, wheel moved
+OK   DESK      -                          knob          St Cue 2 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        St Cue 2 On                                                            click toggles
+OK   DESK      -                          switch        St Cue 2 Post                                                          click toggles
+OK   DESK      -                          knob          HF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        HF Bell                                                                click toggles
+OK   DESK      -                          knob          MF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        EQ In                                                                  click toggles
+OK   DESK      -                          knob          LF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        LF Bell                                                                click toggles
+OK   DESK      -                          knob          Comp Threshold                                                         drag 10.00 dBu -> moved, wheel moved
+OK   DESK      -                          switch        Comp In                                                                click toggles
+OK   DESK      -                          knob          Pan / Balance                                                          drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        INSERT: run this channel's TOOL                                        click toggles
+OK   DESK      -                          switch        Direct out (PRINT STEMS) after the fader                               click toggles
+OK   DESK      -                          switch        MUTE / BUS B: off the main mix, onto Bus B                             click toggles
+OK   DESK      -                          switch        PFL                                                                    click toggles
+OK   DESK      -                          fader         Fader                                                                  click on the slot, wheel moved
+OK   DESK      -                          name strip    Click: load a file into this channel. Right-click: empty it            click sends its action
+OK   DESK      -                          selector      TOOL behind this channel's INSERT switch                               click steps
+OK   DESK      -                          button        Open this channel's tool on the TOOLS page                             click sends its action
+OK   DESK      -                          knob          Trim                                                                   drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        Mono                                                                   click toggles
+OK   DESK      -                          switch        Polarity (Ø)                                                          click toggles
+OK   DESK      -                          switch        HPF 75 Hz                                                              click toggles
+OK   DESK      -                          knob          St Cue 1 Level                                                         drag OFF -> moved, wheel moved
+OK   DESK      -                          knob          St Cue 1 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        St Cue 1 On                                                            click toggles
+OK   DESK      -                          switch        St Cue 1 Post                                                          click toggles
+OK   DESK      -                          knob          St Cue 2 Level                                                         drag OFF -> moved, wheel moved
+OK   DESK      -                          knob          St Cue 2 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        St Cue 2 On                                                            click toggles
+OK   DESK      -                          switch        St Cue 2 Post                                                          click toggles
+OK   DESK      -                          knob          HF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        HF Bell                                                                click toggles
+OK   DESK      -                          knob          MF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        EQ In                                                                  click toggles
+OK   DESK      -                          knob          LF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        LF Bell                                                                click toggles
+OK   DESK      -                          knob          Comp Threshold                                                         drag 10.00 dBu -> moved, wheel moved
+OK   DESK      -                          switch        Comp In                                                                click toggles
+OK   DESK      -                          knob          Pan / Balance                                                          drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        INSERT: run this channel's TOOL                                        click toggles
+OK   DESK      -                          switch        Direct out (PRINT STEMS) after the fader                               click toggles
+OK   DESK      -                          switch        MUTE / BUS B: off the main mix, onto Bus B                             click toggles
+OK   DESK      -                          switch        PFL                                                                    click toggles
+OK   DESK      -                          fader         Fader                                                                  click on the slot, wheel moved
+OK   DESK      -                          name strip    Click: load a file into this channel. Right-click: empty it            click sends its action
+OK   DESK      -                          selector      TOOL behind this channel's INSERT switch                               click steps
+OK   DESK      -                          button        Open this channel's tool on the TOOLS page                             click sends its action
+OK   DESK      -                          knob          Trim                                                                   drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        Mono                                                                   click toggles
+OK   DESK      -                          switch        Polarity (Ø)                                                          click toggles
+OK   DESK      -                          switch        HPF 75 Hz                                                              click toggles
+OK   DESK      -                          knob          St Cue 1 Level                                                         drag OFF -> moved, wheel moved
+OK   DESK      -                          knob          St Cue 1 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        St Cue 1 On                                                            click toggles
+OK   DESK      -                          switch        St Cue 1 Post                                                          click toggles
+OK   DESK      -                          knob          St Cue 2 Level                                                         drag OFF -> moved, wheel moved
+OK   DESK      -                          knob          St Cue 2 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        St Cue 2 On                                                            click toggles
+OK   DESK      -                          switch        St Cue 2 Post                                                          click toggles
+OK   DESK      -                          knob          HF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        HF Bell                                                                click toggles
+OK   DESK      -                          knob          MF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        EQ In                                                                  click toggles
+OK   DESK      -                          knob          LF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        LF Bell                                                                click toggles
+OK   DESK      -                          knob          Comp Threshold                                                         drag 10.00 dBu -> moved, wheel moved
+OK   DESK      -                          switch        Comp In                                                                click toggles
+OK   DESK      -                          knob          Pan / Balance                                                          drag 0.00 -> moved, wheel moved
+OK   DESK      -                          switch        INSERT: run this channel's TOOL                                        click toggles
+OK   DESK      -                          switch        Direct out (PRINT STEMS) after the fader                               click toggles
+OK   DESK      -                          switch        MUTE / BUS B: off the main mix, onto Bus B                             click toggles
+OK   DESK      -                          switch        PFL                                                                    click toggles
+OK   DESK      -                          fader         Fader                                                                  click on the slot, wheel moved
+OK   DESK      -                          name strip    Click: load a file into this channel. Right-click: empty it            click sends its action
+OK   DESK      -                          knob          Bus Comp Threshold                                                     drag +20.0 dB -> moved, wheel moved
+OK   DESK      -                          knob          Bus Comp Make Up                                                       drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        Bus Comp Auto Release                                                  click toggles
+OK   DESK      -                          switch        Bus Comp In                                                            click toggles
+OK   DESK      -                          switch        ST CUE 1 to the bus compressor & sum to main                           click toggles
+OK   DESK      -                          switch        Send the main bus through the RACK (STEP EQ, TWIN BUS, COLOUR STAGE)   click toggles
+OK   DESK      -                          knob          Ext 1 Level                                                            drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          knob          Ext 2 Level                                                            drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        Ext 1 to Main                                                          click toggles
+OK   DESK      -                          switch        Ext 2 to Main                                                          click toggles
+OK   DESK      -                          name strip    Click: load a file into EXT 1 (a reference, a cue track ...)           click sends its action
+OK   DESK      -                          name strip    Click: load a file into EXT 2                                          click sends its action
+OK   DESK      -                          knob          Bus B Level                                                            drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        Bus B Mute                                                             click toggles
+OK   DESK      -                          switch        STEP EQ in the rack                                                    click toggles
+OK   DESK      -                          switch        TWIN BUS in the rack                                                   click toggles
+OK   DESK      -                          switch        COLOUR STAGE in the rack                                               click toggles
+OK   DESK      -                          knob          St Cue 1 Master                                                        drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        St Cue 1 + Ext 1                                                       click toggles
+OK   DESK      -                          switch        St Cue 1 + Ext 2                                                       click toggles
+OK   DESK      -                          knob          St Cue 2 Master                                                        drag 0.0 dB -> moved, wheel moved
+OK   DESK      -                          switch        St Cue 2 + Ext 1                                                       click toggles
+OK   DESK      -                          switch        St Cue 2 + Ext 2                                                       click toggles
+OK   DESK      -                          switch        Monitor Source Main                                                    click toggles
+OK   DESK      -                          switch        Monitor Source Bus B                                                   click toggles
+OK   DESK      -                          switch        Monitor Source Ext 1                                                   click toggles
+OK   DESK      -                          switch        Monitor Source Ext 2                                                   click toggles
+OK   DESK      -                          knob          Dim Level                                                              drag -20.0 dB -> moved, wheel moved
+OK   DESK      -                          knob          Monitor Level                                                          drag 11.00 -> moved, wheel moved
+OK   DESK      -                          switch        Dim                                                                    click toggles
+OK   DESK      -                          switch        Cut                                                                    click toggles
+OK   DESK      -                          switch        Mono                                                                   click toggles
+OK   DESK      -                          switch        ALT: the monitor feed goes to the ALT output (with one output devic... click toggles
+OK   DESK      -                          fader         Main Fader                                                             click on the slot, wheel moved
+OK   DESK      -                          button        Show the DESK faceplate                                                click sends its action
+OK   DESK      -                          button        The desk, five channels at a time, big                                 click sends its action
+OK   DESK      -                          button        Show the STEP EQ faceplate                                             click sends its action
+OK   DESK      -                          button        Show the TWIN BUS faceplate                                            click sends its action
+OK   DESK      -                          button        Show the COLOUR faceplate                                              click sends its action
+OK   DESK      -                          button        Show the METER faceplate                                               click sends its action
+OK   DESK      -                          button        Show the TOOLS faceplate                                               click sends its action
+OK   DESK      -                          selector      Order of the three rack units behind the desk's MAIN INSERT            click steps
+OK   DESK      -                          button        Load up to 13 stems (WAV, MP3, FLAC): Suno stems go to their own ch... click sends its action
+OK   DESK      -                          button        Back to the start                                                      click sends its action
+OK   DESK      -                          button        PLAY                                                                   click sends its action
+OK   DESK      -                          button        STOP                                                                   click sends its action
+OK   DESK      -                          button        LOOP                                                                   click sends its action
+OK   DESK      -                          song bar      Song position: click or drag to jump                                   click sends its action
+OK   DESK      -                          button        What your speakers / headset play: the MONITOR section, or a cue mi... click sends its action
+OK   DESK      -                          button        Render the MAIN OUT to a WAV file (offline, the same sound as playb... click sends its action
+OK   DESK      -                          button        Write each channel's DIRECT OUT to its own WAV file                    click sends its action
+OK   DESK      -                          button        New session (Ctrl+N)                                                   click sends its action
+OK   DESK      -                          button        Open a session or audio files (Ctrl+O)                                 click sends its action
+OK   DESK      -                          button        The last 10 sessions                                                   click sends its action
+OK   DESK      -                          button        Save the session (Ctrl+S). Lit = changes not saved yet                 click sends its action
+OK   DESK      -                          button        Save the session under a new name (Ctrl+Shift+S)                       click sends its action
+OK   DESK      -                          button        Every control back to its starting position (press twice; UNDO for ... click sends its action
+OK   DESK      -                          button        Output device (click to choose)                                        click sends its action
+OK   BIG DESK  -                          button        Show the channels to the left (or the Left arrow key)                  click sends its action
+OK   BIG DESK  -                          button        Show channel 1                                                         click sends its action
+OK   BIG DESK  -                          button        Show channel 2                                                         click sends its action
+OK   BIG DESK  -                          button        Show channel 3                                                         click sends its action
+OK   BIG DESK  -                          button        Show channel 4                                                         click sends its action
+OK   BIG DESK  -                          button        Show channel 5                                                         click sends its action
+OK   BIG DESK  -                          button        Show channel 6                                                         click sends its action
+OK   BIG DESK  -                          button        Show channel 7                                                         click sends its action
+OK   BIG DESK  -                          button        Show channel 8                                                         click sends its action
+OK   BIG DESK  -                          button        Show channel 9                                                         click sends its action
+OK   BIG DESK  -                          button        Show channel 10                                                        click sends its action
+OK   BIG DESK  -                          button        Show channel 11                                                        click sends its action
+OK   BIG DESK  -                          button        Show channel 12                                                        click sends its action
+OK   BIG DESK  -                          button        Show channel 13                                                        click sends its action
+OK   BIG DESK  -                          button        Show the channels to the right (or the Right arrow key)                click sends its action
+OK   BIG DESK  -                          selector      TOOL behind this channel's INSERT switch                               click steps
+OK   BIG DESK  -                          button        Open this channel's tool on the TOOLS page                             click sends its action
+OK   BIG DESK  -                          knob          Trim                                                                   drag 0.0 dB -> moved, wheel moved
+OK   BIG DESK  -                          switch        Mono                                                                   click toggles
+OK   BIG DESK  -                          switch        Polarity (Ø)                                                          click toggles
+OK   BIG DESK  -                          switch        HPF 75 Hz                                                              click toggles
+OK   BIG DESK  -                          knob          St Cue 1 Level                                                         drag OFF -> moved, wheel moved
+OK   BIG DESK  -                          knob          St Cue 1 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   BIG DESK  -                          switch        St Cue 1 On                                                            click toggles
+OK   BIG DESK  -                          switch        St Cue 1 Post                                                          click toggles
+OK   BIG DESK  -                          knob          St Cue 2 Level                                                         drag OFF -> moved, wheel moved
+OK   BIG DESK  -                          knob          St Cue 2 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   BIG DESK  -                          switch        St Cue 2 On                                                            click toggles
+OK   BIG DESK  -                          switch        St Cue 2 Post                                                          click toggles
+OK   BIG DESK  -                          knob          HF                                                                     drag +6.0 dB -> moved, wheel moved
+OK   BIG DESK  -                          knob          MF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   BIG DESK  -                          knob          LF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   BIG DESK  -                          switch        HF Bell                                                                click toggles
+OK   BIG DESK  -                          switch        EQ In                                                                  click toggles
+OK   BIG DESK  -                          switch        LF Bell                                                                click toggles
+OK   BIG DESK  -                          knob          Comp Threshold                                                         drag 10.00 dBu -> moved, wheel moved
+OK   BIG DESK  -                          switch        Comp In                                                                click toggles
+OK   BIG DESK  -                          knob          Pan / Balance                                                          drag 0.00 -> moved, wheel moved
+OK   BIG DESK  -                          switch        INSERT: run this channel's TOOL                                        click toggles
+OK   BIG DESK  -                          switch        Direct out (PRINT STEMS) after the fader                               click toggles
+OK   BIG DESK  -                          switch        MUTE / BUS B: off the main mix, onto Bus B                             click toggles
+OK   BIG DESK  -                          switch        PFL                                                                    click toggles
+OK   BIG DESK  -                          fader         Fader                                                                  click on the slot, wheel moved
+OK   BIG DESK  -                          name strip    Click: load a file into this channel. Right-click: empty it            click sends its action
+OK   BIG DESK  -                          selector      TOOL behind this channel's INSERT switch                               click steps
+OK   BIG DESK  -                          button        Open this channel's tool on the TOOLS page                             click sends its action
+OK   BIG DESK  -                          knob          Trim                                                                   drag 0.0 dB -> moved, wheel moved
+OK   BIG DESK  -                          switch        Mono                                                                   click toggles
+OK   BIG DESK  -                          switch        Polarity (Ø)                                                          click toggles
+OK   BIG DESK  -                          switch        HPF 75 Hz                                                              click toggles
+OK   BIG DESK  -                          knob          St Cue 1 Level                                                         drag OFF -> moved, wheel moved
+OK   BIG DESK  -                          knob          St Cue 1 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   BIG DESK  -                          switch        St Cue 1 On                                                            click toggles
+OK   BIG DESK  -                          switch        St Cue 1 Post                                                          click toggles
+OK   BIG DESK  -                          knob          St Cue 2 Level                                                         drag OFF -> moved, wheel moved
+OK   BIG DESK  -                          knob          St Cue 2 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   BIG DESK  -                          switch        St Cue 2 On                                                            click toggles
+OK   BIG DESK  -                          switch        St Cue 2 Post                                                          click toggles
+OK   BIG DESK  -                          knob          HF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   BIG DESK  -                          knob          MF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   BIG DESK  -                          knob          LF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   BIG DESK  -                          switch        HF Bell                                                                click toggles
+OK   BIG DESK  -                          switch        EQ In                                                                  click toggles
+OK   BIG DESK  -                          switch        LF Bell                                                                click toggles
+OK   BIG DESK  -                          knob          Comp Threshold                                                         drag 10.00 dBu -> moved, wheel moved
+OK   BIG DESK  -                          switch        Comp In                                                                click toggles
+OK   BIG DESK  -                          knob          Pan / Balance                                                          drag 0.00 -> moved, wheel moved
+OK   BIG DESK  -                          switch        INSERT: run this channel's TOOL                                        click toggles
+OK   BIG DESK  -                          switch        Direct out (PRINT STEMS) after the fader                               click toggles
+OK   BIG DESK  -                          switch        MUTE / BUS B: off the main mix, onto Bus B                             click toggles
+OK   BIG DESK  -                          switch        PFL                                                                    click toggles
+OK   BIG DESK  -                          fader         Fader                                                                  click on the slot, wheel moved
+OK   BIG DESK  -                          name strip    Click: load a file into this channel. Right-click: empty it            click sends its action
+OK   BIG DESK  -                          selector      TOOL behind this channel's INSERT switch                               click steps
+OK   BIG DESK  -                          button        Open this channel's tool on the TOOLS page                             click sends its action
+OK   BIG DESK  -                          knob          Trim                                                                   drag 0.0 dB -> moved, wheel moved
+OK   BIG DESK  -                          switch        Mono                                                                   click toggles
+OK   BIG DESK  -                          switch        Polarity (Ø)                                                          click toggles
+OK   BIG DESK  -                          switch        HPF 75 Hz                                                              click toggles
+OK   BIG DESK  -                          knob          St Cue 1 Level                                                         drag OFF -> moved, wheel moved
+OK   BIG DESK  -                          knob          St Cue 1 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   BIG DESK  -                          switch        St Cue 1 On                                                            click toggles
+OK   BIG DESK  -                          switch        St Cue 1 Post                                                          click toggles
+OK   BIG DESK  -                          knob          St Cue 2 Level                                                         drag OFF -> moved, wheel moved
+OK   BIG DESK  -                          knob          St Cue 2 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   BIG DESK  -                          switch        St Cue 2 On                                                            click toggles
+OK   BIG DESK  -                          switch        St Cue 2 Post                                                          click toggles
+OK   BIG DESK  -                          knob          HF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   BIG DESK  -                          knob          MF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   BIG DESK  -                          knob          LF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   BIG DESK  -                          switch        HF Bell                                                                click toggles
+OK   BIG DESK  -                          switch        EQ In                                                                  click toggles
+OK   BIG DESK  -                          switch        LF Bell                                                                click toggles
+OK   BIG DESK  -                          knob          Comp Threshold                                                         drag 10.00 dBu -> moved, wheel moved
+OK   BIG DESK  -                          switch        Comp In                                                                click toggles
+OK   BIG DESK  -                          knob          Pan / Balance                                                          drag 0.00 -> moved, wheel moved
+OK   BIG DESK  -                          switch        INSERT: run this channel's TOOL                                        click toggles
+OK   BIG DESK  -                          switch        Direct out (PRINT STEMS) after the fader                               click toggles
+OK   BIG DESK  -                          switch        MUTE / BUS B: off the main mix, onto Bus B                             click toggles
+OK   BIG DESK  -                          switch        PFL                                                                    click toggles
+OK   BIG DESK  -                          fader         Fader                                                                  click on the slot, wheel moved
+OK   BIG DESK  -                          name strip    Click: load a file into this channel. Right-click: empty it            click sends its action
+OK   BIG DESK  -                          selector      TOOL behind this channel's INSERT switch                               click steps
+OK   BIG DESK  -                          button        Open this channel's tool on the TOOLS page                             click sends its action
+OK   BIG DESK  -                          knob          Trim                                                                   drag 0.0 dB -> moved, wheel moved
+OK   BIG DESK  -                          switch        Mono                                                                   click toggles
+OK   BIG DESK  -                          switch        Polarity (Ø)                                                          click toggles
+OK   BIG DESK  -                          switch        HPF 75 Hz                                                              click toggles
+OK   BIG DESK  -                          knob          St Cue 1 Level                                                         drag OFF -> moved, wheel moved
+OK   BIG DESK  -                          knob          St Cue 1 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   BIG DESK  -                          switch        St Cue 1 On                                                            click toggles
+OK   BIG DESK  -                          switch        St Cue 1 Post                                                          click toggles
+OK   BIG DESK  -                          knob          St Cue 2 Level                                                         drag OFF -> moved, wheel moved
+OK   BIG DESK  -                          knob          St Cue 2 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   BIG DESK  -                          switch        St Cue 2 On                                                            click toggles
+OK   BIG DESK  -                          switch        St Cue 2 Post                                                          click toggles
+OK   BIG DESK  -                          knob          HF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   BIG DESK  -                          knob          MF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   BIG DESK  -                          knob          LF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   BIG DESK  -                          switch        HF Bell                                                                click toggles
+OK   BIG DESK  -                          switch        EQ In                                                                  click toggles
+OK   BIG DESK  -                          switch        LF Bell                                                                click toggles
+OK   BIG DESK  -                          knob          Comp Threshold                                                         drag 10.00 dBu -> moved, wheel moved
+OK   BIG DESK  -                          switch        Comp In                                                                click toggles
+OK   BIG DESK  -                          knob          Pan / Balance                                                          drag 0.00 -> moved, wheel moved
+OK   BIG DESK  -                          switch        INSERT: run this channel's TOOL                                        click toggles
+OK   BIG DESK  -                          switch        Direct out (PRINT STEMS) after the fader                               click toggles
+OK   BIG DESK  -                          switch        MUTE / BUS B: off the main mix, onto Bus B                             click toggles
+OK   BIG DESK  -                          switch        PFL                                                                    click toggles
+OK   BIG DESK  -                          fader         Fader                                                                  click on the slot, wheel moved
+OK   BIG DESK  -                          name strip    Click: load a file into this channel. Right-click: empty it            click sends its action
+OK   BIG DESK  -                          selector      TOOL behind this channel's INSERT switch                               click steps
+OK   BIG DESK  -                          button        Open this channel's tool on the TOOLS page                             click sends its action
+OK   BIG DESK  -                          knob          Trim                                                                   drag 0.0 dB -> moved, wheel moved
+OK   BIG DESK  -                          switch        Mono                                                                   click toggles
+OK   BIG DESK  -                          switch        Polarity (Ø)                                                          click toggles
+OK   BIG DESK  -                          switch        HPF 75 Hz                                                              click toggles
+OK   BIG DESK  -                          knob          St Cue 1 Level                                                         drag OFF -> moved, wheel moved
+OK   BIG DESK  -                          knob          St Cue 1 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   BIG DESK  -                          switch        St Cue 1 On                                                            click toggles
+OK   BIG DESK  -                          switch        St Cue 1 Post                                                          click toggles
+OK   BIG DESK  -                          knob          St Cue 2 Level                                                         drag OFF -> moved, wheel moved
+OK   BIG DESK  -                          knob          St Cue 2 Pan                                                           drag 0.00 -> moved, wheel moved
+OK   BIG DESK  -                          switch        St Cue 2 On                                                            click toggles
+OK   BIG DESK  -                          switch        St Cue 2 Post                                                          click toggles
+OK   BIG DESK  -                          knob          HF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   BIG DESK  -                          knob          MF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   BIG DESK  -                          knob          LF                                                                     drag 0.0 dB -> moved, wheel moved
+OK   BIG DESK  -                          switch        HF Bell                                                                click toggles
+OK   BIG DESK  -                          switch        EQ In                                                                  click toggles
+OK   BIG DESK  -                          switch        LF Bell                                                                click toggles
+OK   BIG DESK  -                          knob          Comp Threshold                                                         drag 10.00 dBu -> moved, wheel moved
+OK   BIG DESK  -                          switch        Comp In                                                                click toggles
+OK   BIG DESK  -                          knob          Pan / Balance                                                          drag 0.00 -> moved, wheel moved
+OK   BIG DESK  -                          switch        INSERT: run this channel's TOOL                                        click toggles
+OK   BIG DESK  -                          switch        Direct out (PRINT STEMS) after the fader                               click toggles
+OK   BIG DESK  -                          switch        MUTE / BUS B: off the main mix, onto Bus B                             click toggles
+OK   BIG DESK  -                          switch        PFL                                                                    click toggles
+OK   BIG DESK  -                          fader         Fader                                                                  click on the slot, wheel moved
+OK   BIG DESK  -                          name strip    Click: load a file into this channel. Right-click: empty it            click sends its action
+OK   BIG DESK  -                          knob          Monitor Level                                                          drag 11.00 -> moved, wheel moved
+OK   BIG DESK  -                          switch        Dim                                                                    click toggles
+OK   BIG DESK  -                          switch        Cut                                                                    click toggles
+OK   BIG DESK  -                          fader         Main Fader                                                             click on the slot, wheel moved
+OK   BIG DESK  -                          button        Show the DESK faceplate                                                click sends its action
+OK   BIG DESK  -                          button        The desk, five channels at a time, big                                 click sends its action
+OK   BIG DESK  -                          button        Show the STEP EQ faceplate                                             click sends its action
+OK   BIG DESK  -                          button        Show the TWIN BUS faceplate                                            click sends its action
+OK   BIG DESK  -                          button        Show the COLOUR faceplate                                              click sends its action
+OK   BIG DESK  -                          button        Show the METER faceplate                                               click sends its action
+OK   BIG DESK  -                          button        Show the TOOLS faceplate                                               click sends its action
+OK   BIG DESK  -                          selector      Order of the three rack units behind the desk's MAIN INSERT            click steps
+OK   BIG DESK  -                          button        Load up to 13 stems (WAV, MP3, FLAC): Suno stems go to their own ch... click sends its action
+OK   BIG DESK  -                          button        Back to the start                                                      click sends its action
+OK   BIG DESK  -                          button        PLAY                                                                   click sends its action
+OK   BIG DESK  -                          button        STOP                                                                   click sends its action
+OK   BIG DESK  -                          button        LOOP                                                                   click sends its action
+OK   BIG DESK  -                          song bar      Song position: click or drag to jump                                   click sends its action
+OK   BIG DESK  -                          button        What your speakers / headset play: the MONITOR section, or a cue mi... click sends its action
+OK   BIG DESK  -                          button        Render the MAIN OUT to a WAV file (offline, the same sound as playb... click sends its action
+OK   BIG DESK  -                          button        Write each channel's DIRECT OUT to its own WAV file                    click sends its action
+OK   BIG DESK  -                          button        New session (Ctrl+N)                                                   click sends its action
+OK   BIG DESK  -                          button        Open a session or audio files (Ctrl+O)                                 click sends its action
+OK   BIG DESK  -                          button        The last 10 sessions                                                   click sends its action
+OK   BIG DESK  -                          button        Save the session (Ctrl+S). Lit = changes not saved yet                 click sends its action
+OK   BIG DESK  -                          button        Save the session under a new name (Ctrl+Shift+S)                       click sends its action
+OK   BIG DESK  -                          button        Every control back to its starting position (press twice; UNDO for ... click sends its action
+OK   BIG DESK  -                          button        Output device (click to choose)                                        click sends its action
+OK   STEP EQ   model SPECIAL EDITION      selector      Which model sits in the rack: STANDARD (7 steps, RANGE) or SPECIAL ... click steps
+OK   STEP EQ   model SPECIAL EDITION      switch        M/S: channel 1 EQs the MID, channel 2 the SIDE, recombined at the o... click toggles
+OK   STEP EQ   model SPECIAL EDITION      switch        Rack In                                                                click toggles
+OK   STEP EQ   model SPECIAL EDITION      switch        Bypass                                                                 click toggles
+OK   STEP EQ   model SPECIAL EDITION      stepped knob  LO GAIN (21 steps)                                                     drag 0 dB -> moved, wheel moved
+OK   STEP EQ   model SPECIAL EDITION      stepped knob  LO FREQUENCY                                                           drag 100 Hz -> moved, wheel moved
+OK   STEP EQ   model SPECIAL EDITION      switch        Ch 1 Lo Shelf                                                          click toggles
+OK   STEP EQ   model SPECIAL EDITION      stepped knob  LO-MID GAIN (21 steps)                                                 drag 0 dB -> moved, wheel moved
+OK   STEP EQ   model SPECIAL EDITION      stepped knob  LO-MID FREQUENCY                                                       drag 500 Hz -> moved, wheel moved
+OK   STEP EQ   model SPECIAL EDITION      stepped knob  HI-MID GAIN (21 steps)                                                 drag 0 dB -> moved, wheel moved
+OK   STEP EQ   model SPECIAL EDITION      stepped knob  HI-MID FREQUENCY                                                       drag 3 kHz -> moved, wheel moved
+OK   STEP EQ   model SPECIAL EDITION      stepped knob  HI GAIN (21 steps)                                                     drag 0 dB -> moved, wheel moved
+OK   STEP EQ   model SPECIAL EDITION      stepped knob  HI FREQUENCY                                                           drag 10 kHz -> moved, wheel moved
+OK   STEP EQ   model SPECIAL EDITION      switch        Ch 1 Hi Shelf                                                          click toggles
+OK   STEP EQ   model SPECIAL EDITION      switch        Ch 1 In                                                                click toggles
+OK   STEP EQ   model SPECIAL EDITION      knob          HIGH-PASS FILTER frequency (40 .. 600 Hz, 12 dB/oct)                   drag 80 Hz -> moved, wheel moved
+OK   STEP EQ   model SPECIAL EDITION      switch        Ch 1 HP-Filt                                                           click toggles
+OK   STEP EQ   model SPECIAL EDITION      stepped knob  LO GAIN (21 steps)                                                     drag 0 dB -> moved, wheel moved
+OK   STEP EQ   model SPECIAL EDITION      stepped knob  LO FREQUENCY                                                           drag 100 Hz -> moved, wheel moved
+OK   STEP EQ   model SPECIAL EDITION      switch        Ch 2 Lo Shelf                                                          click toggles
+OK   STEP EQ   model SPECIAL EDITION      stepped knob  LO-MID GAIN (21 steps)                                                 drag 0 dB -> moved, wheel moved
+OK   STEP EQ   model SPECIAL EDITION      stepped knob  LO-MID FREQUENCY                                                       drag 500 Hz -> moved, wheel moved
+OK   STEP EQ   model SPECIAL EDITION      stepped knob  HI-MID GAIN (21 steps)                                                 drag 0 dB -> moved, wheel moved
+OK   STEP EQ   model SPECIAL EDITION      stepped knob  HI-MID FREQUENCY                                                       drag 3 kHz -> moved, wheel moved
+OK   STEP EQ   model SPECIAL EDITION      stepped knob  HI GAIN (21 steps)                                                     drag 0 dB -> moved, wheel moved
+OK   STEP EQ   model SPECIAL EDITION      stepped knob  HI FREQUENCY                                                           drag 10 kHz -> moved, wheel moved
+OK   STEP EQ   model SPECIAL EDITION      switch        Ch 2 Hi Shelf                                                          click toggles
+OK   STEP EQ   model SPECIAL EDITION      switch        Ch 2 In                                                                click toggles
+OK   STEP EQ   model SPECIAL EDITION      knob          HIGH-PASS FILTER frequency (40 .. 600 Hz, 12 dB/oct)                   drag 80 Hz -> moved, wheel moved
+OK   STEP EQ   model SPECIAL EDITION      switch        Ch 2 HP-Filt                                                           click toggles
+OK   STEP EQ   model SPECIAL EDITION      button        Show the DESK faceplate                                                click sends its action
+OK   STEP EQ   model SPECIAL EDITION      button        The desk, five channels at a time, big                                 click sends its action
+OK   STEP EQ   model SPECIAL EDITION      button        Show the STEP EQ faceplate                                             click sends its action
+OK   STEP EQ   model SPECIAL EDITION      button        Show the TWIN BUS faceplate                                            click sends its action
+OK   STEP EQ   model SPECIAL EDITION      button        Show the COLOUR faceplate                                              click sends its action
+OK   STEP EQ   model SPECIAL EDITION      button        Show the METER faceplate                                               click sends its action
+OK   STEP EQ   model SPECIAL EDITION      button        Show the TOOLS faceplate                                               click sends its action
+OK   STEP EQ   model SPECIAL EDITION      selector      Order of the three rack units behind the desk's MAIN INSERT            click steps
+OK   STEP EQ   model SPECIAL EDITION      button        Load up to 13 stems (WAV, MP3, FLAC): Suno stems go to their own ch... click sends its action
+OK   STEP EQ   model SPECIAL EDITION      button        Back to the start                                                      click sends its action
+OK   STEP EQ   model SPECIAL EDITION      button        PLAY                                                                   click sends its action
+OK   STEP EQ   model SPECIAL EDITION      button        STOP                                                                   click sends its action
+OK   STEP EQ   model SPECIAL EDITION      button        LOOP                                                                   click sends its action
+OK   STEP EQ   model SPECIAL EDITION      song bar      Song position: click or drag to jump                                   click sends its action
+OK   STEP EQ   model SPECIAL EDITION      button        What your speakers / headset play: the MONITOR section, or a cue mi... click sends its action
+OK   STEP EQ   model SPECIAL EDITION      button        Render the MAIN OUT to a WAV file (offline, the same sound as playb... click sends its action
+OK   STEP EQ   model SPECIAL EDITION      button        Write each channel's DIRECT OUT to its own WAV file                    click sends its action
+OK   STEP EQ   model SPECIAL EDITION      button        New session (Ctrl+N)                                                   click sends its action
+OK   STEP EQ   model SPECIAL EDITION      button        Open a session or audio files (Ctrl+O)                                 click sends its action
+OK   STEP EQ   model SPECIAL EDITION      button        The last 10 sessions                                                   click sends its action
+OK   STEP EQ   model SPECIAL EDITION      button        Save the session (Ctrl+S). Lit = changes not saved yet                 click sends its action
+OK   STEP EQ   model SPECIAL EDITION      button        Save the session under a new name (Ctrl+Shift+S)                       click sends its action
+OK   STEP EQ   model SPECIAL EDITION      button        Every control back to its starting position (press twice; UNDO for ... click sends its action
+OK   STEP EQ   model SPECIAL EDITION      button        Output device (click to choose)                                        click sends its action
+OK   STEP EQ   model STANDARD             switch        Bypass                                                                 click toggles
+OK   STEP EQ   model STANDARD             stepped knob  LO GAIN                                                                drag 0 dB -> moved, wheel moved
+OK   STEP EQ   model STANDARD             stepped knob  LO FREQUENCY                                                           drag 100 Hz -> moved, wheel moved
+OK   STEP EQ   model STANDARD             switch        Ch 1 Lo Shelf                                                          click toggles
+OK   STEP EQ   model STANDARD             stepped knob  LO-MID GAIN                                                            drag 0 dB -> moved, wheel moved
+OK   STEP EQ   model STANDARD             stepped knob  LO-MID FREQUENCY                                                       drag 500 Hz -> moved, wheel moved
+OK   STEP EQ   model STANDARD             stepped knob  HI-MID GAIN                                                            drag 0 dB -> moved, wheel moved
+OK   STEP EQ   model STANDARD             stepped knob  HI-MID FREQUENCY                                                       drag 3 kHz -> moved, wheel moved
+OK   STEP EQ   model STANDARD             stepped knob  HI GAIN                                                                drag 0 dB -> moved, wheel moved
+OK   STEP EQ   model STANDARD             stepped knob  HI FREQUENCY                                                           drag 10 kHz -> moved, wheel moved
+OK   STEP EQ   model STANDARD             switch        Ch 1 Hi Shelf                                                          click toggles
+OK   STEP EQ   model STANDARD             switch        Ch 1 In                                                                click toggles
+OK   STEP EQ   model STANDARD             stepped knob  Ch 1 Range                                                             drag x1 -> moved, wheel moved
+OK   STEP EQ   model STANDARD             stepped knob  LO GAIN                                                                drag 0 dB -> moved, wheel moved
+OK   STEP EQ   model STANDARD             stepped knob  LO FREQUENCY                                                           drag 100 Hz -> moved, wheel moved
+OK   STEP EQ   model STANDARD             switch        Ch 2 Lo Shelf                                                          click toggles
+OK   STEP EQ   model STANDARD             stepped knob  LO-MID GAIN                                                            drag 0 dB -> moved, wheel moved
+OK   STEP EQ   model STANDARD             stepped knob  LO-MID FREQUENCY                                                       drag 500 Hz -> moved, wheel moved
+OK   STEP EQ   model STANDARD             stepped knob  HI-MID GAIN                                                            drag 0 dB -> moved, wheel moved
+OK   STEP EQ   model STANDARD             stepped knob  HI-MID FREQUENCY                                                       drag 3 kHz -> moved, wheel moved
+OK   STEP EQ   model STANDARD             stepped knob  HI GAIN                                                                drag 0 dB -> moved, wheel moved
+OK   STEP EQ   model STANDARD             stepped knob  HI FREQUENCY                                                           drag 10 kHz -> moved, wheel moved
+OK   STEP EQ   model STANDARD             switch        Ch 2 Hi Shelf                                                          click toggles
+OK   STEP EQ   model STANDARD             switch        Ch 2 In                                                                click toggles
+OK   STEP EQ   model STANDARD             stepped knob  Ch 2 Range                                                             drag x1 -> moved, wheel moved
+OK   TWIN BUS  -                          stepped knob  L Threshold                                                            drag +0.0 dB -> moved, wheel moved
+OK   TWIN BUS  -                          stepped knob  L Attack                                                               drag 3 ms -> moved, wheel moved
+OK   TWIN BUS  -                          stepped knob  L Ratio                                                                drag 4:1 -> moved, wheel moved
+OK   TWIN BUS  -                          stepped knob  L Release                                                              drag AUTO -> moved, wheel moved
+OK   TWIN BUS  -                          stepped knob  L Make-Up                                                              drag +0 dB -> moved, wheel moved
+OK   TWIN BUS  -                          stepped knob  L Mix                                                                  drag WET -> moved, wheel moved
+OK   TWIN BUS  -                          stepped knob  L S/C HPF                                                              drag OUT -> moved, wheel moved
+OK   TWIN BUS  -                          switch        L In                                                                   click toggles
+OK   TWIN BUS  -                          switch        L Make-Up Fine                                                         click toggles
+OK   TWIN BUS  -                          switch        L Post D-EQ                                                            click toggles
+OK   TWIN BUS  -                          switch        L Low THD                                                              click toggles
+OK   TWIN BUS  -                          switch        L F/B                                                                  click toggles
+OK   TWIN BUS  -                          switch        L Grit                                                                 click toggles
+OK   TWIN BUS  -                          stepped knob  L Grit Level                                                           drag 5 -> moved, wheel moved
+OK   TWIN BUS  -                          switch        L Transient Expander                                                   click toggles
+OK   TWIN BUS  -                          switch        L D-EQ LF On                                                           click toggles
+OK   TWIN BUS  -                          stepped knob  L D-EQ LF Comp/Exp                                                     drag 0 -> moved, wheel moved
+OK   TWIN BUS  -                          stepped knob  L D-EQ LF Freq                                                         drag 60 Hz -> moved, wheel moved
+OK   TWIN BUS  -                          stepped knob  L D-EQ LF Range                                                        drag 15.0 dB -> moved, wheel moved
+OK   TWIN BUS  -                          selector      L LF Fast                                                              click steps
+OK   TWIN BUS  -                          stepped knob  LF GAIN (static)                                                       drag +0.0 dB -> moved, wheel moved
+OK   TWIN BUS  -                          switch        L LF Reso                                                              click toggles
+OK   TWIN BUS  -                          switch        L D-EQ HF On                                                           click toggles
+OK   TWIN BUS  -                          stepped knob  L D-EQ HF Comp/Exp                                                     drag 0 -> moved, wheel moved
+OK   TWIN BUS  -                          stepped knob  L D-EQ HF Freq                                                         drag 6 kHz / 2.5 kHz -> moved, wheel moved
+OK   TWIN BUS  -                          stepped knob  L D-EQ HF Range                                                        drag 15.0 dB -> moved, wheel moved
+OK   TWIN BUS  -                          selector      L HF Fast                                                              click steps
+OK   TWIN BUS  -                          switch        L HF Bell                                                              click toggles
+OK   TWIN BUS  -                          stepped knob  R Threshold                                                            drag +0.0 dB -> moved, wheel moved
+OK   TWIN BUS  -                          stepped knob  R Attack                                                               drag 3 ms -> moved, wheel moved
+OK   TWIN BUS  -                          stepped knob  R Ratio                                                                drag 4:1 -> moved, wheel moved
+OK   TWIN BUS  -                          stepped knob  R Release                                                              drag AUTO -> moved, wheel moved
+OK   TWIN BUS  -                          stepped knob  R Make-Up                                                              drag +0 dB -> moved, wheel moved
+OK   TWIN BUS  -                          stepped knob  R Mix                                                                  drag WET -> moved, wheel moved
+OK   TWIN BUS  -                          stepped knob  R S/C HPF                                                              drag OUT -> moved, wheel moved
+OK   TWIN BUS  -                          switch        R In                                                                   click toggles
+OK   TWIN BUS  -                          switch        R Make-Up Fine                                                         click toggles
+OK   TWIN BUS  -                          switch        R Post D-EQ                                                            click toggles
+OK   TWIN BUS  -                          switch        R Low THD                                                              click toggles
+OK   TWIN BUS  -                          switch        R F/B                                                                  click toggles
+OK   TWIN BUS  -                          switch        R Grit                                                                 click toggles
+OK   TWIN BUS  -                          stepped knob  R Grit Level                                                           drag 5 -> moved, wheel moved
+OK   TWIN BUS  -                          switch        R Transient Expander                                                   click toggles
+OK   TWIN BUS  -                          switch        R D-EQ LF On                                                           click toggles
+OK   TWIN BUS  -                          stepped knob  R D-EQ LF Comp/Exp                                                     drag 0 -> moved, wheel moved
+OK   TWIN BUS  -                          stepped knob  R D-EQ LF Freq                                                         drag 60 Hz -> moved, wheel moved
+OK   TWIN BUS  -                          stepped knob  R D-EQ LF Range                                                        drag 15.0 dB -> moved, wheel moved
+OK   TWIN BUS  -                          selector      R LF Fast                                                              click steps
+OK   TWIN BUS  -                          stepped knob  Right GAIN: HF gain in the stereo modes, LF gain in DUAL MONO / MID... drag +0.0 dB -> moved, wheel moved
+OK   TWIN BUS  -                          switch        R LF Reso                                                              click toggles
+OK   TWIN BUS  -                          switch        R D-EQ HF On                                                           click toggles
+OK   TWIN BUS  -                          stepped knob  R D-EQ HF Comp/Exp                                                     drag 0 -> moved, wheel moved
+OK   TWIN BUS  -                          stepped knob  R D-EQ HF Freq                                                         drag 6 kHz / 2.5 kHz -> moved, wheel moved
+OK   TWIN BUS  -                          stepped knob  R D-EQ HF Range                                                        drag 15.0 dB -> moved, wheel moved
+OK   TWIN BUS  -                          selector      R HF Fast                                                              click steps
+OK   TWIN BUS  -                          switch        R HF Bell                                                              click toggles
+OK   TWIN BUS  -                          selector      Mode                                                                   click steps
+OK   TWIN BUS  -                          selector      Mix Mode                                                               click steps
+OK   TWIN BUS  -                          selector      Input Trim                                                             click steps
+OK   TWIN BUS  -                          switch        Input LPF 26 kHz                                                       click toggles
+OK   TWIN BUS  -                          switch        Right meter shows the right channel in the stereo modes                click toggles
+OK   TWIN BUS  -                          switch        Mid Solo                                                               click toggles
+OK   TWIN BUS  -                          switch        Side Solo                                                              click toggles
+OK   TWIN BUS  -                          selector      Side solo: in phase or decoded                                         click steps
+OK   TWIN BUS  -                          selector      External side-chain key = the file in EXT 2 (desk EXT RETURNS)         click steps
+OK   TWIN BUS  -                          selector      Which D-EQ bands the EXT 2 key drives                                  click steps
+OK   TWIN BUS  -                          switch        Rack In                                                                click toggles
+OK   TWIN BUS  -                          button        Show the DESK faceplate                                                click sends its action
+OK   TWIN BUS  -                          button        The desk, five channels at a time, big                                 click sends its action
+OK   TWIN BUS  -                          button        Show the STEP EQ faceplate                                             click sends its action
+OK   TWIN BUS  -                          button        Show the TWIN BUS faceplate                                            click sends its action
+OK   TWIN BUS  -                          button        Show the COLOUR faceplate                                              click sends its action
+OK   TWIN BUS  -                          button        Show the METER faceplate                                               click sends its action
+OK   TWIN BUS  -                          button        Show the TOOLS faceplate                                               click sends its action
+OK   TWIN BUS  -                          selector      Order of the three rack units behind the desk's MAIN INSERT            click steps
+OK   TWIN BUS  -                          button        Load up to 13 stems (WAV, MP3, FLAC): Suno stems go to their own ch... click sends its action
+OK   TWIN BUS  -                          button        Back to the start                                                      click sends its action
+OK   TWIN BUS  -                          button        PLAY                                                                   click sends its action
+OK   TWIN BUS  -                          button        STOP                                                                   click sends its action
+OK   TWIN BUS  -                          button        LOOP                                                                   click sends its action
+OK   TWIN BUS  -                          song bar      Song position: click or drag to jump                                   click sends its action
+OK   TWIN BUS  -                          button        What your speakers / headset play: the MONITOR section, or a cue mi... click sends its action
+OK   TWIN BUS  -                          button        Render the MAIN OUT to a WAV file (offline, the same sound as playb... click sends its action
+OK   TWIN BUS  -                          button        Write each channel's DIRECT OUT to its own WAV file                    click sends its action
+OK   TWIN BUS  -                          button        New session (Ctrl+N)                                                   click sends its action
+OK   TWIN BUS  -                          button        Open a session or audio files (Ctrl+O)                                 click sends its action
+OK   TWIN BUS  -                          button        The last 10 sessions                                                   click sends its action
+OK   TWIN BUS  -                          button        Save the session (Ctrl+S). Lit = changes not saved yet                 click sends its action
+OK   TWIN BUS  -                          button        Save the session under a new name (Ctrl+Shift+S)                       click sends its action
+OK   TWIN BUS  -                          button        Every control back to its starting position (press twice; UNDO for ... click sends its action
+OK   TWIN BUS  -                          button        Output device (click to choose)                                        click sends its action
+OK   COLOUR    -                          switch        Rack In                                                                click toggles
+OK   COLOUR    -                          knob          Input Trim                                                             drag 0.0 dB -> moved, wheel moved
+OK   COLOUR    -                          stepped knob  HPF                                                                    drag OFF -> moved, wheel moved
+OK   COLOUR    -                          knob          Drive                                                                  drag 5.0 -> moved, wheel moved
+OK   COLOUR    -                          knob          Density                                                                drag 5.0 -> moved, wheel moved
+OK   COLOUR    -                          switch        Drive In                                                               click toggles
+OK   COLOUR    -                          stepped knob  Low Freq                                                               drag 30 Hz -> moved, wheel moved
+OK   COLOUR    -                          knob          Low Gain                                                               drag 0.0 dB -> moved, wheel moved
+OK   COLOUR    -                          stepped knob  High Freq                                                              drag 8 kHz -> moved, wheel moved
+OK   COLOUR    -                          knob          High Gain                                                              drag 0.0 dB -> moved, wheel moved
+OK   COLOUR    -                          switch        Tone EQ In                                                             click toggles
+OK   COLOUR    -                          switch        INSERT before the TONE EQ                                              click toggles
+OK   COLOUR    -                          knob          HF Threshold                                                           drag +10.0 dB -> moved, wheel moved
+OK   COLOUR    -                          knob          X-OVER (CRUSH mode: WET / DRY)                                         drag 15.00 kHz -> moved, wheel moved
+OK   COLOUR    -                          switch        HF Compressor In                                                       click toggles
+OK   COLOUR    -                          switch        Crush Mode                                                             click toggles
+OK   COLOUR    -                          knob          Space                                                                  drag 0.0 dB -> moved, wheel moved
+OK   COLOUR    -                          knob          Width                                                                  drag 0.0 dB -> moved, wheel moved
+OK   COLOUR    -                          switch        Stereo Image In                                                        click toggles
+OK   COLOUR    -                          switch        Transformer                                                            click toggles
+OK   COLOUR    -                          switch        Insert                                                                 click toggles
+OK   COLOUR    -                          switch        Insert M/S Mode                                                        click toggles
+OK   COLOUR    -                          selector      TOOL behind the INSERT switch                                          click steps
+OK   COLOUR    -                          button        ED                                                                     click sends its action
+OK   COLOUR    -                          knob          Output Trim                                                            drag 0.0 dB -> moved, wheel moved
+OK   COLOUR    -                          switch        Bypass                                                                 click toggles
+OK   COLOUR    -                          switch        BYPASS keeps the INPUT TRIM                                            click toggles
+OK   COLOUR    -                          button        Show the DESK faceplate                                                click sends its action
+OK   COLOUR    -                          button        The desk, five channels at a time, big                                 click sends its action
+OK   COLOUR    -                          button        Show the STEP EQ faceplate                                             click sends its action
+OK   COLOUR    -                          button        Show the TWIN BUS faceplate                                            click sends its action
+OK   COLOUR    -                          button        Show the COLOUR faceplate                                              click sends its action
+OK   COLOUR    -                          button        Show the METER faceplate                                               click sends its action
+OK   COLOUR    -                          button        Show the TOOLS faceplate                                               click sends its action
+OK   COLOUR    -                          selector      Order of the three rack units behind the desk's MAIN INSERT            click steps
+OK   COLOUR    -                          button        Load up to 13 stems (WAV, MP3, FLAC): Suno stems go to their own ch... click sends its action
+OK   COLOUR    -                          button        Back to the start                                                      click sends its action
+OK   COLOUR    -                          button        PLAY                                                                   click sends its action
+OK   COLOUR    -                          button        STOP                                                                   click sends its action
+OK   COLOUR    -                          button        LOOP                                                                   click sends its action
+OK   COLOUR    -                          song bar      Song position: click or drag to jump                                   click sends its action
+OK   COLOUR    -                          button        What your speakers / headset play: the MONITOR section, or a cue mi... click sends its action
+OK   COLOUR    -                          button        Render the MAIN OUT to a WAV file (offline, the same sound as playb... click sends its action
+OK   COLOUR    -                          button        Write each channel's DIRECT OUT to its own WAV file                    click sends its action
+OK   COLOUR    -                          button        New session (Ctrl+N)                                                   click sends its action
+OK   COLOUR    -                          button        Open a session or audio files (Ctrl+O)                                 click sends its action
+OK   COLOUR    -                          button        The last 10 sessions                                                   click sends its action
+OK   COLOUR    -                          button        Save the session (Ctrl+S). Lit = changes not saved yet                 click sends its action
+OK   COLOUR    -                          button        Save the session under a new name (Ctrl+Shift+S)                       click sends its action
+OK   COLOUR    -                          button        Every control back to its starting position (press twice; UNDO for ... click sends its action
+OK   COLOUR    -                          button        Output device (click to choose)                                        click sends its action
+OK   METER     view RADAR, EDIT tab 1     switch        RUN / PAUSE the loudness measurement (true peak and correlation kee... click toggles
+OK   METER     view RADAR, EDIT tab 1     button        Start every measurement again (integrated, range, maxima, radar, time) click sends its action
+OK   METER     view RADAR, EDIT tab 1     selector      Main view: loudness RADAR, RTA (spectrum) or vector SCOPE              click steps
+OK   METER     view RADAR, EDIT tab 1     switch        FOLLOW TRANSPORT: measure only while the console plays                 click toggles
+OK   METER     view RADAR, EDIT tab 1     switch        RESET ON PLAY: start the measurement again each time PLAY is pressed   click toggles
+OK   METER     view RADAR, EDIT tab 1     button        EDIT: RADAR settings                                                   click sends its action
+OK   METER     view RADAR, EDIT tab 1     button        EDIT: RTA settings                                                     click sends its action
+OK   METER     view RADAR, EDIT tab 1     button        EDIT: SCOPE settings                                                   click sends its action
+OK   METER     view RADAR, EDIT tab 1     button        EDIT: GENERAL settings                                                 click sends its action
+OK   METER     view RADAR, EDIT tab 1     button        EDIT: LIBRARY settings                                                 click sends its action
+OK   METER     view RADAR, EDIT tab 1     selector      Radar Speed                                                            click steps
+OK   METER     view RADAR, EDIT tab 1     selector      Radar Resolution                                                       click steps
+OK   METER     view RADAR, EDIT tab 1     selector      Target Loudness                                                        click steps
+OK   METER     view RADAR, EDIT tab 1     selector      Loud Alert                                                             click steps
+OK   METER     view RADAR, EDIT tab 1     selector      Momentary Range                                                        click steps
+OK   METER     view RADAR, EDIT tab 1     button        Show the DESK faceplate                                                click sends its action
+OK   METER     view RADAR, EDIT tab 1     button        The desk, five channels at a time, big                                 click sends its action
+OK   METER     view RADAR, EDIT tab 1     button        Show the STEP EQ faceplate                                             click sends its action
+OK   METER     view RADAR, EDIT tab 1     button        Show the TWIN BUS faceplate                                            click sends its action
+OK   METER     view RADAR, EDIT tab 1     button        Show the COLOUR faceplate                                              click sends its action
+OK   METER     view RADAR, EDIT tab 1     button        Show the METER faceplate                                               click sends its action
+OK   METER     view RADAR, EDIT tab 1     button        Show the TOOLS faceplate                                               click sends its action
+OK   METER     view RADAR, EDIT tab 1     selector      Order of the three rack units behind the desk's MAIN INSERT            click steps
+OK   METER     view RADAR, EDIT tab 1     button        Load up to 13 stems (WAV, MP3, FLAC): Suno stems go to their own ch... click sends its action
+OK   METER     view RADAR, EDIT tab 1     button        Back to the start                                                      click sends its action
+OK   METER     view RADAR, EDIT tab 1     button        PLAY                                                                   click sends its action
+OK   METER     view RADAR, EDIT tab 1     button        STOP                                                                   click sends its action
+OK   METER     view RADAR, EDIT tab 1     button        LOOP                                                                   click sends its action
+OK   METER     view RADAR, EDIT tab 1     song bar      Song position: click or drag to jump                                   click sends its action
+OK   METER     view RADAR, EDIT tab 1     button        What your speakers / headset play: the MONITOR section, or a cue mi... click sends its action
+OK   METER     view RADAR, EDIT tab 1     button        Render the MAIN OUT to a WAV file (offline, the same sound as playb... click sends its action
+OK   METER     view RADAR, EDIT tab 1     button        Write each channel's DIRECT OUT to its own WAV file                    click sends its action
+OK   METER     view RADAR, EDIT tab 1     button        New session (Ctrl+N)                                                   click sends its action
+OK   METER     view RADAR, EDIT tab 1     button        Open a session or audio files (Ctrl+O)                                 click sends its action
+OK   METER     view RADAR, EDIT tab 1     button        The last 10 sessions                                                   click sends its action
+OK   METER     view RADAR, EDIT tab 1     button        Save the session (Ctrl+S). Lit = changes not saved yet                 click sends its action
+OK   METER     view RADAR, EDIT tab 1     button        Save the session under a new name (Ctrl+Shift+S)                       click sends its action
+OK   METER     view RADAR, EDIT tab 1     button        Every control back to its starting position (press twice; UNDO for ... click sends its action
+OK   METER     view RADAR, EDIT tab 1     button        Output device (click to choose)                                        click sends its action
+OK   METER     view RADAR, EDIT tab 2     selector      RTA Channels                                                           click steps
+OK   METER     view RADAR, EDIT tab 2     selector      RTA Resolution                                                         click steps
+OK   METER     view RADAR, EDIT tab 2     selector      RTA Integration Time                                                   click steps
+OK   METER     view RADAR, EDIT tab 2     selector      RTA Peak Hold                                                          click steps
+OK   METER     view RADAR, EDIT tab 2     selector      RTA Scale Range                                                        click steps
+OK   METER     view RADAR, EDIT tab 2     selector      RTA Scale Top                                                          click steps
+OK   METER     view RADAR, EDIT tab 2     selector      RTA Auto Scale                                                         click steps
+OK   METER     view RADAR, EDIT tab 2     selector      RTA Cursor                                                             click steps
+OK   METER     view RADAR, EDIT tab 3     selector      Scope Persistence                                                      click steps
+OK   METER     view RADAR, EDIT tab 3     selector      Scope Scale                                                            click steps
+OK   METER     view RADAR, EDIT tab 3     selector      Scope Style                                                            click steps
+OK   METER     view RADAR, EDIT tab 4     selector      Screen Layout                                                          click steps
+OK   METER     view RADAR, EDIT tab 4     selector      Loudness Max Metric                                                    click steps
+OK   METER     view RADAR, EDIT tab 4     selector      Loudness Unit                                                          click steps
+OK   METER     view RADAR, EDIT tab 4     selector      Stereo-Mono Downmix                                                    click steps
+OK   METER     view RADAR, EDIT tab 4     selector      Deviation Span                                                         click steps
+OK   METER     view RADAR, EDIT tab 4     selector      Peak Alert                                                             click steps
+OK   METER     view RADAR, EDIT tab 4     selector      Peak Alert Hold                                                        click steps
+OK   METER     view RADAR, EDIT tab 4     selector      Peak Meter Scale                                                       click steps
+OK   METER     view RADAR, EDIT tab 4     selector      PPM Alignment Level                                                    click steps
+OK   METER     view RADAR, EDIT tab 4     switch        True-Peak Meter Full Height                                            click toggles
+OK   METER     view RADAR, EDIT tab 4     selector      CUSTOM layout: descriptor slot 1                                       click steps
+OK   METER     view RADAR, EDIT tab 4     selector      CUSTOM layout: descriptor slot 2                                       click steps
+OK   METER     view RADAR, EDIT tab 4     selector      CUSTOM layout: descriptor slot 3                                       click steps
+OK   METER     view RADAR, EDIT tab 4     selector      CUSTOM layout: descriptor slot 4                                       click steps
+OK   METER     view RADAR, EDIT tab 4     selector      CUSTOM layout: descriptor slot 5                                       click steps
+OK   METER     view RADAR, EDIT tab 4     selector      CUSTOM layout: descriptor slot 6                                       click steps
+OK   METER     view RADAR, EDIT tab 5     selector      Preset                                                                 click steps
+OK   METER     view RADAR, EDIT tab 5     button        Load the picked preset (factory presets set the target, unit, peak ... click sends its action
+OK   METER     view RADAR, EDIT tab 5     button        Save every meter setting into the picked USER slot (kept with the c... click sends its action
+OK   METER     view RTA, EDIT tab 1       button        AUTO: set the RTA scale from what is playing now (RANGE & TOP or TO... click sends its action
+OK   TOOLS     channel 1 tool off         button        Previous slot                                                          click sends its action
+OK   TOOLS     channel 1 tool off         button        Next slot                                                              click sends its action
+OK   TOOLS     channel 1 tool off         selector      Which tool this slot runs                                              click steps
+OK   TOOLS     channel 1 tool off         switch        The INSERT switch of this slot (the tool only runs while it is lit)    click toggles
+OK   TOOLS     channel 1 tool off         button        Show the DESK faceplate                                                click sends its action
+OK   TOOLS     channel 1 tool off         button        The desk, five channels at a time, big                                 click sends its action
+OK   TOOLS     channel 1 tool off         button        Show the STEP EQ faceplate                                             click sends its action
+OK   TOOLS     channel 1 tool off         button        Show the TWIN BUS faceplate                                            click sends its action
+OK   TOOLS     channel 1 tool off         button        Show the COLOUR faceplate                                              click sends its action
+OK   TOOLS     channel 1 tool off         button        Show the METER faceplate                                               click sends its action
+OK   TOOLS     channel 1 tool off         button        Show the TOOLS faceplate                                               click sends its action
+OK   TOOLS     channel 1 tool off         selector      Order of the three rack units behind the desk's MAIN INSERT            click steps
+OK   TOOLS     channel 1 tool off         button        Load up to 13 stems (WAV, MP3, FLAC): Suno stems go to their own ch... click sends its action
+OK   TOOLS     channel 1 tool off         button        Back to the start                                                      click sends its action
+OK   TOOLS     channel 1 tool off         button        PLAY                                                                   click sends its action
+OK   TOOLS     channel 1 tool off         button        STOP                                                                   click sends its action
+OK   TOOLS     channel 1 tool off         button        LOOP                                                                   click sends its action
+OK   TOOLS     channel 1 tool off         song bar      Song position: click or drag to jump                                   click sends its action
+OK   TOOLS     channel 1 tool off         button        What your speakers / headset play: the MONITOR section, or a cue mi... click sends its action
+OK   TOOLS     channel 1 tool off         button        Render the MAIN OUT to a WAV file (offline, the same sound as playb... click sends its action
+OK   TOOLS     channel 1 tool off         button        Write each channel's DIRECT OUT to its own WAV file                    click sends its action
+OK   TOOLS     channel 1 tool off         button        New session (Ctrl+N)                                                   click sends its action
+OK   TOOLS     channel 1 tool off         button        Open a session or audio files (Ctrl+O)                                 click sends its action
+OK   TOOLS     channel 1 tool off         button        The last 10 sessions                                                   click sends its action
+OK   TOOLS     channel 1 tool off         button        Save the session (Ctrl+S). Lit = changes not saved yet                 click sends its action
+OK   TOOLS     channel 1 tool off         button        Save the session under a new name (Ctrl+Shift+S)                       click sends its action
+OK   TOOLS     channel 1 tool off         button        Every control back to its starting position (press twice; UNDO for ... click sends its action
+OK   TOOLS     channel 1 tool off         button        Output device (click to choose)                                        click sends its action
+OK   TOOLS     channel 1 tool reso        switch        Band 1 On                                                              click toggles
+OK   TOOLS     channel 1 tool reso        knob          Band 1 Freq                                                            drag 300 Hz -> moved, wheel moved
+OK   TOOLS     channel 1 tool reso        knob          Band 1 Width (Q)                                                       drag 4.00 Q -> moved, wheel moved
+OK   TOOLS     channel 1 tool reso        knob          Band 1 Threshold                                                       drag 0.0 dB -> moved, wheel moved
+OK   TOOLS     channel 1 tool reso        knob          Band 1 Depth                                                           drag 0.0 dB -> moved, wheel moved
+OK   TOOLS     channel 1 tool reso        selector      Band 1 Speed                                                           click steps
+OK   TOOLS     channel 1 tool reso        switch        Band 1 Listen                                                          click toggles
+OK   TOOLS     channel 1 tool reso        switch        Band 2 On                                                              click toggles
+OK   TOOLS     channel 1 tool reso        knob          Band 2 Freq                                                            drag 3.00 kHz -> moved, wheel moved
+OK   TOOLS     channel 1 tool reso        knob          Band 2 Width (Q)                                                       drag 4.00 Q -> moved, wheel moved
+OK   TOOLS     channel 1 tool reso        knob          Band 2 Threshold                                                       drag 0.0 dB -> moved, wheel moved
+OK   TOOLS     channel 1 tool reso        knob          Band 2 Depth                                                           drag 0.0 dB -> moved, wheel moved
+OK   TOOLS     channel 1 tool reso        selector      Band 2 Speed                                                           click steps
+OK   TOOLS     channel 1 tool reso        switch        Band 2 Listen                                                          click toggles
+OK   TOOLS     channel 1 tool shuffle     knob          Shuffle Freq                                                           drag 300 Hz -> moved, wheel moved
+OK   TOOLS     channel 1 tool shuffle     knob          Shuffle                                                                drag 0.0 dB -> moved, wheel moved
+OK   TOOLS     channel 1 tool shuffle     knob          Mud Freq                                                               drag 250 Hz -> moved, wheel moved
+OK   TOOLS     channel 1 tool shuffle     knob          Mud Cut                                                                drag 0.0 dB -> moved, wheel moved
+OK   TOOLS     channel 1 tool shuffle     knob          Width                                                                  drag 100 % -> moved, wheel moved
+OK   TOOLS     channel 1 tool shuffle     knob          Output                                                                 drag 0.0 dB -> moved, wheel moved
+OK   TOOLS     channel 1 tool shuffle     switch        Mono Bass                                                              click toggles
+OK   TOOLS     channel 1 tool echo        button        Tap the beat: sets TEMPO (tap 2 or more times)                         click sends its action
+OK   TOOLS     channel 1 tool echo        knob          Tempo                                                                  drag 120.00 BPM -> moved, wheel moved
+OK   TOOLS     channel 1 tool echo        knob          Time                                                                   drag 250 ms -> moved, wheel moved
+OK   TOOLS     channel 1 tool echo        knob          Feedback                                                               drag 0 % -> moved, wheel moved
+OK   TOOLS     channel 1 tool echo        knob          Mix                                                                    drag 0 % -> moved, wheel moved
+OK   TOOLS     channel 1 tool echo        knob          Low Cut                                                                drag 20 Hz -> moved, wheel moved
+OK   TOOLS     channel 1 tool echo        knob          High Cut                                                               drag 20.00 kHz -> moved, wheel moved
+OK   TOOLS     channel 1 tool echo        selector      Note                                                                   click steps
+OK   TOOLS     channel 1 tool echo        selector      Mode                                                                   click steps
+
+972 controls pressed, 0 did not respond -> PASS

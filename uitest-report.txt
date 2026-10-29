@@ -1,0 +1,143 @@
+HEM Digital Console - UI automation test (real clicks + keys via SendInput, Windows dialogs via UI Automation)
+
+[1] Screen fit: every control on screen and not covered, at each screen size and Windows scale
+  screen modes Windows offers here: 640x480 800x600 1024x768 1152x864 1280x720 1280x800 1280x1024 1366x768 1440x900 1600x900 1600x1200 1680x1050 1920x1080 
+  screen at start: 1024x768, 100% scale
+  -- 1366x768: screen set
+  PASS  1366x768 at 100%: app answered
+     screen 1366x768, window client 1366x705, DPI 96, faceplate scale 0.3264, maximized 1
+  PASS  1366x768 at 100%: opens maximized the first time
+  PASS  1366x768 at 100% (DESK, maximized): 435 controls, 0 outside the window/screen, 0 covered; bottom bar: LOAD STEMS  < PLAY STOP LOOP LISTEN EXPORT PRINT STEMS NEW OPEN RECENT SAVE SAVE AS RESET DEVICE 
+  PASS  1366x768 at 100% (BIG DESK): 188 controls, 0 outside the window/screen, 0 covered; bottom bar: LOAD STEMS  < PLAY STOP LOOP LISTEN EXPORT PRINT STEMS NEW OPEN RECENT SAVE SAVE AS RESET DEVICE 
+  PASS  1366x768 at 100% (STEP EQ): 54 controls, 0 outside the window/screen, 0 covered; bottom bar: LOAD STEMS  < PLAY STOP LOOP LISTEN EXPORT PRINT STEMS NEW OPEN RECENT SAVE SAVE AS RESET DEVICE 
+  PASS  1366x768 at 100% (TWIN BUS): 91 controls, 0 outside the window/screen, 0 covered; bottom bar: LOAD STEMS  < PLAY STOP LOOP LISTEN EXPORT PRINT STEMS NEW OPEN RECENT SAVE SAVE AS RESET DEVICE 
+  PASS  1366x768 at 100% (COLOUR): 51 controls, 0 outside the window/screen, 0 covered; bottom bar: LOAD STEMS  < PLAY STOP LOOP LISTEN EXPORT PRINT STEMS NEW OPEN RECENT SAVE SAVE AS RESET DEVICE 
+  PASS  1366x768 at 100% (METER): 39 controls, 0 outside the window/screen, 0 covered; bottom bar: LOAD STEMS  < PLAY STOP LOOP LISTEN EXPORT PRINT STEMS NEW OPEN RECENT SAVE SAVE AS RESET DEVICE 
+  PASS  1366x768 at 100% (TOOLS): 28 controls, 0 outside the window/screen, 0 covered; bottom bar: LOAD STEMS  < PLAY STOP LOOP LISTEN EXPORT PRINT STEMS NEW OPEN RECENT SAVE SAVE AS RESET DEVICE 
+  PASS  1366x768 at 100%: screenshot uitest-1366x768-100pct.png
+  PASS  1366x768 at 100%: smallest window 800x450 px (asked 300x200; minimum 800x450 at 100%)
+  PASS  1366x768 at 100% (smallest window): 435 controls, 0 outside the window/screen, 0 covered; bottom bar: LOAD STEMS  < PLAY STOP LOOP LISTEN EXPORT PRINT STEMS NEW OPEN RECENT SAVE SAVE AS RESET DEVICE 
+     150%: not tested - Windows offers 100% 125% at this size
+     200%: not tested - Windows offers 100% 125% at this size
+  -- 1920x1080: screen set
+  PASS  1920x1080 at 100%: app answered
+     screen 1920x1080, window client 1920x1017, DPI 96, faceplate scale 0.4708, maximized 1
+  PASS  1920x1080 at 100%: opens maximized the first time
+  PASS  1920x1080 at 100% (DESK, maximized): 435 controls, 0 outside the window/screen, 0 covered; bottom bar: LOAD STEMS  < PLAY STOP LOOP LISTEN EXPORT PRINT STEMS NEW OPEN RECENT SAVE SAVE AS RESET DEVICE 
+  PASS  1920x1080 at 100% (BIG DESK): 188 controls, 0 outside the window/screen, 0 covered; bottom bar: LOAD STEMS  < PLAY STOP LOOP LISTEN EXPORT PRINT STEMS NEW OPEN RECENT SAVE SAVE AS RESET DEVICE 
+  PASS  1920x1080 at 100% (STEP EQ): 54 controls, 0 outside the window/screen, 0 covered; bottom bar: LOAD STEMS  < PLAY STOP LOOP LISTEN EXPORT PRINT STEMS NEW OPEN RECENT SAVE SAVE AS RESET DEVICE 
+  PASS  1920x1080 at 100% (TWIN BUS): 91 controls, 0 outside the window/screen, 0 covered; bottom bar: LOAD STEMS  < PLAY STOP LOOP LISTEN EXPORT PRINT STEMS NEW OPEN RECENT SAVE SAVE AS RESET DEVICE 
+  PASS  1920x1080 at 100% (COLOUR): 51 controls, 0 outside the window/screen, 0 covered; bottom bar: LOAD STEMS  < PLAY STOP LOOP LISTEN EXPORT PRINT STEMS NEW OPEN RECENT SAVE SAVE AS RESET DEVICE 
+  PASS  1920x1080 at 100% (METER): 39 controls, 0 outside the window/screen, 0 covered; bottom bar: LOAD STEMS  < PLAY STOP LOOP LISTEN EXPORT PRINT STEMS NEW OPEN RECENT SAVE SAVE AS RESET DEVICE 
+  PASS  1920x1080 at 100% (TOOLS): 28 controls, 0 outside the window/screen, 0 covered; bottom bar: LOAD STEMS  < PLAY STOP LOOP LISTEN EXPORT PRINT STEMS NEW OPEN RECENT SAVE SAVE AS RESET DEVICE 
+  PASS  1920x1080 at 100%: screenshot uitest-1920x1080-100pct.png
+  PASS  1920x1080 at 100%: smallest window 800x450 px (asked 300x200; minimum 800x450 at 100%)
+  PASS  1920x1080 at 100% (smallest window): 435 controls, 0 outside the window/screen, 0 covered; bottom bar: LOAD STEMS  < PLAY STOP LOOP LISTEN EXPORT PRINT STEMS NEW OPEN RECENT SAVE SAVE AS RESET DEVICE 
+  PASS  1920x1080 at 150%: app answered
+     screen 1920x1080, window client 1920x986, DPI 144, faceplate scale 0.4565, maximized 1
+  PASS  1920x1080 at 150%: opens maximized the first time
+  PASS  1920x1080 at 150% (DESK, maximized): 435 controls, 0 outside the window/screen, 0 covered; bottom bar: LOAD STEMS  < PLAY STOP LOOP LISTEN EXPORT PRINT STEMS NEW OPEN RECENT SAVE SAVE AS RESET DEVICE 
+  PASS  1920x1080 at 150% (BIG DESK): 188 controls, 0 outside the window/screen, 0 covered; bottom bar: LOAD STEMS  < PLAY STOP LOOP LISTEN EXPORT PRINT STEMS NEW OPEN RECENT SAVE SAVE AS RESET DEVICE 
+  PASS  1920x1080 at 150% (STEP EQ): 54 controls, 0 outside the window/screen, 0 covered; bottom bar: LOAD STEMS  < PLAY STOP LOOP LISTEN EXPORT PRINT STEMS NEW OPEN RECENT SAVE SAVE AS RESET DEVICE 
+  PASS  1920x1080 at 150% (TWIN BUS): 91 controls, 0 outside the window/screen, 0 covered; bottom bar: LOAD STEMS  < PLAY STOP LOOP LISTEN EXPORT PRINT STEMS NEW OPEN RECENT SAVE SAVE AS RESET DEVICE 
+  PASS  1920x1080 at 150% (COLOUR): 51 controls, 0 outside the window/screen, 0 covered; bottom bar: LOAD STEMS  < PLAY STOP LOOP LISTEN EXPORT PRINT STEMS NEW OPEN RECENT SAVE SAVE AS RESET DEVICE 
+  PASS  1920x1080 at 150% (METER): 39 controls, 0 outside the window/screen, 0 covered; bottom bar: LOAD STEMS  < PLAY STOP LOOP LISTEN EXPORT PRINT STEMS NEW OPEN RECENT SAVE SAVE AS RESET DEVICE 
+  PASS  1920x1080 at 150% (TOOLS): 28 controls, 0 outside the window/screen, 0 covered; bottom bar: LOAD STEMS  < PLAY STOP LOOP LISTEN EXPORT PRINT STEMS NEW OPEN RECENT SAVE SAVE AS RESET DEVICE 
+  PASS  1920x1080 at 150%: screenshot uitest-1920x1080-150pct.png
+  PASS  1920x1080 at 150%: smallest window 1200x675 px (asked 300x200; minimum 800x450 at 100%)
+  PASS  1920x1080 at 150% (smallest window): 435 controls, 0 outside the window/screen, 0 covered; bottom bar: LOAD STEMS  < PLAY STOP LOOP LISTEN EXPORT PRINT STEMS NEW OPEN RECENT SAVE SAVE AS RESET DEVICE 
+     200%: not tested - Windows offers 100% 125% 150% 175% at this size
+  -- 2560x1600: Windows here can't show this size (now 1920x1080), change refused
+
+[2] LOAD STEMS: the 12 Suno stems, real clicks and the real Windows file dialog
+  screen 1024x768, window client 1024x705, DPI 96, faceplate scale 0.2667, maximized 1
+  PASS  DESK at this machine's screen: 435 controls, 0 outside the window/screen, 0 covered; bottom bar: LOAD STEMS  < PLAY STOP LOOP LISTEN EXPORT PRINT STEMS NEW OPEN RECENT SAVE SAVE AS RESET DEVICE 
+  PASS  LOAD STEMS button found
+  PASS  file dialog opened by the click; all 13 files picked and opened
+  dialog title: Load stems (up to 13: Suno stems go to their own channels)
+  PASS  all loaded; 13 of 13 where they belong (Vocals 1, Backing 2, Drums 3, Percussion 4, Bass 5, Guitar 6, Keyboard 7, Synth 8, Strings 9, Brass 10, Woodwinds 11, FX 12, the whole song in EXT 1)
+    channel 1: 12 Vocals.wav
+    channel 2: 11 Backing_Vocals.wav
+    channel 3: 10 Drums.wav
+    channel 4: 6 Percussion.wav
+    channel 5: 9 Bass.wav
+    channel 6: 8 Guitar.wav
+    channel 7: 7 Keyboard.wav
+    channel 8: 4 Synth.wav
+    channel 9: 5 Strings.wav
+    channel 10: 2 Brass.wav
+    channel 11: 1 Woodwinds.wav
+    channel 12: 3 FX.wav
+    channel 13: -
+    channel 14: 0 Reading the Same Letter.wav
+
+[3] Change controls with real clicks (switches and selectors on DESK, STEP EQ, TWIN BUS, COLOUR)
+  PASS  72 real clicks changed 71 saved controls (need at least 50)
+  PASS  title shows unsaved changes: "HEM Digital Console 0.4.0  —  untitled *"
+
+[4] SAVE (Ctrl+S on the keyboard): first save asks for a name
+  PASS  save dialog ("Save the session"), name typed, Save pressed
+  PASS  session file written: Reading the Same Letter.hemc
+  PASS  title after save: "HEM Digital Console 0.4.0  —  Reading the Same Letter" (no *)
+  PASS  it is first in RECENT
+  PASS  file holds the format version and stem paths relative to the session
+  PASS  SAVE button the second time: saved in place, no dialog
+
+[5] Close and reopen: every setting must match
+  PASS  closed without a question (nothing unsaved)
+  PASS  973 of 973 saved settings match after reopening
+  PASS  13 of 13 files back in the same slots (13)
+
+[6] NEW with unsaved changes asks "Save changes?"
+  PASS  NEW: the question appeared; Cancel keeps everything
+  it says: MainInstructionIcon
+Save changes to Reading the Same Letter?
+  PASS  after Cancel the stems are still there
+  PASS  NEW again: "Don't save" pressed
+  PASS  new session: no stems, nothing unsaved, untitled
+
+[7] OPEN: the three file types, start folder, opening a session; RECENT
+  file types offered: Sessions + Audio | Sessions (*.hemc) | Audio (WAV, MP3, FLAC) | 
+  PASS  OPEN dialog offers "Sessions + Audio", "Sessions (*.hemc)" and "Audio (WAV, MP3, FLAC)"
+  PASS  session picked in OPEN
+  PASS  the session opened with its stems
+  PASS  OPEN with two audio files
+  PASS  audio from OPEN loads as stems (Vocals on 1, Drums on 3)
+  PASS  RECENT lists "Reading the Same Letter"
+  PASS  picked from RECENT: the session is open again
+
+[8] SAVE AS (Ctrl+Shift+S)
+  PASS  SAVE AS dialog ("Save the session as"), new name
+  PASS  saved as a new file; the title names it
+
+[9] Crash in the middle of a save: the last saved session must still open; recovery is offered
+  PASS  killed while saving: the half-written side file had 6144 of 22310 bytes
+  PASS  the session file itself is untouched (byte for byte the last save)
+  PASS  after the crash: "Recover my work?" offered and accepted
+  PASS  recovered work has the changes made before the crash (973 of 973 settings)
+  PASS  closing with recovered (unsaved) work asks first
+  PASS  the session opens as last saved: 973 of 973 settings
+
+[10] Moved stems: reopening asks where they are and relinks them by name
+  PASS  stems folder moved to D:\a\_temp\hem-uitest\moved\reading the same letter (moved)
+  PASS  it asked about the missing stems (not crashed): "MainInstructionIcon
+The console did not close properly last ..."
+  FAIL  folder picked in the folder dialog
+  FAIL  all 13 files found in the new folder and loaded
+  PASS  the console is still running
+
+[11] Dropping files (sent as a command: the same code as an Explorer drop)
+  FAIL  one file dropped on channel 5: only channel 5 changed (12 others untouched)
+  FAIL  15 files: the console says plainly which were left out
+  FAIL  the message names Take 14.wav and Take 15.wav
+
+[12] Window size, position and maximized state are remembered
+     closing a dialog left open: "Where are the stems now?"
+     the app did not close: killed
+  FAIL  reopened at the same place and size (1040x744 at -8,-8)
+     the app did not close: killed
+  PASS  closed maximized: opens maximized
+  FAIL  final start: 435 controls, 0 outside the window/screen, 224 covered (first: selector 'Tool'); bottom bar: LOAD STEMS  < PLAY STOP LOOP LISTEN EXPORT PRINT STEMS NEW OPEN RECENT SAVE SAVE AS RESET DEVICE 
+     the app did not close: killed
+
+81 checks, 7 failed -> FAIL
