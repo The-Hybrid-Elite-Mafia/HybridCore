@@ -1,0 +1,7 @@
+{
+ "written": "2026-10-29",
+ "about": "Fix to SPLIT-ADDENDUM-2026-10-29.json, written before any flutter v4 reading was taken on the test clips.",
+ "what_happened": "The first run of check4b.py stopped on its own check ('only 6 test clips') before measuring anything. Most human files are 19.98-20.00 s long, so a strict 20.000 s minimum threw out 13 of 19 files for a few milliseconds.",
+ "change": "Minimum clip length and clip length are 19.5 s (was 20.0 s). Nothing else changes: same meter, same 10 test clips rule (first 10 files from index 24 up that are not refused), same +/-20 % at 0.30 depth, same 9 of 10.",
+ "readings_seen_before_this_note": "none on the test clips"
+}

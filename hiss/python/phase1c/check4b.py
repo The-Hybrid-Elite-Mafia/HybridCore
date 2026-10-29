@@ -8,7 +8,7 @@ SYN_ONLY = len(sys.argv) > 3 and sys.argv[3] == "synthetic"
 def bp(x, s): return signal.sosfiltfilt(signal.butter(4, [5000, min(15000, s/2*0.9)], btype="band", fs=s, output="sos"), x)
 def flutter_depth(x, s, f=25.0):
     """Meter v4. Returns None when it refuses."""
-    if len(x) < 20.0*s: return None
+    if len(x) < 19.5*s: return None
     b = bp(x, s)
     if np.sqrt(np.mean(b*b)) < 10**(-90/20): return None
     e = signal.sosfiltfilt(signal.butter(4, 200, fs=s, output="sos"), np.abs(signal.hilbert(b)))
@@ -28,7 +28,7 @@ hum.sort(key=lambda r: r["C_8_20k_db"]-r["A_5_10k_db"], reverse=True)
 rng = np.random.default_rng(4242); clips = []; refused = []
 for r in hum[24:]:
     x, s = h1c.load_mono(h1c.analysis_path(analysis_dir, r["sha256"]), max_s=40)
-    x = x[:int(20.0*s)]
+    x = x[:int(19.5*s)]
     if flutter_depth(x, s) is None: refused.append(r["sha256"][:8]); continue
     clips.append((r["sha256"][:8], x, s))
     if len(clips) == 10: break
@@ -39,7 +39,7 @@ for name, x, s in clips:
     rows.append({"clip": name, "rate": s, "reading": round(d, 4), "baseline_reading": round(flutter_depth(x, s), 4), "ok": bool(0.24 <= d <= 0.36)})
 # sensitivity
 JIT = (197, 411, 677, 1013, 1500)
-thr = float(np.percentile([abs((flutter_depth(x[j:], s) or 0) - flutter_depth(x, s)) if len(x[j:]) >= 20*s else abs(flutter_depth(np.concatenate([x[j:], x[:j]]), s) - flutter_depth(x, s)) for _, x, s in clips for j in JIT], 95))
+thr = float(np.percentile([abs((flutter_depth(x[j:], s) or 0) - flutter_depth(x, s)) if len(x[j:]) >= 19.5*s else abs(flutter_depth(np.concatenate([x[j:], x[:j]]), s) - flutter_depth(x, s)) for _, x, s in clips for j in JIT], 95))
 lad = []
 for m in (0.05, 0.1, 0.2, 0.3, 0.5):
     det = sum(flutter_depth(inject(x, s, m, rng), s) > thr for _, x, s in clips); lad.append({"depth": m, "present_of_10": int(det)})
