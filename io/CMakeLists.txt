@@ -8,6 +8,7 @@ add_library(hc_io STATIC
     src/CpuProbe.cpp
     src/SampleConvert.cpp
     src/WasapiExclusiveOutput.cpp
+    src/WasapiSharedOutput.cpp
     src/OfflineStream.cpp)
 add_library(hc::io ALIAS hc_io)
 
