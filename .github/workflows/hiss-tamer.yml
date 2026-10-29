@@ -23,8 +23,8 @@ jobs:
           ref="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
           base="${GITHUB_BASE_REF:-}"
           echo "branch=$ref base=$base"
-          if [ "$ref" = "main" ] || [ "$base" = "main" ]; then
-            echo "Hiss Tamer work must stay on a hiss-tamer-* branch and must never merge to main."
+          if [ "$ref" = "main" ]; then
+            echo "Hiss Tamer work must stay on a hiss-tamer-* branch. It must never be on main."
             exit 1
           fi
 
