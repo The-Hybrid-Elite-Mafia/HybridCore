@@ -185,15 +185,18 @@ struct App {
         return ctx.hit;
     }
     // A top-level dialog (#32770) or menu (#32768) of the app's process.
-    [[nodiscard]] HWND findDialog(const wchar_t* cls = L"#32770") const {
-        struct Ctx { DWORD pid; const wchar_t* cls; HWND hit; } ctx{pi.dwProcessId, cls, nullptr};
+    // With a title: only a window with exactly that title (so a step never takes another dialog for its own).
+    [[nodiscard]] HWND findDialog(const wchar_t* cls = L"#32770", const wchar_t* title = nullptr) const {
+        struct Ctx { DWORD pid; const wchar_t* cls; const wchar_t* title; HWND hit; } ctx{pi.dwProcessId, cls, title, nullptr};
         ::EnumWindows([](HWND h, LPARAM lp) -> BOOL {
             auto* c = reinterpret_cast<Ctx*>(lp);
             DWORD pid = 0;
             ::GetWindowThreadProcessId(h, &pid);
             wchar_t name[64] = {};
             ::GetClassNameW(h, name, 64);
-            if (pid == c->pid && std::wstring(name) == c->cls && ::IsWindowVisible(h)) { c->hit = h; return FALSE; }
+            wchar_t t[256] = {};
+            if (c->title) ::GetWindowTextW(h, t, 256);
+            if (pid == c->pid && std::wstring(name) == c->cls && ::IsWindowVisible(h) && (!c->title || std::wstring(t) == c->title)) { c->hit = h; return FALSE; }
             return TRUE;
         }, reinterpret_cast<LPARAM>(&ctx));
         return ctx.hit;
@@ -346,9 +349,19 @@ std::wstring dialogText(HWND dlg) {
 }
 // A file dialog of the app: type the full path(s) into "File name:" and press the default button.
 // For several files in one folder: navigate there first, then the quoted names.
-bool fileDialogPick(App& app, const std::wstring& folder, const std::vector<std::wstring>& names, std::wstring* titleOut = nullptr, std::wstring* textOut = nullptr) {
+bool fileDialogPick(App& app, const std::wstring& title, const std::wstring& folder, const std::vector<std::wstring>& names, std::wstring* titleOut = nullptr,
+                    std::wstring* textOut = nullptr) {
     HWND dlg = nullptr;
-    if (!waitFor([&] { dlg = app.findDialog(); return dlg != nullptr; }, 15s)) return false;
+    if (!waitFor([&] { dlg = app.findDialog(L"#32770", title.c_str()); return dlg != nullptr; }, 15s)) {
+        if (HWND other = app.findDialog()) {
+            wchar_t t[256] = {};
+            ::GetWindowTextW(other, t, 256);
+            log("     expected the dialog \"" + narrow(title) + "\", the app shows \"" + narrow(t) + "\"");
+        } else {
+            log("     expected the dialog \"" + narrow(title) + "\": no dialog appeared");
+        }
+        return false;
+    }
     std::this_thread::sleep_for(700ms);
     wchar_t title[256] = {};
     ::GetWindowTextW(dlg, title, 256);
@@ -376,12 +389,43 @@ bool fileDialogPick(App& app, const std::wstring& folder, const std::vector<std:
     if (okBtn) okBtn->Release();
     if (root) root->Release();
     // gone?
-    return ok && waitFor([&] { return app.findDialog() != dlg || !::IsWindow(dlg) || !::IsWindowVisible(dlg); }, 15s);
+    return ok && waitFor([&] { return !::IsWindow(dlg) || !::IsWindowVisible(dlg); }, 15s);
+}
+// The file types a file dialog offers (its "Save as type" / file type list, opened to read the items).
+std::wstring fileTypes(HWND dlg) {
+    std::wstring out;
+    IUIAutomationElement* root = elementOf(dlg);
+    IUIAutomationElement* combo = findIn(root, UIA_AutomationIdPropertyId, L"1136", UIA_ComboBoxControlTypeId);
+    if (combo) {
+        IUIAutomationExpandCollapsePattern* ec = nullptr;
+        if (SUCCEEDED(combo->GetCurrentPatternAs(UIA_ExpandCollapsePatternId, __uuidof(IUIAutomationExpandCollapsePattern), reinterpret_cast<void**>(&ec))) && ec) {
+            ec->Expand();
+            std::this_thread::sleep_for(500ms);
+        }
+        IUIAutomationCondition* t = nullptr;
+        VARIANT v{}; v.vt = VT_I4; v.lVal = UIA_ListItemControlTypeId;
+        gUia->CreatePropertyCondition(UIA_ControlTypePropertyId, v, &t);
+        IUIAutomationElementArray* arr = nullptr;
+        combo->FindAll(TreeScope_Descendants, t, &arr);
+        int n = 0;
+        if (arr) arr->get_Length(&n);
+        for (int i = 0; i < n; ++i) {
+            IUIAutomationElement* e = nullptr;
+            arr->GetElement(i, &e);
+            if (e) { out += nameOf(e) + L" | "; e->Release(); }
+        }
+        if (arr) arr->Release();
+        if (t) t->Release();
+        if (ec) { ec->Collapse(); ec->Release(); }
+        combo->Release();
+    }
+    if (root) root->Release();
+    return out;
 }
 // Presses a named button in the app's dialog (task dialog). Returns the dialog's text too.
 bool pressDialogButton(App& app, const std::wstring& button, std::wstring* textOut = nullptr, std::chrono::milliseconds wait = 15s) {
-    HWND dlg = nullptr;
-    if (!waitFor([&] { dlg = app.findDialog(); return dlg != nullptr; }, wait)) return false;
+    HWND dlg = nullptr;   // the console's own questions are titled "HEM Digital Console"
+    if (!waitFor([&] { dlg = app.findDialog(L"#32770", L"HEM Digital Console"); return dlg != nullptr; }, wait)) return false;
     std::this_thread::sleep_for(500ms);
     if (textOut) *textOut = dialogText(dlg);
     IUIAutomationElement* root = elementOf(dlg);
@@ -390,6 +434,24 @@ bool pressDialogButton(App& app, const std::wstring& button, std::wstring* textO
     if (b) b->Release();
     if (root) root->Release();
     return ok && waitFor([&] { return !::IsWindow(dlg) || !::IsWindowVisible(dlg); }, 15s);
+}
+
+// Closes the app like the close box: answers "Save changes?" with "Don't save" if it asks; kills it if it hangs.
+// Returns true when it closed by itself.
+bool closeApp(App& app, bool* asked = nullptr) {
+    if (asked) *asked = false;
+    if (!app.running()) { app.close(); return true; }
+    ::PostMessageW(app.hwnd, WM_CLOSE, 0, 0);
+    bool exited = app.waitExit(4s);
+    if (!exited && app.findDialog(L"#32770", L"HEM Digital Console")) {
+        if (asked) *asked = true;
+        pressDialogButton(app, L"Don't save", nullptr, 3s);
+        exited = app.waitExit(20s);
+    }
+    if (!exited) exited = app.waitExit(16s);
+    if (!exited) { log("     the app did not close: killed"); app.kill(); }
+    app.close();
+    return exited;
 }
 
 // ---- screen ----
@@ -677,9 +739,7 @@ int wmain(int argc, wchar_t** argv) {
                 }
                 ++fitRuns;
             }
-            ::PostMessageW(app.hwnd, WM_CLOSE, 0, 0);
-            if (!app.waitExit(20s)) { check(false, tag + ": closed"); whyNoAnswer(app, tag); app.kill(); }
-            app.close();
+            if (!closeApp(app)) check(false, tag + ": closed");
         }
         setScale(100, nullptr);
     }
@@ -703,7 +763,7 @@ int wmain(int argc, wchar_t** argv) {
     std::wstring dlgTitle, dlgText;
     if (check(load.has_value(), "LOAD STEMS button found")) {
         app.clickWidget(*load);
-        check(fileDialogPick(app, stems.wstring(), suno, &dlgTitle, &dlgText), "file dialog opened by the click; all 13 files picked and opened");
+        check(fileDialogPick(app, L"Load stems (up to 13: Suno stems go to their own channels)", stems.wstring(), suno, &dlgTitle, &dlgText), "file dialog opened by the click; all 13 files picked and opened");
         log("  dialog title: " + narrow(dlgTitle));
     }
     auto loadedCount = [&](const char* must) {
@@ -759,7 +819,7 @@ int wmain(int argc, wchar_t** argv) {
     waitNoDialog(app, "SAVE");
     bringToFront(app.hwnd);
     chord({VK_CONTROL, 'S'});
-    if (!check(fileDialogPick(app, L"", {sessionFile.wstring()}, &dlgTitle), "save dialog (\"" + narrow(dlgTitle) + "\"), name typed, Save pressed")) logTrace(app, 15);
+    if (!check(fileDialogPick(app, L"Save the session", L"", {sessionFile.wstring()}, &dlgTitle), "save dialog (\"" + narrow(dlgTitle) + "\"), name typed, Save pressed")) logTrace(app, 15);
     check(waitFor([&] { return fs::exists(sessionFile, ec); }, 10s), "session file written: " + u8(sessionFile.filename()));
     std::this_thread::sleep_for(1500ms);
     app.report(r);
@@ -779,9 +839,8 @@ int wmain(int argc, wchar_t** argv) {
     log("\n[5] Close and reopen: every setting must match");
     std::map<std::string, std::string> saved;
     app.state(saved);
-    ::PostMessageW(app.hwnd, WM_CLOSE, 0, 0);   // the close box
-    check(app.waitExit(20s), "closed without a question (nothing unsaved)");
-    app.close();
+    bool asked = false;
+    check(closeApp(app, &asked) && !asked, "closed without a question (nothing unsaved)");
     if (!app.start({L"\"" + sessionFile.wstring() + L"\""})) { check(false, "app restarted with the session"); return 1; }
     std::this_thread::sleep_for(3s);
     waitFor([&] { return loadedCount(nullptr) == 13; }, 60s, 500ms);
@@ -827,13 +886,14 @@ int wmain(int argc, wchar_t** argv) {
     if (const auto op = button(r, "OPEN")) {
         app.clickWidget(*op);
         HWND dlg = nullptr;
-        waitFor([&] { dlg = app.findDialog(); return dlg != nullptr; }, 15s);
+        waitFor([&] { dlg = app.findDialog(L"#32770", L"Open a session or audio files"); return dlg != nullptr; }, 15s);
         std::this_thread::sleep_for(800ms);
-        const std::wstring all = dialogText(dlg);
+        const std::wstring all = fileTypes(dlg);
+        log("  file types offered: " + narrow(all));
         check(all.find(L"Sessions + Audio") != std::wstring::npos && all.find(L"Sessions (*.hemc)") != std::wstring::npos &&
                   all.find(L"Audio (WAV, MP3, FLAC)") != std::wstring::npos,
               "OPEN dialog offers \"Sessions + Audio\", \"Sessions (*.hemc)\" and \"Audio (WAV, MP3, FLAC)\"");
-        check(fileDialogPick(app, L"", {sessionFile.wstring()}), "session picked in OPEN");
+        check(fileDialogPick(app, L"Open a session or audio files", L"", {sessionFile.wstring()}), "session picked in OPEN");
         std::this_thread::sleep_for(3s);
         app.report(r);
         check(r.get("session") == u8(sessionFile) && !r.get("stem1").empty(), "the session opened with its stems");
@@ -842,7 +902,7 @@ int wmain(int argc, wchar_t** argv) {
     app.report(r);
     if (const auto op = button(r, "OPEN")) {
         app.clickWidget(*op);
-        check(fileDialogPick(app, stems.wstring(), {L"12 Vocals.wav", L"10 Drums.wav"}), "OPEN with two audio files");
+        check(fileDialogPick(app, L"Open a session or audio files", stems.wstring(), {L"12 Vocals.wav", L"10 Drums.wav"}), "OPEN with two audio files");
         std::this_thread::sleep_for(3s);
         app.report(r);
         check(fs::path(widen(r.get("stem1"))).filename() == L"12 Vocals.wav" && fs::path(widen(r.get("stem3"))).filename() == L"10 Drums.wav" && r.get("stem2").empty(),
@@ -889,16 +949,14 @@ int wmain(int argc, wchar_t** argv) {
     const fs::path copyFile = work / "Reading the Same Letter v2.hemc";
     bringToFront(app.hwnd);
     chord({VK_CONTROL, VK_SHIFT, 'S'});
-    check(fileDialogPick(app, L"", {copyFile.wstring()}, &dlgTitle), "SAVE AS dialog (\"" + narrow(dlgTitle) + "\"), new name");
+    check(fileDialogPick(app, L"Save the session as", L"", {copyFile.wstring()}, &dlgTitle), "SAVE AS dialog (\"" + narrow(dlgTitle) + "\"), new name");
     std::this_thread::sleep_for(1500ms);
     app.report(r);
     check(fs::exists(copyFile, ec) && r.get("session") == u8(copyFile) && r.get("title").find("v2") != std::string::npos, "saved as a new file; the title names it");
 
     // =========================================================================================================
     log("\n[9] Crash in the middle of a save: the last saved session must still open; recovery is offered");
-    ::PostMessageW(app.hwnd, WM_CLOSE, 0, 0);
-    app.waitExit(20s);
-    app.close();
+    closeApp(app);
     std::map<std::string, std::string> beforeCrash;
     if (!app.start({L"--test-slow-save", L"60", L"\"" + copyFile.wstring() + L"\""})) { check(false, "app started (slow save)"); return 1; }
     std::this_thread::sleep_for(3s);
@@ -932,10 +990,7 @@ int wmain(int argc, wchar_t** argv) {
     int recMatch = 0;
     for (const auto& [k, v] : changedState) if (recovered.count(k) && recovered[k] == v) ++recMatch;
     check(recMatch == static_cast<int>(changedState.size()), "recovered work has the changes made before the crash (" + std::to_string(recMatch) + " of " + std::to_string(changedState.size()) + " settings)");
-    ::PostMessageW(app.hwnd, WM_CLOSE, 0, 0);
-    check(pressDialogButton(app, L"Don't save", nullptr, 10s), "closing with recovered (unsaved) work asks first");
-    app.waitExit(20s);
-    app.close();
+    check(closeApp(app, &asked) && asked, "closing with recovered (unsaved) work asks first");
     if (!app.start({L"\"" + copyFile.wstring() + L"\""})) { check(false, "app started with the session"); return 1; }
     std::this_thread::sleep_for(3s);
     std::map<std::string, std::string> afterCrash;
@@ -943,9 +998,7 @@ int wmain(int argc, wchar_t** argv) {
     int crashSame = 0;
     for (const auto& [k, v] : beforeCrash) if (afterCrash.count(k) && afterCrash[k] == v) ++crashSame;
     check(crashSame == static_cast<int>(beforeCrash.size()), "the session opens as last saved: " + std::to_string(crashSame) + " of " + std::to_string(beforeCrash.size()) + " settings");
-    ::PostMessageW(app.hwnd, WM_CLOSE, 0, 0);
-    app.waitExit(20s);
-    app.close();
+    closeApp(app);
 
     // =========================================================================================================
     log("\n[10] Moved stems: reopening asks where they are and relinks them by name");
@@ -956,7 +1009,7 @@ int wmain(int argc, wchar_t** argv) {
     if (!app.start({L"\"" + sessionFile.wstring() + L"\""})) { check(false, "app started"); return 1; }
     check(pressDialogButton(app, L"Find the folder...", &text), "it asked about the missing stems (not crashed): \"" +
           narrow(text.substr(0, std::min<std::size_t>(text.size(), 60))) + "...\"");
-    check(fileDialogPick(app, L"", {moved.wstring()}), "folder picked in the folder dialog");
+    check(fileDialogPick(app, L"Where are the stems now?", L"", {moved.wstring()}), "folder picked in the folder dialog");
     loaded = waitFor([&] { return loadedCount("(moved)") == 13; }, 60s, 500ms);
     app.report(r);
     check(loaded, "all 13 files found in the new folder and loaded");
@@ -994,10 +1047,7 @@ int wmain(int argc, wchar_t** argv) {
     std::this_thread::sleep_for(2500ms);
     RECT wr{};
     ::GetWindowRect(app.hwnd, &wr);
-    ::PostMessageW(app.hwnd, WM_CLOSE, 0, 0);
-    pressDialogButton(app, L"Don't save", nullptr, 5s);
-    app.waitExit(20s);
-    app.close();
+    closeApp(app);
     app.start({});
     std::this_thread::sleep_for(3s);
     RECT wr2{};
@@ -1007,21 +1057,14 @@ int wmain(int argc, wchar_t** argv) {
               std::to_string(wr2.left) + "," + std::to_string(wr2.top) + ")");
     ::ShowWindow(app.hwnd, SW_MAXIMIZE);
     std::this_thread::sleep_for(2500ms);
-    ::PostMessageW(app.hwnd, WM_CLOSE, 0, 0);
-    pressDialogButton(app, L"Don't save", nullptr, 5s);
-    app.waitExit(20s);
-    app.close();
+    closeApp(app);
     app.start({});
     std::this_thread::sleep_for(3s);
     check(::IsZoomed(app.hwnd) != FALSE, "closed maximized: opens maximized");
     app.report(r);
     checkOnScreen(app, r, "final start");
     screenshot(out / "uitest-final.png");
-    ::PostMessageW(app.hwnd, WM_CLOSE, 0, 0);
-    pressDialogButton(app, L"Don't save", nullptr, 5s);
-    app.waitExit(20s);
-    app.kill();
-    app.close();
+    closeApp(app);
 
     char tail[160];
     std::snprintf(tail, sizeof tail, "\n%d checks, %d failed -> %s", gChecks, gFails, gFails ? "FAIL" : "PASS");
