@@ -16,7 +16,8 @@ add_library(hc_hiss STATIC
     src/HissMetrics.cpp
     src/HissAuto.cpp
     src/HissCombEngine.cpp
-    src/HissCombAuto.cpp)
+    src/HissCombAuto.cpp
+    src/HissMeters.cpp)
 add_library(hc::hiss ALIAS hc_hiss)
 target_include_directories(hc_hiss PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_link_libraries(hc_hiss PUBLIC hc::build_flags)

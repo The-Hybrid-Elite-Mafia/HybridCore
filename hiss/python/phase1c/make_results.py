@@ -3,6 +3,7 @@ import json, sys, os, hashlib
 d = sys.argv[1]
 L = lambda n: json.load(open(os.path.join(d, n)))
 c1, c2, c3, c4, c5, c6 = (L(f"check{i}.json") for i in range(1, 7))
+c4b, c4p, c7 = L("check4b.json"), L("check4b_posthoc.json"), L("check7.json")
 real1 = [r for r in c1["real"] if "shape" in r]
 gates = {
  "1_bandwidth_audit": {"pass": bool(c1["synthetic_all_ok"]), "synthetic_cases": len(c1["synthetic"]), "synthetic_cases_ok": sum(x["ok"] for x in c1["synthetic"]),
@@ -12,12 +13,16 @@ gates = {
  "4_synthetic_injection": {"pass": bool(c4["gate_pass_with_v1_flutter"] or c4["gate_pass_with_v2_1_flutter"]),
     "air_of_10": c4["air_pass_count"], "air_fixed_mask_of_10": c4["air_fixed_mask_pass_count"], "smear_of_10": c4["smear_pass_count"], "notch_of_10": c4["notch_pass_count"],
     "flutter_v1_of_10": c4["flutter_pass_count"], "flutter_v2_setA_of_10_numeric_bug": c4["flutter_v2_setA_pass_count"], "flutter_v2_1_setC_fresh_of_10": c4["flutter_v2_1_setC_fresh_pass_count"],
-    "failed": ["25 Hz flutter depth"]},
+    "failed": ["25 Hz flutter depth, quantified"],
+    "flutter_v4_fresh_clips_of_10": c4b["pass_count"], "flutter_v4_readings_mean": c4b["readings_mean"], "flutter_v4_note": "pre-registered in SPLIT-ADDENDUM-2026-10-29.json; FAILED; flutter is detect-only",
+    "flutter_detect_floor_posthoc": c4p["detect_only_floor_depth"], "flutter_threshold_posthoc": c4p["highest_clean_reading"],
+    "correction": "check5.json flutter floors (0.2) used a bad threshold (FAILURES.md F12); the post-hoc value above replaces them"},
  "5_sensitivity_floor": {"pass": bool(c5["gate_pass"]), "floors": {k: v["floor"] for k, v in c5["ladders"].items()},
     "comb_floor_line_dbfs": {k: v["floor_line_dbfs"] for k, v in c5["comb_floor"].items()}, "repeatability": c5["repeatability_thresholds"]},
+ "7_cpp_meters_three_way": {"pass": c7["n_ok"] == c7["n"], "files_agree": f'{c7["n_ok"]}/{c7["n"]}', "tools": ["C++23 HissMeters", "Python h1c", "libebur128 (separately written)"]},
  "6_independent_tool_check": {"pass": c6["n_ok"] == c6["n"], "files_ok": f'{c6["n_ok"]}/{c6["n"]}', "worst_abs_diff_db": c6["worst_abs_diff_db"], "tools": c6["tools"]},
 }
-res = {"phase": "1", "all_six_pass": all(g["pass"] for g in gates.values()), "gates": gates,
+res = {"phase": "1", "all_six_pass": all(g["pass"] for k, g in gates.items() if k[0] in "123456"), "gates": gates,
        "inputs": {f: hashlib.sha256(open(os.path.join(d, f), "rb").read()).hexdigest() for f in sorted(os.listdir(d)) if f.startswith("check")},
        "regenerate": "python hiss/python/phase1c/check1.py ... check6.py then make_results.py; needs the closed-key analysis copies, which are not in the repo"}
 json.dump(res, open(os.path.join(d, "..", "RESULTS.json"), "w"), indent=1)

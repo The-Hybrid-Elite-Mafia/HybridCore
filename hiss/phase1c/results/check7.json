@@ -1,0 +1,1324 @@
+{
+ "libebur128": "jiixyj/libebur128 commit 67b33ab (2021-02-14), MIT, built with gcc here",
+ "files": [
+  {
+   "sha256": "84a8b5e865417b84da3dc9dd61d352880016bc9b95409fc45539c1a95cc0701d",
+   "group": "human_reference",
+   "rate": 44100,
+   "seconds": 29.1,
+   "ok": true,
+   "compare": {
+    "lufs_vs_python": {
+     "cpp": -25.9054,
+     "py": -25.9666,
+     "diff": 0.0612,
+     "tol": 0.1,
+     "ok": true
+    },
+    "lufs_vs_libebur128": {
+     "cpp": -25.9054,
+     "py": -25.9054,
+     "diff": 0.0,
+     "tol": 0.1,
+     "ok": true
+    },
+    "true_peak_vs_libebur128": {
+     "cpp": -2.1256,
+     "py": -2.1185,
+     "diff": -0.0071,
+     "tol": 0.2,
+     "ok": true
+    },
+    "rms_dbfs": {
+     "cpp": -24.6811,
+     "py": -24.6811,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "A_5_10k_db": {
+     "cpp": -60.2737,
+     "py": -60.2737,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "B_16_20k_db": {
+     "cpp": -86.7068,
+     "py": -86.7068,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "C_8_20k_db": {
+     "cpp": -66.4244,
+     "py": -66.4244,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "ratio_16_20_over_5_10_db": {
+     "cpp": -26.433,
+     "py": -26.433,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "ratio_16_19_over_5_10_db": {
+     "cpp": -26.724,
+     "py": -26.724,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "cutoff_hz": {
+     "cpp": 22050.0,
+     "py": 22050,
+     "shape_cpp": "NONE",
+     "shape_py": "NONE",
+     "diff": 0.0,
+     "ok": true
+    },
+    "comb_median_line_db": {
+     "cpp": -300.0,
+     "py": -300.0,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "flutter_depth": {
+     "cpp": 0.0766,
+     "py": 0.0765,
+     "diff": 0.0,
+     "tol": 0.005,
+     "ok": true
+    }
+   }
+  },
+  {
+   "sha256": "c472fe1fccc336efbd189ec8b413a2950f5ea0a83d4c9cfd2be7cc5168c15213",
+   "group": "human_reference",
+   "rate": 44100,
+   "seconds": 29.1,
+   "ok": true,
+   "compare": {
+    "lufs_vs_python": {
+     "cpp": -22.8815,
+     "py": -22.9268,
+     "diff": 0.0453,
+     "tol": 0.1,
+     "ok": true
+    },
+    "lufs_vs_libebur128": {
+     "cpp": -22.8815,
+     "py": -22.8815,
+     "diff": 0.0,
+     "tol": 0.1,
+     "ok": true
+    },
+    "true_peak_vs_libebur128": {
+     "cpp": -0.3957,
+     "py": -0.388,
+     "diff": -0.0077,
+     "tol": 0.2,
+     "ok": true
+    },
+    "rms_dbfs": {
+     "cpp": -23.584,
+     "py": -23.584,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "A_5_10k_db": {
+     "cpp": -32.909,
+     "py": -32.909,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "B_16_20k_db": {
+     "cpp": -49.5125,
+     "py": -49.5125,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "C_8_20k_db": {
+     "cpp": -35.1933,
+     "py": -35.1933,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "ratio_16_20_over_5_10_db": {
+     "cpp": -16.6035,
+     "py": -16.6035,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "ratio_16_19_over_5_10_db": {
+     "cpp": -17.1304,
+     "py": -17.1304,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "cutoff_hz": {
+     "cpp": 21926.2,
+     "py": 21926,
+     "shape_cpp": "GENTLE",
+     "shape_py": "GENTLE",
+     "diff": 0.2,
+     "ok": true
+    },
+    "comb_median_line_db": {
+     "cpp": -300.0,
+     "py": -300.0,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "flutter_depth": {
+     "cpp": 0.0198,
+     "py": 0.0198,
+     "diff": -0.0,
+     "tol": 0.005,
+     "ok": true
+    }
+   }
+  },
+  {
+   "sha256": "f99fbbd9de09e53d98bf9d07b0d5fc22e3375ee4f0a53542cd61e8d70d349d28",
+   "group": "no_brakes",
+   "rate": 48000,
+   "seconds": 60.0,
+   "ok": true,
+   "compare": {
+    "lufs_vs_python": {
+     "cpp": -21.006,
+     "py": -21.0481,
+     "diff": 0.0421,
+     "tol": 0.1,
+     "ok": true
+    },
+    "lufs_vs_libebur128": {
+     "cpp": -21.006,
+     "py": -21.006,
+     "diff": 0.0,
+     "tol": 0.1,
+     "ok": true
+    },
+    "true_peak_vs_libebur128": {
+     "cpp": -3.7629,
+     "py": -3.7643,
+     "diff": 0.0014,
+     "tol": 0.2,
+     "ok": true
+    },
+    "rms_dbfs": {
+     "cpp": -22.8291,
+     "py": -22.8291,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "A_5_10k_db": {
+     "cpp": -32.8154,
+     "py": -32.8154,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "B_16_20k_db": {
+     "cpp": -56.1875,
+     "py": -56.1875,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "C_8_20k_db": {
+     "cpp": -34.1511,
+     "py": -34.1511,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "ratio_16_20_over_5_10_db": {
+     "cpp": -23.3722,
+     "py": -23.3722,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "ratio_16_19_over_5_10_db": {
+     "cpp": -23.9248,
+     "py": -23.9248,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "cutoff_hz": {
+     "cpp": 20021.5,
+     "py": 20021,
+     "shape_cpp": "WALL",
+     "shape_py": "WALL",
+     "diff": 0.5,
+     "ok": true
+    },
+    "comb_median_line_db": {
+     "cpp": -98.271,
+     "py": -98.271,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "flutter_depth": {
+     "cpp": 0.0067,
+     "py": 0.0067,
+     "diff": -0.0,
+     "tol": 0.005,
+     "ok": true
+    }
+   }
+  },
+  {
+   "sha256": "48999cc8366be92c1c70dc16b2666f3bac5a0255d01c6fc711480c7ad7006b3e",
+   "group": "no_brakes",
+   "rate": 48000,
+   "seconds": 60.0,
+   "ok": true,
+   "compare": {
+    "lufs_vs_python": {
+     "cpp": -23.7372,
+     "py": -23.7765,
+     "diff": 0.0393,
+     "tol": 0.1,
+     "ok": true
+    },
+    "lufs_vs_libebur128": {
+     "cpp": -23.7372,
+     "py": -23.7372,
+     "diff": 0.0,
+     "tol": 0.1,
+     "ok": true
+    },
+    "true_peak_vs_libebur128": {
+     "cpp": -2.2713,
+     "py": -2.2713,
+     "diff": 0.0,
+     "tol": 0.2,
+     "ok": true
+    },
+    "rms_dbfs": {
+     "cpp": -25.5908,
+     "py": -25.5908,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "A_5_10k_db": {
+     "cpp": -34.3541,
+     "py": -34.3541,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "B_16_20k_db": {
+     "cpp": -49.1441,
+     "py": -49.1441,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "C_8_20k_db": {
+     "cpp": -35.4484,
+     "py": -35.4484,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "ratio_16_20_over_5_10_db": {
+     "cpp": -14.79,
+     "py": -14.79,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "ratio_16_19_over_5_10_db": {
+     "cpp": -15.5379,
+     "py": -15.5379,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "cutoff_hz": {
+     "cpp": 20015.6,
+     "py": 20015,
+     "shape_cpp": "WALL",
+     "shape_py": "WALL",
+     "diff": 0.6,
+     "ok": true
+    },
+    "comb_median_line_db": {
+     "cpp": -88.949,
+     "py": -88.949,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "flutter_depth": {
+     "cpp": 0.0096,
+     "py": 0.0096,
+     "diff": 0.0,
+     "tol": 0.005,
+     "ok": true
+    }
+   }
+  },
+  {
+   "sha256": "7643e400eb669bf2b987883b6e8a792d9985e08001996d1c101c0816c2368cc4",
+   "group": "days240",
+   "rate": 48000,
+   "seconds": 60.0,
+   "ok": true,
+   "compare": {
+    "lufs_vs_python": {
+     "cpp": -30.675,
+     "py": -30.7153,
+     "diff": 0.0403,
+     "tol": 0.1,
+     "ok": true
+    },
+    "lufs_vs_libebur128": {
+     "cpp": -30.675,
+     "py": -30.675,
+     "diff": 0.0,
+     "tol": 0.1,
+     "ok": true
+    },
+    "true_peak_vs_libebur128": {
+     "cpp": -3.5633,
+     "py": -3.5632,
+     "diff": -0.0001,
+     "tol": 0.2,
+     "ok": true
+    },
+    "rms_dbfs": {
+     "cpp": -37.8324,
+     "py": -37.8324,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "A_5_10k_db": {
+     "cpp": -40.8334,
+     "py": -40.8334,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "B_16_20k_db": {
+     "cpp": -53.4246,
+     "py": -53.4246,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "C_8_20k_db": {
+     "cpp": -41.1649,
+     "py": -41.1649,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "ratio_16_20_over_5_10_db": {
+     "cpp": -12.5912,
+     "py": -12.5912,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "ratio_16_19_over_5_10_db": {
+     "cpp": -13.1795,
+     "py": -13.1795,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "cutoff_hz": {
+     "cpp": 19980.5,
+     "py": 19974,
+     "shape_cpp": "WALL",
+     "shape_py": "WALL",
+     "diff": 6.5,
+     "ok": true
+    },
+    "comb_median_line_db": {
+     "cpp": -111.863,
+     "py": -111.863,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "flutter_depth": {
+     "cpp": 0.0461,
+     "py": 0.046,
+     "diff": 0.0,
+     "tol": 0.005,
+     "ok": true
+    }
+   }
+  },
+  {
+   "sha256": "aa970993ade4ff7dadae03c23a48b1a6e71ab4b0cd845631426c45441d86d9b3",
+   "group": "days240",
+   "rate": 48000,
+   "seconds": 60.0,
+   "ok": true,
+   "compare": {
+    "lufs_vs_python": {
+     "cpp": -21.5306,
+     "py": -21.5715,
+     "diff": 0.0409,
+     "tol": 0.1,
+     "ok": true
+    },
+    "lufs_vs_libebur128": {
+     "cpp": -21.5306,
+     "py": -21.5306,
+     "diff": 0.0,
+     "tol": 0.1,
+     "ok": true
+    },
+    "true_peak_vs_libebur128": {
+     "cpp": -2.4942,
+     "py": -2.4922,
+     "diff": -0.002,
+     "tol": 0.2,
+     "ok": true
+    },
+    "rms_dbfs": {
+     "cpp": -21.5026,
+     "py": -21.5026,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "A_5_10k_db": {
+     "cpp": -49.7349,
+     "py": -49.7349,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "B_16_20k_db": {
+     "cpp": -59.0454,
+     "py": -59.0454,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "C_8_20k_db": {
+     "cpp": -49.2389,
+     "py": -49.2389,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "ratio_16_20_over_5_10_db": {
+     "cpp": -9.3105,
+     "py": -9.3105,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "ratio_16_19_over_5_10_db": {
+     "cpp": -9.9701,
+     "py": -9.9701,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "cutoff_hz": {
+     "cpp": 19933.6,
+     "py": 19933,
+     "shape_cpp": "WALL",
+     "shape_py": "WALL",
+     "diff": 0.6,
+     "ok": true
+    },
+    "comb_median_line_db": {
+     "cpp": -117.817,
+     "py": -117.8168,
+     "diff": -0.0002,
+     "tol": 0.05,
+     "ok": true
+    },
+    "flutter_depth": {
+     "cpp": 0.0432,
+     "py": 0.0432,
+     "diff": -0.0,
+     "tol": 0.005,
+     "ok": true
+    }
+   }
+  },
+  {
+   "sha256": "47bff08cfb5978faf74eee2794dc68937c611bdcd0f73bb8c885fe86952ba5cb",
+   "group": "twelve_stem_june",
+   "rate": 48000,
+   "seconds": 60.0,
+   "ok": true,
+   "compare": {
+    "lufs_vs_python": {
+     "cpp": -20.1321,
+     "py": -20.1742,
+     "diff": 0.0421,
+     "tol": 0.1,
+     "ok": true
+    },
+    "lufs_vs_libebur128": {
+     "cpp": -20.1321,
+     "py": -20.1321,
+     "diff": 0.0,
+     "tol": 0.1,
+     "ok": true
+    },
+    "true_peak_vs_libebur128": {
+     "cpp": -4.612,
+     "py": -4.612,
+     "diff": 0.0,
+     "tol": 0.2,
+     "ok": true
+    },
+    "rms_dbfs": {
+     "cpp": -22.9455,
+     "py": -22.9455,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "A_5_10k_db": {
+     "cpp": -32.7333,
+     "py": -32.7333,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "B_16_20k_db": {
+     "cpp": -50.7138,
+     "py": -50.7138,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "C_8_20k_db": {
+     "cpp": -32.8417,
+     "py": -32.8417,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "ratio_16_20_over_5_10_db": {
+     "cpp": -17.9805,
+     "py": -17.9805,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "ratio_16_19_over_5_10_db": {
+     "cpp": -18.1022,
+     "py": -18.1022,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "cutoff_hz": {
+     "cpp": 20027.3,
+     "py": 20027,
+     "shape_cpp": "WALL",
+     "shape_py": "WALL",
+     "diff": 0.3,
+     "ok": true
+    },
+    "comb_median_line_db": {
+     "cpp": -101.831,
+     "py": -101.8311,
+     "diff": 0.0001,
+     "tol": 0.05,
+     "ok": true
+    },
+    "flutter_depth": {
+     "cpp": 0.0077,
+     "py": 0.0077,
+     "diff": -0.0,
+     "tol": 0.005,
+     "ok": true
+    }
+   }
+  },
+  {
+   "sha256": "14a7e26ee22be4ed46e35a43371df829014f1b8b6e1bd999960b6e65bd7e067b",
+   "group": "twelve_stem_june",
+   "rate": 48000,
+   "seconds": 60.0,
+   "ok": true,
+   "compare": {
+    "lufs_vs_python": {
+     "cpp": -27.1109,
+     "py": -27.1476,
+     "diff": 0.0367,
+     "tol": 0.1,
+     "ok": true
+    },
+    "lufs_vs_libebur128": {
+     "cpp": -27.1109,
+     "py": -27.1109,
+     "diff": 0.0,
+     "tol": 0.1,
+     "ok": true
+    },
+    "true_peak_vs_libebur128": {
+     "cpp": -2.6558,
+     "py": -2.6558,
+     "diff": 0.0,
+     "tol": 0.2,
+     "ok": true
+    },
+    "rms_dbfs": {
+     "cpp": -30.9104,
+     "py": -30.9104,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "A_5_10k_db": {
+     "cpp": -42.2083,
+     "py": -42.2083,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "B_16_20k_db": {
+     "cpp": -51.0779,
+     "py": -51.0779,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "C_8_20k_db": {
+     "cpp": -42.3601,
+     "py": -42.3601,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "ratio_16_20_over_5_10_db": {
+     "cpp": -8.8696,
+     "py": -8.8696,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "ratio_16_19_over_5_10_db": {
+     "cpp": -8.9727,
+     "py": -8.9727,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "cutoff_hz": {
+     "cpp": 20021.5,
+     "py": 20021,
+     "shape_cpp": "WALL",
+     "shape_py": "WALL",
+     "diff": 0.5,
+     "ok": true
+    },
+    "comb_median_line_db": {
+     "cpp": -102.137,
+     "py": -102.1368,
+     "diff": -0.0002,
+     "tol": 0.05,
+     "ok": true
+    },
+    "flutter_depth": {
+     "cpp": 0.0484,
+     "py": 0.0483,
+     "diff": 0.0,
+     "tol": 0.005,
+     "ok": true
+    }
+   }
+  },
+  {
+   "sha256": "9b30d51d5af384618bff94a87cd75bae299e34526bd585c738ee392d25462853",
+   "group": "ending_swoosh",
+   "rate": 48000,
+   "seconds": 60.0,
+   "ok": true,
+   "compare": {
+    "lufs_vs_python": {
+     "cpp": -18.3874,
+     "py": -18.4293,
+     "diff": 0.0419,
+     "tol": 0.1,
+     "ok": true
+    },
+    "lufs_vs_libebur128": {
+     "cpp": -18.3874,
+     "py": -18.3874,
+     "diff": 0.0,
+     "tol": 0.1,
+     "ok": true
+    },
+    "true_peak_vs_libebur128": {
+     "cpp": -2.6015,
+     "py": -2.6022,
+     "diff": 0.0007,
+     "tol": 0.2,
+     "ok": true
+    },
+    "rms_dbfs": {
+     "cpp": -19.6296,
+     "py": -19.6296,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "A_5_10k_db": {
+     "cpp": -30.3963,
+     "py": -30.3963,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "B_16_20k_db": {
+     "cpp": -54.755,
+     "py": -54.755,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "C_8_20k_db": {
+     "cpp": -30.3286,
+     "py": -30.3286,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "ratio_16_20_over_5_10_db": {
+     "cpp": -24.3586,
+     "py": -24.3586,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "ratio_16_19_over_5_10_db": {
+     "cpp": -24.8203,
+     "py": -24.8203,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "cutoff_hz": {
+     "cpp": 20021.5,
+     "py": 20021,
+     "shape_cpp": "WALL",
+     "shape_py": "WALL",
+     "diff": 0.5,
+     "ok": true
+    },
+    "comb_median_line_db": {
+     "cpp": -98.474,
+     "py": -98.4744,
+     "diff": 0.0004,
+     "tol": 0.05,
+     "ok": true
+    },
+    "flutter_depth": {
+     "cpp": 0.0293,
+     "py": 0.0293,
+     "diff": -0.0,
+     "tol": 0.005,
+     "ok": true
+    }
+   }
+  },
+  {
+   "sha256": "896a7ce76aaa0b423b5725b78a6e474031502f6dd47700f692ec9d1d16cdc764",
+   "group": "ending_swoosh",
+   "rate": 48000,
+   "seconds": 60.0,
+   "ok": true,
+   "compare": {
+    "lufs_vs_python": {
+     "cpp": -25.6921,
+     "py": -25.7343,
+     "diff": 0.0422,
+     "tol": 0.1,
+     "ok": true
+    },
+    "lufs_vs_libebur128": {
+     "cpp": -25.6921,
+     "py": -25.6921,
+     "diff": 0.0,
+     "tol": 0.1,
+     "ok": true
+    },
+    "true_peak_vs_libebur128": {
+     "cpp": -8.8471,
+     "py": -8.8452,
+     "diff": -0.0019,
+     "tol": 0.2,
+     "ok": true
+    },
+    "rms_dbfs": {
+     "cpp": -37.2202,
+     "py": -37.2202,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "A_5_10k_db": {
+     "cpp": -50.4205,
+     "py": -50.4205,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "B_16_20k_db": {
+     "cpp": -60.7555,
+     "py": -60.7555,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "C_8_20k_db": {
+     "cpp": -50.6541,
+     "py": -50.6541,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "ratio_16_20_over_5_10_db": {
+     "cpp": -10.3351,
+     "py": -10.3351,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "ratio_16_19_over_5_10_db": {
+     "cpp": -11.7735,
+     "py": -11.7735,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "cutoff_hz": {
+     "cpp": 20027.3,
+     "py": 20027,
+     "shape_cpp": "WALL",
+     "shape_py": "WALL",
+     "diff": 0.3,
+     "ok": true
+    },
+    "comb_median_line_db": {
+     "cpp": -123.494,
+     "py": -123.4936,
+     "diff": -0.0004,
+     "tol": 0.05,
+     "ok": true
+    },
+    "flutter_depth": {
+     "cpp": 0.0131,
+     "py": 0.0131,
+     "diff": -0.0,
+     "tol": 0.005,
+     "ok": true
+    }
+   }
+  },
+  {
+   "sha256": "30f44d7409443f13c14bc2d2d03ae3b52495e5fe052e423ff3797f6146b1ba67",
+   "group": "reading_same_letter",
+   "rate": 48000,
+   "seconds": 60.0,
+   "ok": true,
+   "compare": {
+    "lufs_vs_python": {
+     "cpp": -18.4212,
+     "py": -18.4622,
+     "diff": 0.041,
+     "tol": 0.1,
+     "ok": true
+    },
+    "lufs_vs_libebur128": {
+     "cpp": -18.4212,
+     "py": -18.4212,
+     "diff": 0.0,
+     "tol": 0.1,
+     "ok": true
+    },
+    "true_peak_vs_libebur128": {
+     "cpp": -0.8706,
+     "py": -0.8654,
+     "diff": -0.0052,
+     "tol": 0.2,
+     "ok": true
+    },
+    "rms_dbfs": {
+     "cpp": -18.7861,
+     "py": -18.7861,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "A_5_10k_db": {
+     "cpp": -31.7057,
+     "py": -31.7057,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "B_16_20k_db": {
+     "cpp": -46.1136,
+     "py": -46.1136,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "C_8_20k_db": {
+     "cpp": -31.2316,
+     "py": -31.2316,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "ratio_16_20_over_5_10_db": {
+     "cpp": -14.4079,
+     "py": -14.4079,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "ratio_16_19_over_5_10_db": {
+     "cpp": -15.223,
+     "py": -15.223,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "cutoff_hz": {
+     "cpp": 23601.6,
+     "py": 23601,
+     "shape_cpp": "WALL",
+     "shape_py": "WALL",
+     "diff": 0.6,
+     "ok": true
+    },
+    "comb_median_line_db": {
+     "cpp": -300.0,
+     "py": -300.0,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "flutter_depth": {
+     "cpp": 0.0166,
+     "py": 0.0166,
+     "diff": 0.0,
+     "tol": 0.005,
+     "ok": true
+    }
+   }
+  },
+  {
+   "sha256": "1c3b2925c173b6fa041b7465ef511ff81faf1eb28ba2b54770e892fee66fd59b",
+   "group": "reading_same_letter",
+   "rate": 48000,
+   "seconds": 60.0,
+   "ok": true,
+   "compare": {
+    "lufs_vs_python": {
+     "cpp": -21.3748,
+     "py": -21.4134,
+     "diff": 0.0386,
+     "tol": 0.1,
+     "ok": true
+    },
+    "lufs_vs_libebur128": {
+     "cpp": -21.3748,
+     "py": -21.3748,
+     "diff": 0.0,
+     "tol": 0.1,
+     "ok": true
+    },
+    "true_peak_vs_libebur128": {
+     "cpp": -0.2081,
+     "py": -0.206,
+     "diff": -0.0021,
+     "tol": 0.2,
+     "ok": true
+    },
+    "rms_dbfs": {
+     "cpp": -25.0865,
+     "py": -25.0865,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "A_5_10k_db": {
+     "cpp": -34.6729,
+     "py": -34.6729,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "B_16_20k_db": {
+     "cpp": -46.2068,
+     "py": -46.2068,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "C_8_20k_db": {
+     "cpp": -35.227,
+     "py": -35.227,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "ratio_16_20_over_5_10_db": {
+     "cpp": -11.5339,
+     "py": -11.5339,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "ratio_16_19_over_5_10_db": {
+     "cpp": -12.4439,
+     "py": -12.4439,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "cutoff_hz": {
+     "cpp": 23601.6,
+     "py": 23601,
+     "shape_cpp": "WALL",
+     "shape_py": "WALL",
+     "diff": 0.6,
+     "ok": true
+    },
+    "comb_median_line_db": {
+     "cpp": -300.0,
+     "py": -300.0,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "flutter_depth": {
+     "cpp": 0.0079,
+     "py": 0.0079,
+     "diff": 0.0,
+     "tol": 0.005,
+     "ok": true
+    }
+   }
+  },
+  {
+   "sha256": "1cb2b27bd8ce788c5b3dbc9e3ca8e6254df965b8a4f056b0dfc8f4717cc32601",
+   "group": "song_4m31",
+   "rate": 48000,
+   "seconds": 60.0,
+   "ok": true,
+   "compare": {
+    "lufs_vs_python": {
+     "cpp": -20.0667,
+     "py": -20.1025,
+     "diff": 0.0358,
+     "tol": 0.1,
+     "ok": true
+    },
+    "lufs_vs_libebur128": {
+     "cpp": -20.0667,
+     "py": -20.0667,
+     "diff": 0.0,
+     "tol": 0.1,
+     "ok": true
+    },
+    "true_peak_vs_libebur128": {
+     "cpp": -1.1306,
+     "py": -1.1301,
+     "diff": -0.0005,
+     "tol": 0.2,
+     "ok": true
+    },
+    "rms_dbfs": {
+     "cpp": -21.2612,
+     "py": -21.2612,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "A_5_10k_db": {
+     "cpp": -35.3409,
+     "py": -35.3409,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "B_16_20k_db": {
+     "cpp": -75.8801,
+     "py": -75.8801,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "C_8_20k_db": {
+     "cpp": -37.5354,
+     "py": -37.5354,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "ratio_16_20_over_5_10_db": {
+     "cpp": -40.5392,
+     "py": -40.5392,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "ratio_16_19_over_5_10_db": {
+     "cpp": -40.9656,
+     "py": -40.9656,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "cutoff_hz": {
+     "cpp": 23584.0,
+     "py": 23589,
+     "shape_cpp": "WALL",
+     "shape_py": "WALL",
+     "diff": -5.0,
+     "ok": true
+    },
+    "comb_median_line_db": {
+     "cpp": -300.0,
+     "py": -300.0,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "flutter_depth": {
+     "cpp": 0.0084,
+     "py": 0.0084,
+     "diff": -0.0,
+     "tol": 0.005,
+     "ok": true
+    }
+   }
+  },
+  {
+   "sha256": "e0f072f445168eea10b53d044854cd42e05e2060249220bb64322d9ab097dcf6",
+   "group": "song_4m31",
+   "rate": 48000,
+   "seconds": 60.0,
+   "ok": true,
+   "compare": {
+    "lufs_vs_python": {
+     "cpp": -20.1907,
+     "py": -20.2328,
+     "diff": 0.0421,
+     "tol": 0.1,
+     "ok": true
+    },
+    "lufs_vs_libebur128": {
+     "cpp": -20.1907,
+     "py": -20.1907,
+     "diff": 0.0,
+     "tol": 0.1,
+     "ok": true
+    },
+    "true_peak_vs_libebur128": {
+     "cpp": -2.805,
+     "py": -2.8046,
+     "diff": -0.0004,
+     "tol": 0.2,
+     "ok": true
+    },
+    "rms_dbfs": {
+     "cpp": -22.162,
+     "py": -22.162,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "A_5_10k_db": {
+     "cpp": -32.8215,
+     "py": -32.8215,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "B_16_20k_db": {
+     "cpp": -84.0415,
+     "py": -84.0415,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "C_8_20k_db": {
+     "cpp": -34.6819,
+     "py": -34.6819,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "ratio_16_20_over_5_10_db": {
+     "cpp": -51.22,
+     "py": -51.22,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "ratio_16_19_over_5_10_db": {
+     "cpp": -51.7867,
+     "py": -51.7867,
+     "diff": -0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "cutoff_hz": {
+     "cpp": 23601.6,
+     "py": 23601,
+     "shape_cpp": "WALL",
+     "shape_py": "WALL",
+     "diff": 0.6,
+     "ok": true
+    },
+    "comb_median_line_db": {
+     "cpp": -300.0,
+     "py": -300.0,
+     "diff": 0.0,
+     "tol": 0.05,
+     "ok": true
+    },
+    "flutter_depth": {
+     "cpp": 0.0256,
+     "py": 0.0256,
+     "diff": -0.0,
+     "tol": 0.005,
+     "ok": true
+    }
+   }
+  }
+ ],
+ "n_ok": 14,
+ "n": 14,
+ "failures": []
+}

@@ -1,0 +1,104 @@
+{
+ "rule_file": "SPLIT-ADDENDUM-2026-10-29.json",
+ "clips": [
+  {
+   "clip": "59cb0c28",
+   "rate": 44100,
+   "reading": 0.2242,
+   "baseline_reading": 0.0244,
+   "ok": false
+  },
+  {
+   "clip": "8ab9814e",
+   "rate": 44100,
+   "reading": 0.1468,
+   "baseline_reading": 0.0419,
+   "ok": false
+  },
+  {
+   "clip": "f544057c",
+   "rate": 44100,
+   "reading": 0.2405,
+   "baseline_reading": 0.0186,
+   "ok": true
+  },
+  {
+   "clip": "21340c8d",
+   "rate": 44100,
+   "reading": 0.2414,
+   "baseline_reading": 0.1147,
+   "ok": true
+  },
+  {
+   "clip": "566c730e",
+   "rate": 44100,
+   "reading": 0.2409,
+   "baseline_reading": 0.0098,
+   "ok": true
+  },
+  {
+   "clip": "f2055f7d",
+   "rate": 44100,
+   "reading": 0.2239,
+   "baseline_reading": 0.0109,
+   "ok": false
+  },
+  {
+   "clip": "0e20bb5b",
+   "rate": 44100,
+   "reading": 0.1118,
+   "baseline_reading": 0.0156,
+   "ok": false
+  },
+  {
+   "clip": "d09c6cf7",
+   "rate": 44100,
+   "reading": 0.2897,
+   "baseline_reading": 0.1608,
+   "ok": true
+  },
+  {
+   "clip": "fd0c990c",
+   "rate": 44100,
+   "reading": 0.2337,
+   "baseline_reading": 0.0162,
+   "ok": false
+  },
+  {
+   "clip": "eac2d81d",
+   "rate": 44100,
+   "reading": 0.2296,
+   "baseline_reading": 0.0145,
+   "ok": false
+  }
+ ],
+ "pass_count": 4,
+ "pass": false,
+ "refused_files_skipped": [],
+ "readings_mean": 0.2182,
+ "readings_sd": 0.0485,
+ "repeatability_threshold": 0.0001,
+ "sensitivity": [
+  {
+   "depth": 0.05,
+   "present_of_10": 10
+  },
+  {
+   "depth": 0.1,
+   "present_of_10": 10
+  },
+  {
+   "depth": 0.2,
+   "present_of_10": 10
+  },
+  {
+   "depth": 0.3,
+   "present_of_10": 10
+  },
+  {
+   "depth": 0.5,
+   "present_of_10": 10
+  }
+ ],
+ "floor_depth": 0.05
+}

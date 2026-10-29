@@ -8,6 +8,7 @@
 // A file the tool leaves alone is written back with exactly the same samples.
 #include "HissTestSignals.hpp"
 #include "HissWav.hpp"
+#include "hybrid/hiss/HissMeters.hpp"
 #include "hybrid/hiss/HissAuto.hpp"
 #include "hybrid/hiss/HissCombAuto.hpp"
 
@@ -207,6 +208,28 @@ int cmdDemo(const fs::path& out) {
     return 0;
 }
 
+
+// meters <wav>: prints the Phase 1C measurements for one file (mono-mixed as 0.5 (L + R)), one "name value" per line.
+int cmdMeters(const std::string& path) {
+    namespace Mt = hc::hiss::meters;
+    wav::File f; std::string err;
+    if (!wav::read(path, f, err)) { std::cerr << err << "\n"; return 2; }
+    std::vector<float> x(f.left.size());
+    for (std::size_t i = 0; i < x.size(); ++i) x[i] = f.channels == 2 ? 0.5f * (f.left[i] + f.right[i]) : f.left[i];
+    const double fs = f.sampleRate; const std::size_t n = x.size();
+    std::printf("rate %d\nseconds %.3f\nrms_dbfs %.4f\ntrue_peak_dbfs %.4f\nlufs %.4f\n", f.sampleRate, n / fs, Mt::rmsDbfs(x.data(), n), Mt::truePeakDbfs(x.data(), n), Mt::integratedLufs(x.data(), n, fs));
+    std::printf("band_8000_12000 %.4f\nband_12000_16000 %.4f\nband_16000_19000 %.4f\n", Mt::bandRmsDbfs(x.data(), n, fs, 8000, 12000), Mt::bandRmsDbfs(x.data(), n, fs, 12000, 16000), Mt::bandRmsDbfs(x.data(), n, fs, 16000, 19000));
+    const auto r = Mt::ratioMetrics(x.data(), n, fs);
+    std::printf("ratio_valid %d\nloud_frames %d\nA_5_10k_db %.4f\nB_16_20k_db %.4f\nC_8_20k_db %.4f\nratio_16_20_over_5_10_db %.4f\nratio_16_19_over_5_10_db %.4f\n", r.valid, r.loud, r.a5to10Db, r.b16to20Db, r.c8to20Db, r.ratio16_20Over5_10Db, r.ratio16_19Over5_10Db);
+    const auto c = Mt::cutoffAudit(x.data(), n, fs);
+    std::printf("cutoff_shape %s\ncutoff_hz %.1f\n", c.shape == Mt::EndShape::Wall ? "WALL" : c.shape == Mt::EndShape::Gentle ? "GENTLE" : "NONE", c.cutoffHz);
+    const auto cb = Mt::combLines(x.data(), n, fs);
+    std::printf("comb_valid %d\ncomb_median_line_db %.3f\ncomb_on_gt_off_pct %.2f\ncomb_bandwidth_hz %.4f\n", cb.valid, cb.medianLineDb, cb.onGreaterThanOffPct, cb.bandwidthHz);
+    const auto fl = Mt::flutterDepth(x.data(), n, fs);
+    std::printf("flutter_valid %d\nflutter_depth %.5f\nflutter_shown %d\n", fl.valid, fl.depth, fl.valid && fl.depth > Mt::kFlutterPresentThreshold);
+    return 0;
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -214,6 +237,7 @@ int main(int argc, char** argv) {
     if (argc >= 4 && std::string(argv[1]) == "stems") return cmdStems(argv[2], argv[3]);
     if (argc >= 4 && std::string(argv[1]) == "comb") return cmdComb(argv[2], argv[3], argc >= 5 && std::string(argv[4]) == "force");
     if (argc >= 4 && std::string(argv[1]) == "combstems") return cmdCombStems(argv[2], argv[3]);
+    if (argc >= 3 && std::string(argv[1]) == "meters") return cmdMeters(argv[2]);
     if (argc >= 3 && std::string(argv[1]) == "demo") return cmdDemo(argv[2]);
     std::cerr << "usage:\n  hc_hiss_cli auto  <in.wav> <outdir>\n  hc_hiss_cli stems <indir> <outdir>\n  hc_hiss_cli comb  <in.wav> <outdir>\n  hc_hiss_cli combstems <indir> <outdir>\n  hc_hiss_cli demo  <outdir>\n";
     return 1;

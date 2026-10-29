@@ -64,8 +64,14 @@
    "flutter_v2_setA_of_10_numeric_bug": 3,
    "flutter_v2_1_setC_fresh_of_10": 2,
    "failed": [
-    "25 Hz flutter depth"
-   ]
+    "25 Hz flutter depth, quantified"
+   ],
+   "flutter_v4_fresh_clips_of_10": 4,
+   "flutter_v4_readings_mean": 0.2182,
+   "flutter_v4_note": "pre-registered in SPLIT-ADDENDUM-2026-10-29.json; FAILED; flutter is detect-only",
+   "flutter_detect_floor_posthoc": 0.3,
+   "flutter_threshold_posthoc": 0.1608,
+   "correction": "check5.json flutter floors (0.2) used a bad threshold (FAILURES.md F12); the post-hoc value above replaces them"
   },
   "5_sensitivity_floor": {
    "pass": true,
@@ -88,6 +94,15 @@
     "flutter_v2_1_depth": 0.007
    }
   },
+  "7_cpp_meters_three_way": {
+   "pass": true,
+   "files_agree": "14/14",
+   "tools": [
+    "C++23 HissMeters",
+    "Python h1c",
+    "libebur128 (separately written)"
+   ]
+  },
   "6_independent_tool_check": {
    "pass": true,
    "files_ok": "14/14",
@@ -106,9 +121,12 @@
   "check3.json": "e04ee34263af05d4f8ed12f6082bdb58136b061edd75d0b785af39997e782398",
   "check4.json": "785fc06f1f6234f319c7cf2e35634f933985c9b6a6855ec548c66ba508b36e77",
   "check4_run2_flutter_v2_numeric_bug.json": "0c77434d0ff39a178656dbce2cfc378f229088fa32d89cd85239a8cf81dae3bc",
+  "check4b.json": "de4a487dad88ebcea53a8904c3bfe474f689856b8a0a85cda3b127a7b06a7325",
+  "check4b_posthoc.json": "b6db2dd78e2e26b989da82e6fe3f14d16154d65f7dd2dbfa7c89ac84ce4d01be",
   "check5.json": "2e82fff068899220084a58e28a0bf03039efb88d15feff39e229cd68f2aae430",
   "check5_run2_flutter_v2_numeric_bug.json": "d5a231d9d04bde5a99348607d7ad03dc337fb229ccd8576208b3962126a024ce",
-  "check6.json": "1d8ecad97f279624f503cc55c071c735f6c35ddfc057704a7db8eacb7b1df1d9"
+  "check6.json": "1d8ecad97f279624f503cc55c071c735f6c35ddfc057704a7db8eacb7b1df1d9",
+  "check7.json": "62d6de88a5d3d05693691d9d58c59a384900345a7ca5a9b000cbae0367ebe4bc"
  },
  "regenerate": "python hiss/python/phase1c/check1.py ... check6.py then make_results.py; needs the closed-key analysis copies, which are not in the repo"
 }

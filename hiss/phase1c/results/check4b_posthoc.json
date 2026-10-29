@@ -1,0 +1,51 @@
+{
+ "label": "POST-HOC (after seeing the failure)",
+ "highest_clean_reading": 0.1608,
+ "clean_readings": [
+  0.024,
+  0.042,
+  0.019,
+  0.115,
+  0.01,
+  0.011,
+  0.016,
+  0.161,
+  0.016,
+  0.015
+ ],
+ "ladder": [
+  {
+   "injected_depth": 0.1,
+   "mean_reading": 0.09,
+   "above_highest_clean_reading_of_10": 0
+  },
+  {
+   "injected_depth": 0.2,
+   "mean_reading": 0.16,
+   "above_highest_clean_reading_of_10": 4
+  },
+  {
+   "injected_depth": 0.3,
+   "mean_reading": 0.227,
+   "above_highest_clean_reading_of_10": 9
+  },
+  {
+   "injected_depth": 0.4,
+   "mean_reading": 0.296,
+   "above_highest_clean_reading_of_10": 9
+  },
+  {
+   "injected_depth": 0.5,
+   "mean_reading": 0.374,
+   "above_highest_clean_reading_of_10": 10
+  },
+  {
+   "injected_depth": 0.7,
+   "mean_reading": 0.512,
+   "above_highest_clean_reading_of_10": 10
+  }
+ ],
+ "detect_only_floor_depth": 0.3,
+ "detect_only_rule_proposed": "flag flutter as PRESENT only if depth reading > 0.161; below that say 'not shown'",
+ "gain_note": "reading / injected depth is about 0.73 on these clips"
+}

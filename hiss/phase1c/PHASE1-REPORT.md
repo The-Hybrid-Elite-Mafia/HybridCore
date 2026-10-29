@@ -3,7 +3,21 @@
 Branch `hiss-tamer-1`. Draft pull request only. Never merged to main.
 Every number comes from `RESULTS.json` and the `results/check*.json` files next to it. The plan was committed first, in `SPLIT.json` (commit dafe2ef), before any measurement.
 
-## The first paragraph (tool status)
+## UPDATE 2026-10-29 (you asked me to make Phase 1 work, everything)
+
+**Result: five checks pass. Check 4 still fails on one thing: reading the flutter depth as an exact number.** Everything else in Phase 1 works, and the C++ meters you asked for now exist and are tested.
+
+1. **Flutter, new try (v4), judged on 10 never-used clips, rule written and committed first** (`SPLIT-ADDENDUM-2026-10-29.json`, then a second note fixing a 0.5 s length slip before any reading). **Result: 4 of 10 within 20 %. FAIL.** Readings ran low: mean 0.22 for a true 0.30, spread 0.05. That is mostly a steady bias, not random noise, so the smoother averaging in the advice you pasted would not fix it. I did not touch the meter again on those clips.
+2. **Flutter is now DETECT-ONLY.** After the fact (labelled POST-HOC in `check4b_posthoc.json`): a human clip with nothing added reads as high as 0.16. Injected 0.3 was above that in 9 of 10 clips, 0.2 in only 4 of 10. So **flutter below about 30 % depth cannot be seen with this meter.** Earlier I wrote 0.2; that was wrong (F12). The old "no 25 Hz flutter in loud cymbal parts" finding can only rule out flutter of about 30 % or more.
+3. **Bug found in my own table:** the "smallest flutter seen" threshold in check4b.json was 0.0001 (nonsense). Fixed in the post-hoc file. Logged as F12 in `FAILURES.md` (14 entries now).
+4. **C++ meter engine built** (`hiss/include/hybrid/hiss/HissMeters.hpp`, pure C++23, no JUCE; the advice you pasted said JUCE, so I left that out). It has: loud-part mask, band levels and the 16–20 over 5–10 ratio, bandwidth audit, 25 Hz comb lines, flutter (detect-only), RMS, true peak, loudness, band RMS. Command: `hc_hiss_cli meters <file.wav>`.
+   - **20 new known-answer tests, 20 pass** (locally): sine at −20 dBFS reads −23.0103 LUFS; a 10 dB cut in 5–10 kHz raises the ratio exactly 10.00 dB while the 16–20 kHz level moves 0.000 dB; a comb of −100 dBFS per line is read as −100.02; a brick wall at 16 kHz is found at 16 025 Hz; flutter 0.30 reads 0.303 and none reads 0.004 (on clean steady noise; real cymbals read lower); short or empty clips are refused.
+   - **Three-way check on 14 real files (check 7): C++, Python and libebur128 agree on all 14.** C++ vs libebur128 loudness: identical to 4 decimals. True peak differs by at most 0.008 dB. Band levels and ratios: identical to 0.0000 dB. Comb: within 0.0004 dB. Flutter: identical. Cutoff: within 6.5 Hz. C++ vs `pyloudnorm`: 0.061 LU (inside the 0.1 limit).
+   - **Not yet shown:** that the new tests pass on the Windows runner (the push does that), and the post-hit smear meter is not ported yet (Phase 2).
+
+**What I need from you:** Phase 1 is now "five pass, one failed honestly, flutter detect-only". Reply **GO** to accept flutter as detect-only and start Phase 2. I will not call Phase 1 passed on my own.
+
+## The first paragraph (tool status, written before the update above)
 
 **One of my measuring tools is broken. The other five work.**
 The broken one is the 25 Hz flutter meter. I injected a known 30 % flutter into human cymbals. The meter found it within 20 % in only 4 of 10 tries. I changed the meter twice. The first change had a plain bug (3 of 10 and 4 of 10). The bug-fixed one got 2 of 10 on 10 clips it had never seen. Your rule says all six checks must pass, so **Phase 1 FAILS and I stopped.** I did not start Phase 2.
@@ -52,7 +66,7 @@ The broken one is the 25 Hz flutter meter. I injected a known 30 % flutter into 
 | Air, 16–20 kHz level, as first defined | 3 dB |
 | Air, with the loud frames held fixed | 0.25 dB (the lowest I tried) |
 | Post-hit smear | 3 dB (tail energy equal to the hit's own) |
-| Flutter | 0.2 depth, detect only |
+| Flutter (corrected, see Update) | 0.3 depth, detect only. The 0.2 first printed here came from a bad threshold |
 | Moving notch | 14 dB deep at its centre (full strength = 1.0, 0.8 passed, 0.5 did not) |
 | Comb, in silence at the 16-bit floor (20 s) | at or below −155 dBFS per line (the lowest I tried) |
 | Comb, under loud human cymbals (8 s) | **−105 dBFS per line** |

@@ -8,6 +8,8 @@
 #include "hybrid/hiss/HissCombEngine.hpp"
 #include "hybrid/hiss/HissFft.hpp"
 #include "hybrid/hiss/HissMetrics.hpp"
+#include "hybrid/hiss/HissMeters.hpp"
+#include <random>
 
 #include <algorithm>
 #include <chrono>
@@ -651,10 +653,120 @@ void testComb() {
     }
 }
 
+
+// ---------------------------------------------------------------------------------------------
+// Meters (Phase 1C). Known answers: every signal is built from parts whose level we chose.
+std::vector<float> bandNoise(int log2n, double fs, double lo, double hi, unsigned seed, double rms = 1.0) {
+    const int N = 1 << log2n;
+    FftD fft; fft.prepare(N);
+    std::mt19937 g(seed);
+    std::normal_distribution<double> nd(0.0, 1.0);
+    std::vector<std::complex<double>> X(static_cast<std::size_t>(N));
+    for (int k = 1; k < N / 2; ++k) {
+        const double f = k * fs / N;
+        if (f < lo || f >= hi) continue;
+        const std::complex<double> v(nd(g), nd(g));
+        X[static_cast<std::size_t>(k)] = v;
+        X[static_cast<std::size_t>(N - k)] = std::conj(v);
+    }
+    fft.inverse(X.data());
+    double ms = 0;
+    for (auto& v : X) ms += v.real() * v.real();
+    const double sc = rms / std::sqrt(ms / N);
+    std::vector<float> out(static_cast<std::size_t>(N));
+    for (int i = 0; i < N; ++i) out[static_cast<std::size_t>(i)] = static_cast<float>(X[static_cast<std::size_t>(i)].real() * sc);
+    return out;
+}
+
+void testMeters() {
+    std::printf("[meters]\n");
+    namespace Mt = hc::hiss::meters;
+    const double fs = 48000.0;
+    {   // levels and loudness
+        std::vector<float> s(480000);
+        for (std::size_t i = 0; i < s.size(); ++i) s[i] = static_cast<float>(0.1 * std::sin(2.0 * 3.14159265358979323846 * 997.0 * static_cast<double>(i) / fs));
+        const double l = Mt::integratedLufs(s.data(), s.size(), fs), r = Mt::rmsDbfs(s.data(), s.size()), b = Mt::bandRmsDbfs(s.data(), s.size(), fs, 500.0, 2000.0);
+        HMEASURED("loudness of a 997 Hz sine, peak -20 dBFS", l, "LUFS");
+        HCHECK(std::fabs(r - (-23.0103)) < 0.01, "rms of a -20 dBFS-peak sine is -23.01 dBFS (read %.3f)", r);
+        HCHECK(std::fabs(b - (-23.0103)) < 0.1, "band rms 0.5-2 kHz of that sine is -23.01 dBFS (read %.3f)", b);
+        HCHECK(std::fabs(l - (-23.0103)) < 0.1, "loudness of that sine is -23.01 LUFS (read %.3f; K-weighting is about +0.69 dB at 997 Hz and the BS.1770 offset is -0.691)", l);
+        std::vector<float> q(48000);
+        for (std::size_t i = 0; i < q.size(); ++i) q[i] = static_cast<float>(std::sin(3.14159265358979323846 * static_cast<double>(i) / 2.0 + 3.14159265358979323846 / 4.0));
+        const double tp = Mt::truePeakDbfs(q.data(), q.size());
+        HCHECK(tp > -0.3 && tp < 0.3, "true peak of a fs/4 sine whose samples all sit at 0.707 reads about 0 dBFS (read %.3f, sample peak is -3.01)", tp);
+    }
+    {   // ratio can rise because the bottom band fell
+        const int L = 20;   // 2^20 samples = 21.8 s
+        const auto nA = bandNoise(L, fs, 5000, 10000, 1), nB = bandNoise(L, fs, 16000, 20000, 2), nL = bandNoise(L, fs, 200, 4000, 3);
+        auto mix = [&](double gAdb, double gBdb) {
+            std::vector<float> x(nA.size());
+            const double gA = 0.05 * std::pow(10.0, gAdb / 20.0), gB = 0.005 * std::pow(10.0, gBdb / 20.0);
+            for (std::size_t i = 0; i < x.size(); ++i) x[i] = static_cast<float>(gA * nA[i] + gB * nB[i] + 0.05 * nL[i]);
+            return x;
+        };
+        const auto base = mix(0, 0), cut = mix(-10, 0), air = mix(0, 6);
+        const auto m0 = Mt::ratioMetrics(base.data(), base.size(), fs), m1 = Mt::ratioMetrics(cut.data(), cut.size(), fs), m2 = Mt::ratioMetrics(air.data(), air.size(), fs);
+        HCHECK(m0.valid && m1.valid && m2.valid, "enough loud frames to measure (%d, %d, %d)", m0.loud, m1.loud, m2.loud);
+        HMEASURED("5-10 kHz cut 10 dB: ratio rise", m1.ratio16_20Over5_10Db - m0.ratio16_20Over5_10Db, "dB");
+        HCHECK(std::fabs((m1.ratio16_20Over5_10Db - m0.ratio16_20Over5_10Db) - 10.0) < 0.5, "cutting 5-10 kHz by 10 dB raises the ratio by 10 dB (+/-0.5)");
+        HCHECK(std::fabs(m1.b16to20Db - m0.b16to20Db) < 0.3, "...while the absolute 16-20 kHz level moves less than 0.3 dB (%.3f)", m1.b16to20Db - m0.b16to20Db);
+        HCHECK(std::fabs((m2.b16to20Db - m0.b16to20Db) - 6.0) < 0.5, "adding 6 dB of real air raises the absolute 16-20 kHz level by 6 dB (+/-0.5) (%.3f)", m2.b16to20Db - m0.b16to20Db);
+    }
+    {   // bandwidth audit
+        const auto wall = bandNoise(20, fs, 20, 16000, 4, 0.1), full = bandNoise(20, fs, 20, 23990, 5, 0.1);
+        const auto cw = Mt::cutoffAudit(wall.data(), wall.size(), fs), cf = Mt::cutoffAudit(full.data(), full.size(), fs);
+        HMEASURED("brick wall at 16000 Hz found at", cw.cutoffHz, "Hz");
+        HCHECK(cw.shape == Mt::EndShape::Wall && std::fabs(cw.cutoffHz - 16000.0) < 300.0, "a brick wall at 16 kHz is found as a WALL within 300 Hz");
+        HCHECK(!cw.reaches19k(), "a file ending at 16 kHz is disqualified from the 8-20 kHz measurement");
+        HCHECK(cf.shape == Mt::EndShape::None || cf.cutoffHz > 23000.0, "a full-band file is not called a wall below 23 kHz");
+    }
+    {   // the 25 Hz comb
+        const std::size_t n = 960000;
+        auto x = bandNoise(20, fs, 20, 20000, 6, std::pow(10.0, -60.0 / 20.0));
+        x.resize(n);
+        const auto none = Mt::combLines(x.data(), n, fs);
+        std::mt19937 g(9); std::uniform_real_distribution<double> ph(0.0, 6.283185307179586);
+        const double amp = std::sqrt(2.0) * std::pow(10.0, -100.0 / 20.0);
+        std::vector<double> phase; for (int k = 120; k <= 800; ++k) phase.push_back(ph(g));
+        for (std::size_t i = 0; i < n; ++i) {
+            double add = 0;
+            for (int k = 120; k <= 800; k += 1) add += std::sin(2.0 * 3.14159265358979323846 * k * 25.0 * static_cast<double>(i % 1920) / fs + phase[static_cast<std::size_t>(k - 120)]);
+            x[i] += static_cast<float>(amp * add);
+        }
+        const auto with = Mt::combLines(x.data(), n, fs);
+        HMEASURED("comb injected at -100 dBFS per line, read", with.medianLineDb, "dBFS");
+        HMEASURED("measurement bandwidth", with.bandwidthHz, "Hz");
+        HCHECK(with.valid && std::fabs(with.medianLineDb - (-100.0)) < 1.0, "an injected comb of -100 dBFS per line is read within 1 dB (%.2f)", with.medianLineDb);
+        HCHECK(with.onGreaterThanOffPct > 95.0, "with a comb, nearly every line beats its neighbours (%.1f %%)", with.onGreaterThanOffPct);
+        HCHECK(none.onGreaterThanOffPct < 65.0 && none.onGreaterThanOffPct > 30.0, "with no comb, about half do (%.1f %%)", none.onGreaterThanOffPct);
+        HCHECK(!Mt::combLines(x.data(), n, 44100.5).valid, "a sample rate that is not a multiple of 25 Hz is refused");
+    }
+    {   // flutter (detect-only)
+        const auto b = bandNoise(20, fs, 5000, 15000, 7, 0.05);
+        const std::size_t n = 960000;
+        std::vector<float> plain(b.begin(), b.begin() + static_cast<std::ptrdiff_t>(n)), am = plain;
+        for (std::size_t i = 0; i < n; ++i) am[i] = static_cast<float>(plain[i] * (1.0 + 0.30 * std::sin(2.0 * 3.14159265358979323846 * 25.0 * static_cast<double>(i) / fs + 1.0)));
+        const auto f0 = Mt::flutterDepth(plain.data(), n, fs), f1 = Mt::flutterDepth(am.data(), n, fs);
+        HMEASURED("flutter reading, nothing injected", f0.depth, "");
+        HMEASURED("flutter reading, 0.30 injected", f1.depth, "");
+        HCHECK(f0.valid && f1.valid, "both clips are long enough and have a band to measure");
+        HCHECK(f1.depth > Mt::kFlutterPresentThreshold && f0.depth < Mt::kFlutterPresentThreshold, "0.30 flutter is shown, none is not shown");
+        HCHECK(f1.depth > 0.20 && f1.depth < 0.40, "reading for a true 0.30 is between 0.20 and 0.40 (detect-only: NOT held to +/-20 %%) (%.3f)", f1.depth);
+        HCHECK(!Mt::flutterDepth(plain.data(), 480000, fs).valid, "a 10 s clip is refused");
+        std::vector<float> silent(n, 0.0f);
+        HCHECK(!Mt::flutterDepth(silent.data(), n, fs).valid, "a clip with nothing in 5-15 kHz is refused");
+    }
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
     std::printf("HEM HISS TAMER + HISS AUTO — tests\n\n");
+    if (argc > 1 && std::string(argv[1]) == "meters") {
+        testMeters();
+        std::printf("\n%d checks, %d failed\n", T::gChecks, T::gFails);
+        return T::gFails == 0 ? 0 : 1;
+    }
     if (argc > 1 && std::string(argv[1]) == "comb") {     // quick run of the comb tests only
         testComb();
         std::printf("\n%d checks, %d failed\n", T::gChecks, T::gFails);
@@ -669,6 +781,7 @@ int main(int argc, char** argv) {
     testAutoDoNoHarm();
     testStems();
     testComb();
+    testMeters();
     std::printf("\n%d checks, %d failed\n", T::gChecks, T::gFails);
     return T::gFails == 0 ? 0 : 1;
 }
