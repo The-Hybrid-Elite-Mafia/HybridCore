@@ -13,6 +13,6 @@
  },
  "c_plus_plus_meters": {
   "rule": "The C++ meter engine (hiss/include/hybrid/hiss/HissMeters.hpp) must agree with the Python meters on the same real files within 0.05 dB for band levels and ratios, 0.005 for flutter depth, and 0.1 LU for loudness. libebur128 (separately written, MIT licence) is used as a third loudness reference.",
-  "scope": "pure C++23, no JUCE, no allocation in the measuring loops after prepare() where a block API exists; offline functions may allocate"
+  "scope": "pure C++23, no JUCE, no allocation in the measuring loops after prepare() where a block-by-block version exists; offline functions may allocate"
  }
 }
