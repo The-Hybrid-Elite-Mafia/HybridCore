@@ -191,8 +191,8 @@ void drawComb(Graphics& g, RectF gl, const View& v) {
     Gdiplus::Pen line(kGreen, 1.2f);
     g.DrawLines(&line, pts.data(), static_cast<INT>(pts.size()));
     text(g, fmt(L"%.1f %% of lines beat neighbours", v.res.comb.onGreaterThanOffPct), RectF(gl.X + 14, plot.GetBottom() + 6, gl.Width - 28, 20), Face::Mono, 13.5f, kText);
-    text(g, v.res.comb.medianLineDb <= -299.0 ? std::wstring(L"median line: not above neighbours") : fmt(L"median line %.1f dBFS", v.res.comb.medianLineDb), RectF(gl.X + 14, plot.GetBottom() + 26, gl.Width - 28, 18), Face::Mono, 13.5f, kDim);
-    text(g, L"45-50 % = no comb. clearly higher = comb", RectF(gl.X + 14, plot.GetBottom() + 44, gl.Width - 28, 16), Face::Mono, 11.5f, kDim);
+    text(g, v.res.comb.medianLineDb <= -299.0 ? std::wstring(L"median: not above neighbours") : fmt(L"median %.1f dBFS", v.res.comb.medianLineDb), RectF(gl.X + 14, plot.GetBottom() + 26, gl.Width - 28, 18), Face::Mono, 13.5f, kDim);
+    text(g, L"45-50 % = no comb; more = comb", RectF(gl.X + 14, plot.GetBottom() + 44, gl.Width - 28, 16), Face::Mono, 11.5f, kDim);
 }
 
 void drawStatus(Graphics& g, RectF gl, const View& v) {
