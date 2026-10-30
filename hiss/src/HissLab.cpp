@@ -76,6 +76,70 @@ std::vector<double> hann(int n) {
 
 } // namespace
 
+
+// =============================================================================================================
+//  statistics (the only place a threshold is worked out)
+// =============================================================================================================
+namespace stats {
+double zUpper(double p) noexcept {
+    if (!(p > 0.0)) return 40.0;
+    if (p >= 0.5) return 0.0;
+    double lo = 0.0, hi = 40.0;
+    for (int i = 0; i < 100; ++i) {
+        const double mid = 0.5 * (lo + hi);
+        if (0.5 * std::erfc(mid / std::numbers::sqrt2) > p) lo = mid; else hi = mid;
+    }
+    return 0.5 * (lo + hi);
+}
+double median(std::vector<double> v) {
+    if (v.empty()) return 0.0;
+    const std::size_t mid = v.size() / 2;
+    std::nth_element(v.begin(), v.begin() + static_cast<std::ptrdiff_t>(mid), v.end());
+    const double hi = v[mid];
+    if (v.size() % 2 == 1) return hi;
+    const double lo = *std::max_element(v.begin(), v.begin() + static_cast<std::ptrdiff_t>(mid));
+    return 0.5 * (lo + hi);
+}
+double robustSigma(const std::vector<double>& v) {
+    if (v.size() < 2) return 0.0;
+    const double med = median(v);
+    std::vector<double> d(v.size());
+    for (std::size_t i = 0; i < v.size(); ++i) d[i] = std::fabs(v[i] - med);
+    const double mad = median(d);
+    if (mad > 0.0) return 1.4826 * mad;
+    double m = 0, q = 0;
+    for (double x : v) m += x;
+    m /= static_cast<double>(v.size());
+    for (double x : v) q += (x - m) * (x - m);
+    return std::sqrt(q / static_cast<double>(v.size() - 1));
+}
+double tailBar(const std::vector<double>& nullSample, double neff, double alpha) {
+    // Exponential tail from two points inside the sample: its 80th and 90th percentiles (chance 0.2 and 0.1 of being beaten).
+    // For an exponential tail, P(X > x) = 0.1 exp(-(x - q90)/lambda) beyond q90, with lambda = (q90 - q80)/ln 2.
+    // Using only the 80-90 % range keeps a real signal that fills the top 10 % or less from bending the fit.
+    // The result is the level a clean value beats with chance alpha/neff.
+    if (nullSample.size() < 100 || !(neff > 0)) return 1e300;
+    std::vector<double> v = nullSample;
+    std::sort(v.begin(), v.end());
+    auto q = [&](double f) { return v[static_cast<std::size_t>(f * static_cast<double>(v.size() - 1))]; };
+    const double q80 = q(0.80), q90 = q(0.90), lam = (q90 - q80) / std::log(2.0);
+    if (!(lam > 0)) return 1e300;
+    return q90 + lam * std::log(0.1 * neff / alpha);
+}
+double binomTail(int k, int n, double p) noexcept {
+    if (k <= 0) return 1.0;
+    if (k > n) return 0.0;
+    if (p <= 0.0) return 0.0;
+    if (p >= 1.0) return 1.0;
+    double sum = 0.0;
+    for (int i = k; i <= n; ++i) {
+        const double lg = std::lgamma(n + 1.0) - std::lgamma(i + 1.0) - std::lgamma(n - i + 1.0) + i * std::log(p) + (n - i) * std::log1p(-p);
+        sum += std::exp(lg);
+    }
+    return std::min(1.0, sum);
+}
+} // namespace stats
+
 // =============================================================================================================
 //  8: seam clicks
 // =============================================================================================================
@@ -84,9 +148,83 @@ SeamResult seamClicks(const float* x, std::size_t n, double fs, double periodMs)
     if (n < static_cast<std::size_t>(0.5 * fs)) return r;
     r.valid = true;
     Bq h1 = makeBq(true, cfg::kClickHpHz, fs), h2 = h1;
-    std::vector<double> a(n);
-    for (std::size_t i = 0; i < n; ++i) a[i] = std::fabs(h2.run(h1.run(static_cast<double>(x[i]))));
-    // Typical size: median of |sample| inside a window around each point. Computed on a coarse grid (every 0.5 ms), so it stays cheap.
+    std::vector<double> h(n), a(n);
+    for (std::size_t i = 0; i < n; ++i) { h[i] = h2.run(h1.run(static_cast<double>(x[i]))); a[i] = std::fabs(h[i]); }
+
+    // ---- the fold test (decides "pattern") ----
+    // Two folds are made. (1) ENERGY fold: add up the click-band energy at every position inside a 40 ms frame, over the whole clip.
+    // Works for clicks of any sign. (2) SIGNED fold: the same, but with a filter matched to what a single-sample click looks like after the
+    // 3 kHz high-pass, and without squaring. If the clicks all point the same way their sizes add up in step, which is much stronger.
+    // Each fold is compared with the same fold at other frame lengths (the null). Two tests are run, so each gets half of kAlpha.
+    std::vector<double> g;
+    double Eh = 0;
+    {
+        Bq i1 = makeBq(true, cfg::kClickHpHz, fs), i2 = i1;
+        std::vector<double> full(8192);
+        for (int k = 0; k < 8192; ++k) { full[static_cast<std::size_t>(k)] = i2.run(i1.run(k == 0 ? 1.0 : 0.0)); Eh += full[static_cast<std::size_t>(k)] * full[static_cast<std::size_t>(k)]; }
+        double acc = 0; std::size_t L = 0;
+        while (L < full.size() && acc < 0.999 * Eh) { acc += full[L] * full[L]; ++L; }
+        g.assign(full.begin(), full.begin() + static_cast<std::ptrdiff_t>(std::max<std::size_t>(L, 8)));
+    }
+    double Eg = 0; for (double v : g) Eg += v * v;
+    const std::size_t Lg = g.size();
+    const std::size_t W = std::max<std::size_t>(1, static_cast<std::size_t>(std::lround(cfg::kClickWindowMs * 0.001 * fs)));
+    const std::size_t nv = n > W + Lg ? n - W - Lg : 0;                 // positions that fit inside the clip
+    std::vector<double> e(nv, 0.0), mf(nv, 0.0);
+    if (nv > 0) {
+        double run = 0;
+        for (std::size_t i = 0; i < W; ++i) run += h[i] * h[i];
+        for (std::size_t i = 0; i < nv; ++i) { e[i] = run; run += h[i + W] * h[i + W] - h[i] * h[i]; }
+        for (std::size_t i = 0; i < nv; ++i) { double acc = 0; for (std::size_t j = 0; j < Lg; ++j) acc += g[j] * h[i + j]; mf[i] = acc / Eg; }
+    }
+    // statistic of one fold length: energy fold -> (largest - median) of the mean energy per position; signed fold -> largest |mean| per position
+    auto foldStat = [&](const std::vector<double>& arr, std::size_t P, bool isSigned, std::vector<double>* keep) {
+        std::vector<double> S(P, 0.0), cnt(P, 0.0);
+        for (std::size_t i = 0; i < nv; ++i) { const std::size_t q = i % P; S[q] += arr[i]; cnt[q] += 1.0; }
+        for (std::size_t q = 0; q < P; ++q) S[q] = cnt[q] > 0 ? S[q] / cnt[q] : 0.0;
+        if (keep) *keep = S;
+        if (isSigned) { double mx = 0; for (double v : S) mx = std::max(mx, std::fabs(v)); return mx; }
+        return *std::max_element(S.begin(), S.end()) - stats::median(S);
+    };
+    const std::size_t P0 = static_cast<std::size_t>(std::lround(periodMs * 0.001 * fs));
+    if (P0 >= 8 && nv >= 5 * P0) {
+        std::vector<double> SE, SS;
+        const double ME = foldStat(e, P0, false, &SE), MS = foldStat(mf, P0, true, &SS);
+        // null: other frame lengths (75 % to 125 % of 40 ms, but not within 3 % of it). How many is set by kAlpha.
+        const int J = static_cast<int>(std::ceil(3.0 / cfg::kAlpha)) - 1;
+        std::vector<double> nE, nS;
+        const int cand = static_cast<int>(std::ceil(J / 0.94)) + 2;
+        for (int c = 0; c < cand && static_cast<int>(nE.size()) < J; ++c) {
+            const double ratio = 0.75 + 0.5 * (c + 0.5) / cand;
+            if (std::fabs(ratio - 1.0) < 0.03) continue;
+            const std::size_t Pn = static_cast<std::size_t>(std::lround(ratio * static_cast<double>(P0)));
+            if (Pn < 8) continue;
+            nE.push_back(foldStat(e, Pn, false, nullptr));
+            nS.push_back(foldStat(mf, Pn, true, nullptr));
+        }
+        r.nullFolds = static_cast<int>(nE.size());
+        int exE = 0, exS = 0;
+        for (double v : nE) if (v >= ME) ++exE;
+        for (double v : nS) if (v >= MS) ++exS;
+        const double pE = (1.0 + exE) / (1.0 + static_cast<double>(nE.size())), pS = (1.0 + exS) / (1.0 + static_cast<double>(nS.size()));
+        r.foldP = std::min(1.0, 2.0 * std::min(pE, pS));
+        r.pattern = r.foldP <= cfg::kAlpha;
+        r.foldSigned = pS <= pE;
+        const std::vector<double>& SB = r.foldSigned ? SS : SE;
+        std::size_t pk = 0;
+        if (r.foldSigned) { for (std::size_t q = 0; q < SB.size(); ++q) if (std::fabs(SB[q]) > std::fabs(SB[pk])) pk = q; }
+        else pk = static_cast<std::size_t>(std::max_element(SB.begin(), SB.end()) - SB.begin());
+        r.foldPhaseMs = 1000.0 * static_cast<double>(pk) / fs;
+        r.foldLevelDb = r.foldSigned ? 20.0 * std::log10(std::max(std::fabs(SB[pk]), 1e-12)) : (ME > 0 ? 10.0 * std::log10(ME / Eh) : -200.0);
+        std::sort(nE.begin(), nE.end()); std::sort(nS.begin(), nS.end());
+        const std::size_t qi = std::min(nE.size() - 1, static_cast<std::size_t>(std::ceil((1.0 - cfg::kAlpha / 2.0) * static_cast<double>(nE.size() + 1))) - 1);
+        r.detectLimitAnySignDb = nE[qi] > 0 ? 10.0 * std::log10(nE[qi] / Eh) : -200.0;
+        r.detectLimitDb = nS[qi] > 0 ? 20.0 * std::log10(nS[qi]) : -200.0;
+    }
+
+    // ---- single clicks (information: where they sit). The size rule comes from the clip length, assuming the local noise is bell-shaped. ----
+    const double zc = stats::zUpper(cfg::kAlpha / (2.0 * static_cast<double>(n)));
+    r.clickThresholdRatio = zc / 0.67449;           // median of |bell-shaped noise| is 0.67449 sigma
     const std::size_t win = std::max<std::size_t>(8, static_cast<std::size_t>(cfg::kClickLocalMs * 0.001 * fs));
     const std::size_t grid = std::max<std::size_t>(1, static_cast<std::size_t>(0.0005 * fs));
     std::vector<double> typical((n + grid - 1) / grid, 0.0), tmp;
@@ -100,9 +238,8 @@ SeamResult seamClicks(const float* x, std::size_t n, double fs, double periodMs)
     const std::size_t refractory = static_cast<std::size_t>(0.004 * fs);
     std::size_t i = 0;
     while (i < n) {
-        const double t = std::max(typical[i / grid], 1e-9);
-        if (a[i] >= cfg::kClickRiseRatio * t && a[i] > 1e-5) {
-            // peak inside the next 1 ms
+        const double t = std::max(typical[i / grid], cfg::kClickAbsFloor);
+        if (a[i] >= r.clickThresholdRatio * t && a[i] > cfg::kClickAbsFloor) {
             std::size_t pk = i, end = std::min(n, i + static_cast<std::size_t>(0.001 * fs) + 1);
             for (std::size_t j = i; j < end; ++j) if (a[j] > a[pk]) pk = j;
             r.clicks.push_back({1000.0 * static_cast<double>(pk) / fs, 20.0 * std::log10(a[pk] / t)});
@@ -120,7 +257,6 @@ SeamResult seamClicks(const float* x, std::size_t n, double fs, double periodMs)
         }
         r.periodicShare = static_cast<double>(ok) / static_cast<double>(gaps.size());
     }
-    r.pattern = static_cast<int>(r.clicks.size()) >= cfg::kClickMinCount && r.periodicShare >= cfg::kClickMinPeriodic;
     return r;
 }
 
@@ -141,17 +277,19 @@ NotchResult trackNotch(const float* x, std::size_t n, double fs) {
     std::vector<Cx> buf(static_cast<std::size_t>(N));
     const int wide = std::max(2, static_cast<int>(std::lround(cfg::kNotchWideHz / df))), narrow = std::max(1, static_cast<int>(std::lround(cfg::kNotchNarrowHz / df)));
     std::vector<double> acc(static_cast<std::size_t>(bins), 0.0);
+    std::vector<std::vector<double>> allDepths;
     int have = 0;
     auto flush = [&](double tSec) {
         // acc holds summed power over `have` frames
         std::vector<double> db(static_cast<std::size_t>(bins), -200.0);
         for (int b = b0; b <= b1; ++b) db[static_cast<std::size_t>(b)] = 10.0 * std::log10(acc[static_cast<std::size_t>(b)] / have + 1e-30);
-        // moving averages by running sums
+        // moving average of POWER (then to dB) by running sums. Averaging in power keeps the "nothing there" spread nearly symmetric
+        // (averaging dB values would make dips rarer-and-deeper than bumps, which breaks the bumps-as-null rule below).
         std::vector<double> cs(static_cast<std::size_t>(bins) + 1, 0.0);
-        for (int b = 0; b < bins; ++b) cs[static_cast<std::size_t>(b) + 1] = cs[static_cast<std::size_t>(b)] + db[static_cast<std::size_t>(b)];
+        for (int b = 0; b < bins; ++b) cs[static_cast<std::size_t>(b) + 1] = cs[static_cast<std::size_t>(b)] + (b >= b0 && b <= b1 ? acc[static_cast<std::size_t>(b)] / have : 0.0);
         auto avg = [&](int c, int hw) {
             const int lo = std::max(b0, c - hw), hi = std::min(b1, c + hw);
-            return (cs[static_cast<std::size_t>(hi) + 1] - cs[static_cast<std::size_t>(lo)]) / (hi - lo + 1);
+            return 10.0 * std::log10((cs[static_cast<std::size_t>(hi) + 1] - cs[static_cast<std::size_t>(lo)]) / (hi - lo + 1) + 1e-30);
         };
         std::vector<double> win;
         auto med = [&](int c, int hw) {       // normal level = MEDIAN of the wide window, so the dip itself does not pull it down
@@ -160,11 +298,15 @@ NotchResult trackNotch(const float* x, std::size_t n, double fs) {
             return win[win.size() / 2];
         };
         double bestDepth = -1e9; int bestBin = b0;
+        std::vector<double> depths;
         for (int b = b0 + wide; b <= b1 - wide; ++b) {
             const double depth = med(b, wide) - avg(b, narrow);
+            depths.push_back(depth);
             if (depth > bestDepth) { bestDepth = depth; bestBin = b; }
         }
-        r.track.push_back({tSec, bestBin * df, bestDepth});
+        allDepths.push_back(std::move(depths));
+        const bool sig = false;     // decided after all groups are in (see below)
+        r.track.push_back({tSec, bestBin * df, bestDepth, sig});
         std::fill(acc.begin(), acc.end(), 0.0);
         have = 0;
     };
@@ -178,11 +320,27 @@ NotchResult trackNotch(const float* x, std::size_t n, double fs) {
     }
     if (r.track.empty()) return r;
     r.valid = true;
+    // Decide which readings hold a real dip. The depth of a dip is (normal level - level over 30 Hz). Across all bins and readings of
+    // the clip, the top 10 % tail of that depth is fitted with an exponential tail (the standard peaks-over-threshold method), and the bar
+    // is the depth a clean reading beats only 1 time in 100 over the independent places in the band. A notch covers a small share of
+    // the bins, so it barely moves a fit made from the top 10 %.
+    {
+        std::vector<double> pooled;
+        for (auto& g : allDepths) pooled.insert(pooled.end(), g.begin(), g.end());
+        const double med = stats::median(pooled);
+        const double neff = std::max(1.0, static_cast<double>(allDepths.front().size()) / (2.0 * narrow + 1.0));
+        const double bar = stats::tailBar(pooled, neff, cfg::kAlpha) - med;
+        r.depthBarDb = bar;
+        for (std::size_t g = 0; g < r.track.size() && g < allDepths.size(); ++g) r.track[g].significant = (r.track[g].depthDb - med) >= bar;
+    }
     std::vector<double> d, fr;
     for (auto& p : r.track) { d.push_back(p.depthDb); fr.push_back(p.freqHz); }
     r.medianDepthDb = percentile(d, 50.0);
     r.medianFreqHz = percentile(fr, 50.0);
-    r.found = r.medianDepthDb >= cfg::kNotchMinDepthDb;
+    r.groups = static_cast<int>(r.track.size());
+    for (auto& p : r.track) if (p.significant) ++r.significantGroups;
+    r.binomP = stats::binomTail(r.significantGroups, r.groups, cfg::kAlpha);
+    r.found = r.binomP <= cfg::kAlpha;
     if (r.found && r.track.size() >= 3) {
         double st = 0, sf = 0, stt = 0, stf = 0;
         const double m = static_cast<double>(r.track.size());
@@ -206,11 +364,22 @@ HitResult hitsAndTails(const float* x, std::size_t n, double fs, double bandLoHz
     r.floorDb = percentile(db, 10.0);
     r.valid = true;
     const int refr = static_cast<int>(cfg::kHitRefractoryMs / c.dtMs), peakWin = static_cast<int>(20.0 / c.dtMs), back = static_cast<int>(10.0 / c.dtMs);
+    // A hit is a rise (over 10 ms) that is a rare outlier among all the rises in the clip. The spread of normal rises comes from the
+    // clip itself (robust, so the hits do not inflate it); the bar is the chance level for that many independent looks at kAlpha.
+    std::vector<double> rises;
+    const int settle = std::max(back, static_cast<int>(100.0 / c.dtMs));      // the band filters start from rest: skip their first 100 ms
+    for (int i = settle; i < m; ++i) rises.push_back(db[static_cast<std::size_t>(i)] - db[static_cast<std::size_t>(i - back)]);
+    // Falls (rises mirrored around the median) hold no hits, so they are the null sample. Hits only make rises.
+    const double riseMed = stats::median(rises);
+    std::vector<double> falls;
+    for (double q : rises) if (q < riseMed) falls.push_back(riseMed - q);
+    const double riseSd = falls.size() >= 200 ? 1.0 : 0.0;     // 0 = not enough clip to tell
+    r.riseBarDb = riseMed + stats::tailBar(falls, std::max(1.0, static_cast<double>(m) / back), cfg::kAlpha);
     std::vector<int> pk;
     int last = -1000000;
-    for (int i = back; i < m; ++i) {
+    for (int i = settle; i < m && riseSd > 0; ++i) {
         if (i - last < refr) continue;
-        if (db[static_cast<std::size_t>(i)] - db[static_cast<std::size_t>(i - back)] >= cfg::kHitRiseDb && db[static_cast<std::size_t>(i)] >= r.floorDb + cfg::kHitAboveFloorDb) {
+        if (db[static_cast<std::size_t>(i)] - db[static_cast<std::size_t>(i - back)] >= r.riseBarDb) {
             int p = i;
             for (int j = i; j < std::min(m, i + peakWin + 1); ++j) if (db[static_cast<std::size_t>(j)] > db[static_cast<std::size_t>(p)]) p = j;
             pk.push_back(p);
@@ -275,32 +444,76 @@ EchoResult echoCheck(const float* x, std::size_t n, double fs, double bandLoHz, 
     std::vector<double> nov(m, 0.0);
     double prev = std::sqrt(c.p[0]);
     for (std::size_t i = 1; i < m; ++i) { const double a = std::sqrt(c.p[i]); nov[i] = std::max(0.0, a - prev); prev = a; }
-    const int N = nextPow2(2 * m);
-    FftD fft; fft.prepare(N);
-    std::vector<Cx> v(static_cast<std::size_t>(N), Cx{});
-    for (std::size_t i = 0; i < m; ++i) v[i] = Cx(nov[i], 0.0);
-    fft.forward(v.data());
-    for (auto& s : v) s = Cx(std::norm(s), 0.0);
-    fft.inverse(v.data());
-    const double r0 = v[0].real();
-    if (r0 <= 1e-30) return r;
-    const int lo = static_cast<int>(cfg::kEchoMinMs / c.dtMs), hi = std::min(static_cast<int>(cfg::kEchoMaxMs / c.dtMs), static_cast<int>(m) / 2);
-    if (hi <= lo + 4) return r;
+    // autocorrelation of a piece of the novelty curve, normalised; returns q[lag] for lag in [lo, hi]
+    auto auto_corr = [&](std::size_t from, std::size_t len, int lo, int hi, std::vector<double>& q) {
+        const int N = nextPow2(2 * len);
+        FftD fft; fft.prepare(N);
+        std::vector<Cx> v(static_cast<std::size_t>(N), Cx{});
+        for (std::size_t i = 0; i < len; ++i) v[i] = Cx(nov[from + i], 0.0);
+        fft.forward(v.data());
+        for (auto& z : v) z = Cx(std::norm(z), 0.0);
+        fft.inverse(v.data());
+        const double r0 = v[0].real();
+        q.clear();
+        if (r0 <= 1e-30) return false;
+        // Every hit correlates with its own shape (rise and tail), which makes a smooth hill at short lags in ANY clip. Take that hill away
+        // (median of the neighbouring lags, 50 ms each side, taken from lags a window wider than the search range so the edges are not bent).
+        const int hw = std::max(2, static_cast<int>(50.0 / c.dtMs));
+        const int ra = std::max(1, lo - hw), rb = std::min(static_cast<int>(len) - 1, hi + hw);
+        std::vector<double> raw, win;
+        for (int l = ra; l <= rb; ++l) raw.push_back(v[static_cast<std::size_t>(l)].real() / r0);
+        for (int l = lo; l <= hi; ++l) {
+            const std::size_t ci = static_cast<std::size_t>(l - ra);
+            const std::size_t w0 = ci > static_cast<std::size_t>(hw) ? ci - static_cast<std::size_t>(hw) : 0, w1 = std::min(raw.size(), ci + static_cast<std::size_t>(hw) + 1);
+            win.assign(raw.begin() + static_cast<std::ptrdiff_t>(w0), raw.begin() + static_cast<std::ptrdiff_t>(w1));
+            q.push_back(raw[ci] - stats::median(win));
+        }
+        return true;
+    };
+    int lo = static_cast<int>(cfg::kEchoMinMs / c.dtMs), hi = std::min(static_cast<int>(cfg::kEchoMaxMs / c.dtMs), static_cast<int>(m) / 2);
+    // How many separate parts of the clip must agree on the lag: the number where agreement by luck is rarer than kAlpha.
+    // One part picks a lag; another part lands within +-1 step of it by luck with chance about 3/L (L = number of lags tried).
+    const double L0 = std::max(4.0, static_cast<double>(hi - lo + 1));
+    int K = static_cast<int>(std::ceil(1.0 + std::log(cfg::kAlpha) / std::log(std::min(0.99, 3.0 / L0))));
+    K = std::max(K, 2);
+    const std::size_t seg = m / static_cast<std::size_t>(K);
+    hi = std::min(hi, static_cast<int>(seg) / 2 - 1);      // a part must be long enough to hold the longest lag twice
+    if (hi <= lo + 4) return r;                             // clip too short for the replicated test: refuse
     r.valid = true;
+    const double L = static_cast<double>(hi - lo + 1);
+    K = std::max(2, static_cast<int>(std::ceil(1.0 + std::log(cfg::kAlpha) / std::log(std::min(0.99, 3.0 / L)))));
+    std::vector<double> qAll;
+    if (!auto_corr(0, m, lo, hi, qAll)) return r;
+    int best = 0; double bv = -1;
     std::vector<double> mags;
-    int best = lo; double bv = -1;
-    for (int l = lo; l <= hi; ++l) {
-        const double q = v[static_cast<std::size_t>(l)].real() / r0;
-        mags.push_back(std::fabs(q));
-        if (q > bv) { bv = q; best = l; }
-    }
+    for (std::size_t i = 0; i < qAll.size(); ++i) { mags.push_back(std::fabs(qAll[i])); if (qAll[i] > bv) { bv = qAll[i]; best = static_cast<int>(i); } }
     const double typical = std::max(percentile(mags, 50.0), 1e-9);
-    r.lagMs = best * c.dtMs;
+    r.lagMs = (lo + best) * c.dtMs;
     r.contrast = bv / typical;
-    // ratio = g / (1 + g^2)  ->  g = (1 - sqrt(1 - 4 ratio^2)) / (2 ratio)
-    const double q = std::clamp(bv, 0.0, 0.499);
-    r.strength = q > 1e-6 ? (1.0 - std::sqrt(1.0 - 4.0 * q * q)) / (2.0 * q) : 0.0;
-    r.found = r.strength >= cfg::kEchoMinStrength && r.contrast >= cfg::kEchoMinContrast;
+    const double qc = std::clamp(bv, 0.0, 0.499);      // ratio = g / (1 + g^2)  ->  g = (1 - sqrt(1 - 4 ratio^2)) / (2 ratio)
+    r.strength = qc > 1e-6 ? (1.0 - std::sqrt(1.0 - 4.0 * qc * qc)) / (2.0 * qc) : 0.0;
+    // Size test: after the smooth hill is taken away, dips and bumps of the correlation look alike when nothing repeats. The dips are the
+    // "nothing there" sample; the bar is the height a clean clip beats 1 time in 100 over the independent lags (lag-to-lag correlation sets how many).
+    {
+        std::vector<double> neg;
+        double s11 = 0, s01 = 0;
+        for (std::size_t i = 0; i < qAll.size(); ++i) { if (qAll[i] < 0) neg.push_back(-qAll[i]); s11 += qAll[i] * qAll[i]; if (i + 1 < qAll.size()) s01 += qAll[i] * qAll[i + 1]; }
+        const double rho = s11 > 0 ? std::clamp(s01 / s11, 0.0, 0.95) : 0.0;
+        const double neffLags = std::max(1.0, L * (1.0 - rho) / (1.0 + rho));
+        r.peakBar = stats::tailBar(neg, neffLags, cfg::kAlpha);
+    }
+    // replication
+    const std::size_t sl = m / static_cast<std::size_t>(K);
+    r.segments = K;
+    for (int k = 0; k < K; ++k) {
+        std::vector<double> q;
+        if (!auto_corr(static_cast<std::size_t>(k) * sl, sl, lo, hi, q)) continue;
+        int bi = 0; double bq = -1;
+        for (std::size_t i = 0; i < q.size(); ++i) if (q[i] > bq) { bq = q[i]; bi = static_cast<int>(i); }
+        if (std::abs(bi - best) <= 1) ++r.agreeing;
+    }
+    r.chanceAllAgree = std::pow(std::min(1.0, 3.0 / L), static_cast<double>(r.segments - 1));
+    r.found = r.agreeing == r.segments && r.chanceAllAgree <= cfg::kAlpha && bv >= r.peakBar;
     return r;
 }
 
@@ -319,94 +532,177 @@ WobbleResult highBandWobble(const float* x, std::size_t n, double fs, double ban
     if (mean <= 1e-9) return r;     // band empty
     for (std::size_t i = 0; i < m; ++i) z[i] = a[i] / mean - 1.0;
     const double rate = cfg::kWobbleEnvHz;
-    const int seg = 1024, hop = 512;
-    if (m < static_cast<std::size_t>(seg + hop)) return r;
-    const auto w = hann(seg);
-    FftD fft; fft.prepare(seg);
-    std::vector<double> ps(static_cast<std::size_t>(seg / 2 + 1), 0.0);
-    std::vector<Cx> buf(static_cast<std::size_t>(seg));
-    int cnt = 0;
-    for (std::size_t s0 = 0; s0 + static_cast<std::size_t>(seg) <= m; s0 += static_cast<std::size_t>(hop)) {
-        for (int i = 0; i < seg; ++i) buf[static_cast<std::size_t>(i)] = Cx(z[s0 + static_cast<std::size_t>(i)] * w[static_cast<std::size_t>(i)], 0.0);
+
+    // amplitude spectrum of the loudness curve (Hann window, amplitude of a sine = its depth)
+    const int Nf = nextPow2(m);
+    FftD fft; fft.prepare(Nf);
+    const auto wv = hann(static_cast<int>(m));
+    double wsum = 0; for (double v : wv) wsum += v;
+    const double df = rate / Nf;
+    const int lo = std::max(1, static_cast<int>(std::ceil(cfg::kWobbleMinHz / df))), hi = std::min(Nf / 2 - 1, static_cast<int>(std::floor(cfg::kWobbleMaxHz / df)));
+    std::vector<Cx> buf(static_cast<std::size_t>(Nf));
+    auto spectrum = [&](const std::vector<double>& sig, std::vector<double>& amp) {
+        double mu = 0; for (double v : sig) mu += v; mu /= static_cast<double>(sig.size());
+        std::fill(buf.begin(), buf.end(), Cx{});
+        for (std::size_t i = 0; i < m; ++i) buf[i] = Cx((sig[i] - mu) * wv[i], 0.0);
         fft.forward(buf.data());
-        for (int b = 0; b <= seg / 2; ++b) ps[static_cast<std::size_t>(b)] += std::norm(buf[static_cast<std::size_t>(b)]);
-        ++cnt;
-    }
-    const double df = rate / seg;
-    const int lo = std::max(1, static_cast<int>(std::ceil(cfg::kWobbleMinHz / df))), hi = std::min(seg / 2 - 1, static_cast<int>(std::floor(cfg::kWobbleMaxHz / df)));
-    std::vector<double> inband;
-    for (int b = lo; b <= hi; ++b) inband.push_back(ps[static_cast<std::size_t>(b)]);
-    const double typical = std::max(percentile(inband, 50.0), 1e-30);
-    // peaks: local maxima that clear the contrast rule, strongest first, at least 1.5 Hz apart, at most 6
+        amp.assign(static_cast<std::size_t>(hi) + 2, 0.0);
+        for (int b = 0; b <= hi + 1; ++b) amp[static_cast<std::size_t>(b)] = 2.0 * std::abs(buf[static_cast<std::size_t>(b)]) / wsum;
+    };
+    std::vector<double> amp;
+    spectrum(z, amp);
+
+    // Is a line real? Compare it with the loudness-curve spectrum at nearby rates (1-10 Hz away, not at its multiples): that is what
+    // "nothing there" looks like in THIS clip, beat and wander included. With bell-shaped noise the strength of one rate follows a
+    // Rayleigh law, so the chance of a value this big at one rate is exp(-A^2 / s2). We tried (range x seconds) independent rates,
+    // so the bar is raised by that count (Bonferroni). A beat that is loud in this clip raises s2 and hides a small wobble; the limit
+    // below says how small.
+    const double Tsec = static_cast<double>(m) / rate;
+    const double nRates = std::max(1.0, (cfg::kWobbleMaxHz - cfg::kWobbleMinHz) * Tsec);
+    auto ampNoise = [&](double centre, double f) {
+        std::vector<double> v;
+        const double excl = 0.5 * cfg::kWobbleNearMinHz;
+        for (double d = cfg::kWobbleNearMinHz; d <= cfg::kWobbleNearMaxHz + 1e-9; d += cfg::kWobbleNearStepHz)
+            for (int sgn = -1; sgn <= 1; sgn += 2) {
+                const double g = centre + sgn * d;
+                if (g < cfg::kWobbleMinHz || g > cfg::kWobbleMaxHz) continue;
+                bool bad = false;
+                for (int k = 1; k <= 4; ++k) { if (std::fabs(g - k * f) < excl || (k > 1 && std::fabs(g - f / k) < excl)) bad = true; }
+                if (bad) continue;
+                const int bi = static_cast<int>(std::lround(g / df));
+                if (bi >= 1 && bi <= hi) v.push_back(amp[static_cast<std::size_t>(bi)] * amp[static_cast<std::size_t>(bi)]);
+            }
+        if (v.size() < 20) return -1.0;
+        // median of a Rayleigh-shaped power is ln2 x its mean. The median of N independent values has relative spread 1.44/sqrt(N)
+        // (N = span x seconds / 2 for a Hann window), so the estimate is raised by its own one-sided kAlpha uncertainty.
+        const double nInd = std::max(1.0, static_cast<double>(v.size()) * cfg::kWobbleNearStepHz * Tsec / 2.0);
+        return stats::median(v) / std::log(2.0) * (1.0 + stats::zUpper(cfg::kAlpha) * 1.4427 / std::sqrt(nInd));
+    };
+    // adjusted chance (<= kAlpha means: a clean clip shows a rate this strong less than 1 time in 100)
+    auto pAdj = [&](double A, double centre, double f) {
+        const double s2 = ampNoise(centre, f);
+        if (s2 <= 0) return 1.0;
+        return std::min(1.0, nRates * std::exp(-A * A / s2));
+    };
+
+    // candidate lines: local maxima that pass, strongest first, at least 1.5 Hz apart, at most 6
     std::vector<int> peaks;
-    for (int b = lo + 1; b < hi; ++b) {
-        const double v = ps[static_cast<std::size_t>(b)];
-        if (v >= ps[static_cast<std::size_t>(b - 1)] && v > ps[static_cast<std::size_t>(b + 1)]) peaks.push_back(b);
-    }
-    std::sort(peaks.begin(), peaks.end(), [&](int p, int q) { return ps[static_cast<std::size_t>(p)] > ps[static_cast<std::size_t>(q)]; });
+    for (int b = lo + 1; b < hi; ++b) if (amp[static_cast<std::size_t>(b)] >= amp[static_cast<std::size_t>(b - 1)] && amp[static_cast<std::size_t>(b)] > amp[static_cast<std::size_t>(b + 1)]) peaks.push_back(b);
+    std::sort(peaks.begin(), peaks.end(), [&](int p, int q) { return amp[static_cast<std::size_t>(p)] > amp[static_cast<std::size_t>(q)]; });
     std::vector<int> chosen;
     const int sep = std::max(1, static_cast<int>(std::lround(1.5 / df)));
     for (int p : peaks) {
-        if (10.0 * std::log10(ps[static_cast<std::size_t>(p)] / typical) < cfg::kWobbleContrastDb) break;
+        if (chosen.size() == 6) break;
+        const double fp = p * df;
+        if (pAdj(amp[static_cast<std::size_t>(p)], fp, fp) > cfg::kAlpha) continue;
         bool near = false;
         for (int q : chosen) if (std::abs(p - q) < sep) near = true;
         if (!near) chosen.push_back(p);
-        if (chosen.size() == 6) break;
     }
-    if (chosen.empty()) {     // nothing clears the rule: report the strongest line so the page can show how far under it was
-        int pb = lo;
-        for (int b = lo; b <= hi; ++b) if (ps[static_cast<std::size_t>(b)] > ps[static_cast<std::size_t>(pb)]) pb = b;
-        chosen.push_back(pb);
+    std::vector<double> typicalAmp;
+    for (int b = lo; b <= hi; ++b) typicalAmp.push_back(amp[static_cast<std::size_t>(b)] * amp[static_cast<std::size_t>(b)]);
+    const double typicalPow = std::max(stats::median(typicalAmp), 1e-30);
+    r.valid = true;
+    // the smallest plain wobble this clip could show: amplitude whose adjusted chance equals kAlpha at the clip-wide typical s2
+    // The limit depends on the rate (a beat is loud at low rates and quiet at high ones), so it is worked out at every rate from 1 Hz up:
+    // the middle one and the worst one are reported.
+    std::vector<double> limitsAmp; double worstAmp = 0, worstAt = 0;
+    for (double fr = 1.0; fr <= cfg::kWobbleMaxHz; fr += 0.5) {
+        const double s2 = ampNoise(fr, fr);
+        if (s2 <= 0) continue;
+        const double la = std::sqrt(s2 * std::log(nRates / cfg::kAlpha));
+        limitsAmp.push_back(la);
+        if (la > worstAmp) { worstAmp = la; worstAt = fr; }
     }
+    const double limitAmp = limitsAmp.empty() ? 0.0 : stats::median(limitsAmp);
+
     auto lockIn = [&](const std::vector<double>& zz, double f) {
         Cx acc{};
         for (std::size_t i = 0; i < zz.size(); ++i) acc += zz[i] * std::polar(1.0, -2.0 * kPi * f * static_cast<double>(i) / rate);
         return 2.0 * acc / static_cast<double>(zz.size());
     };
+    // leakage power at a rate: median over nearby rates (not near f or its multiples) of |lock-in|^2, divided by ln 2 (the median/mean ratio of that spread)
+    auto leakPower = [&](double centre, double f) {
+        std::vector<double> v;
+        const double excl = 0.5 * cfg::kWobbleNearMinHz;
+        for (double d = cfg::kWobbleNearMinHz; d <= cfg::kWobbleNearMaxHz + 1e-9; d += cfg::kWobbleNearStepHz)
+            for (int sgn = -1; sgn <= 1; sgn += 2) {
+                const double g = centre + sgn * d;
+                if (g < cfg::kWobbleMinHz || g > cfg::kWobbleMaxHz) continue;
+                bool bad = false;
+                for (int k = 1; k <= 4; ++k) { if (std::fabs(g - k * f) < excl || (k > 1 && std::fabs(g - f / k) < excl)) bad = true; }
+                if (bad) continue;
+                v.push_back(std::norm(lockIn(z, g)));
+            }
+        return v.size() >= 20 ? stats::median(v) / std::log(2.0) : -1.0;
+    };
+    const double tFac = std::sqrt(-std::log(cfg::kAlpha));      // 1 - kAlpha bound of a Rayleigh-shaped spread, in units of its sigma
+    // add a known wobble of `depth` at f, return how far the reading at f moved per unit depth (0 if it cannot be read)
+    auto probeGain = [&](double f, double depth, std::vector<double>* zOut, const Cx& a0) {
+        std::vector<float> copy(x, x + n);
+        maker::injectBandWobble(copy, fs, f, depth, bandLoHz, std::min(bandHiHz, 0.45 * fs));
+        const Curve c2 = bandCurve(copy.data(), n, fs, bandLoHz, bandHiHz, cfg::kWobbleEnvHz, 80.0);
+        if (c2.p.size() != m) return 0.0;
+        std::vector<double> zz(m);
+        double mean2 = 0;
+        for (std::size_t i = 0; i < m; ++i) { zz[i] = std::sqrt(c2.p[i]); mean2 += zz[i]; }
+        mean2 /= static_cast<double>(m);
+        for (std::size_t i = 0; i < m; ++i) zz[i] = zz[i] / mean2 - 1.0;
+        const double mv = std::abs(lockIn(zz, f) - a0);
+        if (zOut) *zOut = std::move(zz);
+        return mv / depth;
+    };
+
     for (int pb : chosen) {
         WobbleLine ln;
-        ln.contrastDb = 10.0 * std::log10(ps[static_cast<std::size_t>(pb)] / typical);
         double f = pb * df;
-        if (pb > lo && pb < hi) {
-            const double l = std::log(ps[static_cast<std::size_t>(pb - 1)] + 1e-30), cc = std::log(ps[static_cast<std::size_t>(pb)] + 1e-30), rr = std::log(ps[static_cast<std::size_t>(pb + 1)] + 1e-30);
+        {
+            const double l = std::log(amp[static_cast<std::size_t>(pb - 1)] + 1e-30), cc = std::log(amp[static_cast<std::size_t>(pb)] + 1e-30), rr = std::log(amp[static_cast<std::size_t>(pb + 1)] + 1e-30);
             const double den = l - 2.0 * cc + rr;
             if (std::fabs(den) > 1e-12) f += 0.5 * (l - rr) / den * df;
         }
         ln.freqHz = f;
-        auto nearPow = [&](double mult) {
-            const int c = static_cast<int>(std::lround(mult * f / df));
-            if (c + 1 > seg / 2) return 0.0;
-            return std::max({ps[static_cast<std::size_t>(c - 1)], ps[static_cast<std::size_t>(c)], ps[static_cast<std::size_t>(c + 1)]});
-        };
-        const double pf = ps[static_cast<std::size_t>(pb)];
-        ln.rhythmLike = nearPow(2.0) >= cfg::kWobbleHarmonicShare * pf || nearPow(3.0) >= cfg::kWobbleHarmonicShare * pf;
+        ln.contrastDb = 10.0 * std::log10(amp[static_cast<std::size_t>(pb)] * amp[static_cast<std::size_t>(pb)] / typicalPow);
+        ln.p = pAdj(amp[static_cast<std::size_t>(pb)], f, f);
+        ln.significant = ln.p <= cfg::kAlpha;
         const Cx a0 = lockIn(z, f);
-        // Standard addition (same idea as the flutter meter): add a known wobble at this rate, read how much the reading moved,
-        // and scale. This removes the meter's own gain error. If the reading does not move, no number is given.
-        std::vector<float> copy(x, x + n);
-        maker::injectBandWobble(copy, fs, f, cfg::kWobbleCalibDepth, bandLoHz, std::min(bandHiHz, 0.45 * fs));
-        const Curve c2 = bandCurve(copy.data(), n, fs, bandLoHz, bandHiHz, cfg::kWobbleEnvHz, 80.0);
-        if (c2.p.size() != m) continue;
-        std::vector<double> z2(m);
-        double mean2 = 0;
-        for (std::size_t i = 0; i < m; ++i) { z2[i] = std::sqrt(c2.p[i]); mean2 += z2[i]; }
-        mean2 /= static_cast<double>(m);
-        for (std::size_t i = 0; i < m; ++i) z2[i] = z2[i] / mean2 - 1.0;
-        const double moved = std::abs(lockIn(z2, f) - a0);
-        if (moved < 0.2 * cfg::kWobbleCalibDepth) continue;
-        ln.depth = std::abs(a0) / moved * cfg::kWobbleCalibDepth;
+        // standard addition: add a known wobble at this rate, see how far the reading moves, scale (removes the meter's own gain error).
+        // Two sizes of added wobble: the reading is slightly sub-linear when a wobble is already there, so the two gains differ a little.
+        // Their mean is used and their half-difference widens the range.
+        std::vector<double> z2;
+        const double gSmall = probeGain(f, cfg::kWobbleCalibSmall, nullptr, a0);
+        const double gBig = probeGain(f, cfg::kWobbleCalibBig, &z2, a0);
+        if (gSmall <= 0 || gBig <= 0) continue;
+        const double gain = 0.5 * (gSmall + gBig), gRel = 0.5 * std::fabs(gSmall - gBig) / gain;
+        const double sig2 = std::max(leakPower(f, f), 0.0);
+        const double amp0 = std::abs(a0), bound = tFac * std::sqrt(sig2);
+        if (gain * cfg::kWobbleCalibSmall < bound) continue;     // the added wobble did not rise above this clip's leakage: no number
+        ln.depth = std::sqrt(std::max(amp0 * amp0 - sig2, 0.0)) / gain;
+        ln.depthLo = std::max(amp0 - bound, 0.0) / (gain * (1.0 + gRel));
+        ln.depthHi = (amp0 + bound) / (gain * (1.0 - gRel));
+        ln.depthTrusted = ln.significant && ln.depthLo > 0.0;
+        // rhythm: a plain wobble puts a little at 2x and 3x (the meter's own response, measured by the same added wobble). A beat puts clearly more.
+        for (int h = 2; h <= 3 && !ln.rhythmLike; ++h) {
+            const double fh = h * f;
+            if (fh > cfg::kWobbleMaxHz) break;
+            const Cx ah = lockIn(z, fh);
+            const double predicted = std::abs(lockIn(z2, fh) - ah) * std::pow(std::max(ln.depth, 0.0) / cfg::kWobbleCalibBig, h);
+            const double sh = std::max(leakPower(fh, f), 0.0);
+            // is the amplitude at fh a line (beats the null) AND more than the pure-wobble prediction plus its own spread?
+            if (std::abs(ah) > predicted + tFac * std::sqrt(sh) && pAdj(std::abs(ah), fh, f) <= cfg::kAlpha) ln.rhythmLike = true;
+        }
         r.lines.push_back(ln);
     }
-    if (r.lines.empty()) return r;
-    r.valid = true;
-    for (auto& ln : r.lines) {
-        ln.depthTrusted = !ln.rhythmLike;
-        for (const auto& o : r.lines) if (o.rhythmLike && o.contrastDb > ln.contrastDb) ln.depthTrusted = false;
+    // gain of the meter for the limit: one small added wobble at 10 Hz
+    {
+        const double g = probeGain(10.0, cfg::kWobbleCalibSmall, nullptr, lockIn(z, 10.0));
+        if (g > 0) { r.detectLimitDepth = limitAmp / g; r.detectLimitWorstDepth = worstAmp / g; r.detectLimitWorstHz = worstAt; }
     }
+    if (r.lines.empty()) return r;
     const WobbleLine* best = &r.lines[0];
-    for (const auto& ln : r.lines) if (!ln.rhythmLike) { best = &ln; break; }
+    for (const auto& ln : r.lines) if (ln.significant && !ln.rhythmLike) { best = &ln; break; }
     r.freqHz = best->freqHz; r.depth = best->depth; r.contrastDb = best->contrastDb;
-    for (const auto& ln : r.lines) { if (ln.contrastDb >= cfg::kWobbleContrastDb) { r.found = true; if (!ln.rhythmLike) r.foundSteady = true; } }
+    for (const auto& ln : r.lines) { if (ln.significant) { r.found = true; if (!ln.rhythmLike) r.foundSteady = true; } }
     return r;
 }
 
@@ -419,37 +715,82 @@ PhaseResult phaseConsistency(const float* left, const float* right, std::size_t 
     if (n < static_cast<std::size_t>(2 * N)) return r;
     const int frames = 1 + static_cast<int>((n - static_cast<std::size_t>(N)) / static_cast<std::size_t>(hop));
     const double edges[] = {100, 200, 400, 800, 1600, 3200, 6400, 12800, 20000};
+    constexpr int kBands = 8;
     const double df = fs / N;
     const auto w = hann(N);
     FftD fft; fft.prepare(N);
+    // frames used: all of them, or kPhaseMaxFrames spread evenly across the clip
+    const int Fu = std::min(frames, cfg::kPhaseMaxFrames);
+    int kLo[kBands], kHi[kBands], nb = 0;
+    for (int b = 0; b < kBands; ++b) {
+        if (edges[b] >= 0.45 * fs) break;
+        kLo[b] = static_cast<int>(std::ceil(edges[b] / df)); kHi[b] = std::min(N / 2, static_cast<int>(std::floor(edges[b + 1] / df)));
+        ++nb;
+    }
+    if (nb == 0) return r;
+    const int k0 = kLo[0], k1 = kHi[nb - 1], nk = k1 - k0;
+    if (nk <= 0) return r;
+    using Cf = std::complex<float>;
+    std::vector<Cf> LS(static_cast<std::size_t>(Fu) * static_cast<std::size_t>(nk)), RS(LS.size());
     std::vector<Cx> L(static_cast<std::size_t>(N)), R(static_cast<std::size_t>(N));
-    constexpr int kBands = 8;
-    Cx cross[kBands] = {};
-    double pl[kBands] = {}, pr[kBands] = {};
-    for (int f = 0; f < frames; ++f) {
+    for (int j = 0; j < Fu; ++j) {
+        const int f = Fu == frames ? j : static_cast<int>(std::lround(static_cast<double>(j) * (frames - 1) / std::max(1, Fu - 1)));
         const std::size_t o = static_cast<std::size_t>(f) * static_cast<std::size_t>(hop);
         for (int i = 0; i < N; ++i) { L[static_cast<std::size_t>(i)] = Cx(left[o + static_cast<std::size_t>(i)] * w[static_cast<std::size_t>(i)], 0); R[static_cast<std::size_t>(i)] = Cx(right[o + static_cast<std::size_t>(i)] * w[static_cast<std::size_t>(i)], 0); }
         fft.forward(L.data()); fft.forward(R.data());
-        for (int b = 0; b < kBands; ++b) {
-            const int k0 = static_cast<int>(std::ceil(edges[b] / df)), k1 = std::min(N / 2, static_cast<int>(std::floor(edges[b + 1] / df)));
-            for (int k = k0; k < k1; ++k) {
-                cross[b] += L[static_cast<std::size_t>(k)] * std::conj(R[static_cast<std::size_t>(k)]);
-                pl[b] += std::norm(L[static_cast<std::size_t>(k)]); pr[b] += std::norm(R[static_cast<std::size_t>(k)]);
-            }
+        for (int k = 0; k < nk; ++k) {
+            LS[static_cast<std::size_t>(j) * static_cast<std::size_t>(nk) + static_cast<std::size_t>(k)] = Cf(static_cast<float>(L[static_cast<std::size_t>(k0 + k)].real()), static_cast<float>(L[static_cast<std::size_t>(k0 + k)].imag()));
+            RS[static_cast<std::size_t>(j) * static_cast<std::size_t>(nk) + static_cast<std::size_t>(k)] = Cf(static_cast<float>(R[static_cast<std::size_t>(k0 + k)].real()), static_cast<float>(R[static_cast<std::size_t>(k0 + k)].imag()));
         }
     }
-    double sum = 0; int used = 0;
-    for (int b = 0; b < kBands; ++b) {
-        if (edges[b] >= 0.45 * fs) break;
-        PhaseBand pb; pb.loHz = edges[b]; pb.hiHz = std::min(edges[b + 1], 0.5 * fs);
-        const double den = std::sqrt(pl[b] * pr[b]);
-        pb.coherence = den > 1e-30 ? std::abs(cross[b]) / den : 0.0;
-        pb.phaseDeg = std::arg(cross[b]) * 180.0 / kPi;
-        r.bands.push_back(pb);
-        sum += pb.coherence; ++used;
+    // agreement of L with R paired at a frame shift (0 = the real pairing)
+    auto pairing = [&](int shift, double* coh, double* phaseDeg) {
+        std::complex<double> cross[kBands] = {};
+        double pl[kBands] = {}, pr[kBands] = {};
+        for (int j = 0; j < Fu; ++j) {
+            const int jr = (j + shift) % Fu;
+            for (int b = 0; b < nb; ++b)
+                for (int k = kLo[b]; k < kHi[b]; ++k) {
+                    const Cf l = LS[static_cast<std::size_t>(j) * static_cast<std::size_t>(nk) + static_cast<std::size_t>(k - k0)];
+                    const Cf rr = RS[static_cast<std::size_t>(jr) * static_cast<std::size_t>(nk) + static_cast<std::size_t>(k - k0)];
+                    const Cf cp = l * std::conj(rr);
+                    cross[b] += std::complex<double>(cp.real(), cp.imag());
+                    pl[b] += std::norm(l); pr[b] += std::norm(rr);
+                }
+        }
+        for (int b = 0; b < nb; ++b) {
+            const double den = std::sqrt(pl[b] * pr[b]);
+            coh[b] = den > 1e-30 ? std::abs(cross[b]) / den : 0.0;
+            if (phaseDeg) phaseDeg[b] = std::arg(cross[b]) * 180.0 / kPi;
+        }
+    };
+    double coh0[kBands] = {}, ph0[kBands] = {};
+    pairing(0, coh0, ph0);
+    // NULL: the same agreement with R slid in time against L (the two channels no longer belong together). Neighbouring frames overlap, so
+    // slides closer than 4 frames to the real pairing are not used. The number of slides is set by kAlpha.
+    const int S = static_cast<int>(std::ceil(2.0 / cfg::kAlpha)) - 1;
+    std::vector<int> shifts;
+    const int avail = Fu - 7;
+    if (avail > 0) {
+        const int take = std::min(S, avail);
+        for (int i = 0; i < take; ++i) shifts.push_back(4 + static_cast<int>(std::lround(static_cast<double>(i) * (avail - 1) / std::max(1, take - 1))));
     }
-    r.valid = used > 0;
-    r.meanCoherence = used ? sum / used : 0.0;
+    std::vector<std::vector<double>> nullC(static_cast<std::size_t>(nb));
+    for (int sh : shifts) { double cb[kBands] = {}; pairing(sh, cb, nullptr); for (int b = 0; b < nb; ++b) nullC[static_cast<std::size_t>(b)].push_back(cb[b]); }
+    const bool enough = static_cast<int>(shifts.size()) >= static_cast<int>(std::ceil(1.0 / cfg::kAlpha)) - 1;
+    double sum = 0;
+    for (int b = 0; b < nb; ++b) {
+        PhaseBand pb; pb.loHz = edges[b]; pb.hiHz = std::min(edges[b + 1], 0.5 * fs);
+        pb.coherence = coh0[b]; pb.phaseDeg = ph0[b];
+        pb.nullMedian = stats::median(nullC[static_cast<std::size_t>(b)]);
+        int ex = 0; for (double v : nullC[static_cast<std::size_t>(b)]) if (v >= coh0[b]) ++ex;
+        const double pv = (1.0 + ex) / (1.0 + static_cast<double>(shifts.size()));
+        pb.significant = enough && pv <= cfg::kAlpha;
+        r.bands.push_back(pb);
+        sum += pb.coherence;
+    }
+    r.valid = nb > 0;
+    r.meanCoherence = nb ? sum / nb : 0.0;
     return r;
 }
 

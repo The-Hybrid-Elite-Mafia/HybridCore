@@ -73,15 +73,27 @@ ToolOutput combAndClickFinder(const float* left, const float* right, std::size_t
     const auto sc = lab::seamClicks(x.data(), n, fs);
     if (!sc.valid) f.push_back(report::refused("40 ms seam clicks", "clip shorter than 0.5 s"));
     else {
-        f.push_back(report::withAbsRange("Clicks found", static_cast<double>(sc.clicks.size()), 0.05 * static_cast<double>(sc.clicks.size()), "clicks", kSyn, "made-up clip: 95 % of injected clicks found, under 5 % invented"));
+        char b[260];
+        std::snprintf(b, sizeof b, "40 ms fold test: chance a clean file looks this periodic = %.4f (%d other frame lengths used as the null). Call: %s", sc.foldP, sc.nullFolds, sc.pattern ? "YES, a 40 ms pattern" : "no pattern shown");
+        f.push_back(report::noRange("40 ms pattern", sc.pattern ? 1.0 : 0.0, "(1 = yes)", kSyn, b));
+        if (sc.nullFolds > 0) {
+            std::snprintf(b, sizeof b, "worked out from THIS file's own high-frequency noise: a single-sample click smaller than this is not shown as a pattern");
+            f.push_back(report::noRange("Smallest click this file can show (all same direction)", sc.detectLimitDb, "dBFS", kSyn, b));
+            f.push_back(report::noRange("Smallest click this file can show (either direction)", sc.detectLimitAnySignDb, "dBFS", kSyn, b));
+            if (sc.pattern) {
+                f.push_back(report::withAbsRange("Click size (single-sample peak)", sc.foldLevelDb, 3.0, "dBFS", kSyn, "read from the fold; range from tests on made-up clips"));
+                f.push_back(report::withAbsRange("Click position inside the 40 ms frame", sc.foldPhaseMs, 0.5, "ms", kSyn));
+            }
+        }
+        std::snprintf(b, sizeof b, "single-click rule for this clip: %.1f times the local typical size (from clip length at 1 in 100; assumes bell-shaped local noise)", sc.clickThresholdRatio);
+        f.push_back(report::withAbsRange("Single clicks found", static_cast<double>(sc.clicks.size()), 0.05 * static_cast<double>(sc.clicks.size()), "clicks", kSyn, b));
         if (sc.clicks.size() >= 2) {
             f.push_back(report::withAbsRange("Median gap between clicks", sc.medianIntervalMs, 0.1, "ms", kSyn));
-            char b[200]; std::snprintf(b, sizeof b, "pattern call: %s (needs %d clicks and %.0f %% of gaps at 40 ms or a whole multiple)", sc.pattern ? "YES, a 40 ms pattern" : "no", cfg::kClickMinCount, 100.0 * cfg::kClickMinPeriodic);
-            f.push_back(report::withAbsRange("Share of gaps at 40 ms (or multiple)", 100.0 * sc.periodicShare, 5.0, "%", "ASSUMED", b));
-        } else f.push_back(report::refused("Gaps between clicks", "fewer than 2 clicks found"));
+            f.push_back(report::withAbsRange("Share of gaps at 40 ms (or multiple)", 100.0 * sc.periodicShare, 5.0, "%", kSyn, "information only; the pattern call uses the fold test above"));
+        }
     }
     o.text = report::makeReport("Comb and Click Finder: " + name, f, {
-        "The click finder was tested on clicks we put into noise. Music with sharp drum attacks above 3 kHz can look like clicks. A click quieter than about 8 times the typical high-frequency level around it is NOT found (measured in tests). Real files: UNKNOWN.",
+        "The click finder was tested on clicks we put into noise. Music with sharp drum attacks above 3 kHz can look like clicks. The smallest click it can show is worked out per file (line above). Music with a steady beat that divides evenly by 40 ms can also fold strongly. Real files: UNKNOWN.",
         "The 25 Hz comb meter confuses grid music with comb unless lines are compared to their neighbours; it does that (FAILURES.md F6)."});
     return o;
 }
@@ -97,7 +109,7 @@ ToolOutput airAndSmearLab(const float* left, const float* right, std::size_t n, 
     else f.push_back(report::withRelRange("Flutter depth at 25 Hz", fl.depth, 0.20, "", kSyn, "27 of 27 trials inside +/-20 % on never-used clips"));
     const auto nt = lab::trackNotch(x.data(), n, fs);
     if (!nt.valid) f.push_back(report::refused("Moving notch", "clip too short"));
-    else if (!nt.found) f.push_back(report::nothingFound("Moving notch", "no notch: the deepest dip in 8-18 kHz was only " + std::to_string(nt.medianDepthDb).substr(0, 4) + " dB (rule: 8 dB or more)", kSyn));
+    else if (!nt.found) f.push_back(report::nothingFound("Moving notch", "no notch: only " + std::to_string(nt.significantGroups) + " of " + std::to_string(nt.groups) + " readings had a dip rarer than chance (chance of that many in a clean file " + std::to_string(nt.binomP).substr(0, 6) + ")", kSyn));
     else {
         f.push_back(report::withAbsRange("Notch depth", nt.medianDepthDb, 4.0, "dB", kSyn, "a relative figure, it reads about 3 dB under the true depth on made-up dips"));
         f.push_back(report::withAbsRange("Notch frequency (median)", nt.medianFreqHz, 150.0, "Hz", kSyn));
@@ -120,26 +132,30 @@ ToolOutput airAndSmearLab(const float* left, const float* right, std::size_t n, 
     }
     const auto ec = lab::echoCheck(x.data(), n, fs);
     if (!ec.valid) f.push_back(report::refused("Echo / repeat", "clip too short"));
-    else if (!ec.found) f.push_back(report::nothingFound("Echo / repeat", "no repeat found (rule: strength 0.12 or more AND 4 times the typical size)", kSyn));
+    else if (!ec.found) f.push_back(report::nothingFound("Echo / repeat", "no repeat found: " + std::to_string(ec.agreeing) + " of " + std::to_string(ec.segments) + " parts of the clip agree on one delay. A steady beat also repeats, so a repeat alone is not proof of an artifact", kSyn));
     else {
         f.push_back(report::withAbsRange("Repeat delay", ec.lagMs, 4.0, "ms", kSyn));
         f.push_back(report::withAbsRange("Repeat strength", ec.strength, 0.08, "", kSyn, "about the loudness of the repeat against the original; reads about 0.07 low at -10 dB"));
     }
     const auto wb = lab::highBandWobble(x.data(), n, fs);
+    if (wb.valid && wb.detectLimitDepth > 0) {
+        char lb[240]; std::snprintf(lb, sizeof lb, "worked out from this clip's own loudness wander and beat at 1 in 100. At the worst rate (%.1f Hz) it is %.3f: a smaller wobble can hide under the beat there", wb.detectLimitWorstHz, wb.detectLimitWorstDepth);
+        f.push_back(report::noRange("Smallest wobble depth this clip could show (typical rate)", wb.detectLimitDepth, "", kSyn, lb));
+    }
     if (!wb.valid) f.push_back(report::refused("10-16 kHz wobble", "clip under 10 s, band empty, or the calibration did not move"));
-    else if (!wb.found) f.push_back(report::nothingFound("10-16 kHz wobble", "no wobble line stands 9 dB above the typical level (the 9 dB rule is ASSUMED)", "ASSUMED"));
+    else if (!wb.found) f.push_back(report::nothingFound("10-16 kHz wobble", "no line beats the shuffled copies of this clip (rank test at 1 in 100)", kSyn));
     else {
         int k = 0;
         for (const auto& ln : wb.lines) {
-            if (ln.contrastDb < cfg::kWobbleContrastDb) continue;
+            if (!ln.significant) continue;
             ++k;
-            char nm[96], nt3[160];
+            char nm[96], nt3[200];
             std::snprintf(nm, sizeof nm, "Wobble line %d: rate", k);
-            std::snprintf(nt3, sizeof nt3, "%s", ln.rhythmLike ? "RHYTHM-LIKE: strong at 2x and 3x the rate too, so a beat or pattern in the music, not a steady wobble (ASSUMED rule)" : "steady (no strong harmonics)");
+            std::snprintf(nt3, sizeof nt3, "%s (chance a clean clip shows a line this strong: %.4f)", ln.rhythmLike ? "RHYTHM-LIKE: more at 2x or 3x the rate than a plain wobble gives, so a beat or pattern, not a steady wobble" : "plain wobble (no extra at 2x or 3x)", ln.p);
             f.push_back(report::withAbsRange(nm, ln.freqHz, 0.3, "Hz", kSyn, nt3));
             std::snprintf(nm, sizeof nm, "Wobble line %d: depth", k);
-            if (ln.depthTrusted) f.push_back(report::withRelRange(nm, ln.depth, 0.20, "", kSyn));
-            else f.push_back(report::noRange(nm, ln.depth, "", "UNKNOWN", "NOT trusted: a beat or pattern sits in the same clip. In a test the depth read 0.117 for a true 0.20 under a beat"));
+            std::snprintf(nt3, sizeof nt3, "range %.3f to %.3f at 1 in 100, worked out from the leakage in this clip", ln.depthLo, ln.depthHi);
+            f.push_back(report::withAbsRange(nm, ln.depth, std::max(ln.depth - ln.depthLo, ln.depthHi - ln.depth), "", kSyn, nt3));
         }
     }
     if (std::equal(left, left + n, right)) f.push_back(report::refused("Left/right phase", "the file is mono (both channels identical), nothing to compare"));
@@ -149,11 +165,11 @@ ToolOutput airAndSmearLab(const float* left, const float* right, std::size_t n, 
         else for (const auto& b : ph.bands) {
             char nm[96]; std::snprintf(nm, sizeof nm, "Phase L-R, %.0f-%.0f Hz", b.loHz, b.hiHz);
             char nt2[160];
-            if (b.coherence < cfg::kPhaseMinCoherence) {
-                std::snprintf(nt2, sizeof nt2, "agreement %.3f is under %.2f: left and right are different sounds here, a phase angle would mean nothing", b.coherence, cfg::kPhaseMinCoherence);
-                f.push_back(report::nothingFound(nm, nt2, "ASSUMED"));
+            if (!b.significant) {
+                std::snprintf(nt2, sizeof nt2, "agreement %.3f does not beat time-shifted copies (their median %.3f): left and right are different sounds here, a phase angle would mean nothing", b.coherence, b.nullMedian);
+                f.push_back(report::nothingFound(nm, nt2, kSyn));
             } else {
-                std::snprintf(nt2, sizeof nt2, "agreement %.3f (1 = same signal)", b.coherence);
+                std::snprintf(nt2, sizeof nt2, "agreement %.3f (1 = same signal), beats every time-shifted copy (median %.3f)", b.coherence, b.nullMedian);
                 f.push_back(report::withAbsRange(nm, b.phaseDeg, 3.0, "deg", kSyn, nt2));
             }
         }
@@ -169,9 +185,9 @@ ToolOutput airAndSmearLab(const float* left, const float* right, std::size_t n, 
     }
     o.text = report::makeReport("Air and Smear Lab: " + name, f, {
         "Every engine here was checked on signals we made, with a known answer. None has been run against a real Suno file with a known cause. Real files: UNKNOWN.",
-        "Music has its own beat. A line marked RHYTHM-LIKE in the wobble section is probably the groove, not a fault.",
+        "Music has its own beat. A line marked RHYTHM-LIKE in the wobble section is probably the groove, not a fault. Its depth range is wider because the groove leaks into it.",
         "Masking is an assumed textbook model. Only a blind listening test says what a person hears.",
-        "A 'found' call means the rule in HissConfig.hpp (section LAB) was met. Those rules are ASSUMED."});
+        "Every yes/no call is a rank test against copies of THIS file at a 1 in 100 false-alarm rate. The masking line uses published textbook constants, not measured ones."});
     return o;
 }
 

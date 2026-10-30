@@ -174,52 +174,62 @@ inline constexpr double kFlutterCalibDepth    = 0.20;    // ASSUMED: size of the
 inline constexpr double kFlutterGainMismatch  = 0.15;    // ASSUMED: if the two calibration readings differ by more than this share, the clip is not linear and no number is given
 
 // =============================================================================
-//  LAB (HissLab): seam clicks, moving notch, smear, masking, hits, echo, wobble, phase. Every number is a working guess.
-//  Nothing here has been checked against a real Suno file. Each is ASSUMED until a real-file run says otherwise.
+//  LAB (HissLab). Every number is put in ONE of these boxes. No decision in the lab depends on a guessed number.
+//    CHOSEN     the one number somebody has to pick: how often a CLEAN file may be wrongly accused. Everything else is worked out from it.
+//    DEFINITION what is being measured (a band, a window, a name). Changing it changes the question, not the quality of the answer.
+//               These become knobs on the faceplates. Tests show what each one does.
+//    PUBLISHED  a constant from a published model. Not derived or measured here. Used only for the masking estimate, never for a decision.
+//    ASSUMED    a real guess. Count of these is printed by the lab report.
+//  Thresholds like "8 times the typical size", "8 dB deep", "10 dB rise", "9 dB contrast", "0.30 agreement" are GONE.
+//  Each is now computed from the clip itself at kAlpha (see HissLab.cpp: stats::zUpper, rank tests, shifted-copy nulls).
 // =============================================================================
-inline constexpr double kClickHpHz          = 3000.0;   // ASSUMED: clicks are looked for above this
-inline constexpr double kClickRiseRatio     = 8.0;      // ASSUMED: a click is a sample this many times louder than the local typical size
-inline constexpr double kClickLocalMs       = 50.0;     // ASSUMED: length of the window that sets the "typical size"
+inline constexpr double kAlpha              = 0.01;     // CHOSEN: a clean file is wrongly accused at most 1 time in 100 per decision
+
+// ---- DEFINITION ----
+inline constexpr double kClickHpHz          = 3000.0;   // DEFINITION: clicks are looked for above this
+inline constexpr double kClickLocalMs       = 50.0;     // DEFINITION: "local" means this window (sets the typical size)
+inline constexpr double kClickWindowMs      = 3.0;      // DEFINITION: a click's energy is added up over this long (covers the filter ring of a single-sample click)
 inline constexpr double kClickPeriodMs      = 40.0;     // from Steven's finding: seams about every 40 ms
-inline constexpr double kClickPeriodTolMs   = 0.5;      // ASSUMED: an interval counts as "40 ms" if it is within this
-inline constexpr int    kClickMinCount      = 5;        // ASSUMED: fewer clicks than this are never called a pattern
-inline constexpr double kClickMinPeriodic   = 0.6;      // ASSUMED: share of intervals that must be 40 ms (or a whole multiple)
-inline constexpr double kNotchBandLoHz      = 8000.0;   // ASSUMED: notch search band
-inline constexpr double kNotchBandHiHz      = 18000.0;  // ASSUMED
-inline constexpr int    kNotchFft           = 4096;     // ASSUMED
-inline constexpr int    kNotchAvgFrames     = 8;        // ASSUMED: frames averaged before looking for a dip (about 0.34 s at 48 kHz)
-inline constexpr double kNotchWideHz        = 600.0;    // ASSUMED: "normal level" is the average within this distance
-inline constexpr double kNotchNarrowHz      = 30.0;     // ASSUMED: a dip is read over this width
-inline constexpr double kNotchMinDepthDb    = 8.0;      // ASSUMED: a dip shallower than this is not called a notch
-inline constexpr double kEnvHz              = 500.0;    // ASSUMED: rate of the band loudness curve the hit tools use (2 ms)
-inline constexpr double kHitBandLoHz        = 6000.0;   // ASSUMED: band that carries cymbal and hat hits
-inline constexpr double kHitBandHiHz        = 16000.0;  // ASSUMED
-inline constexpr double kHitRiseDb          = 10.0;     // ASSUMED: a hit is a rise of at least this in 10 ms
-inline constexpr double kHitAboveFloorDb    = 15.0;     // ASSUMED: and the peak must be this far above the quiet floor
-inline constexpr double kHitRefractoryMs    = 60.0;     // ASSUMED: no second hit inside this time
-inline constexpr double kHitTailDb          = 20.0;     // ASSUMED: "tail time" = time for the band to fall this far from the peak
-inline constexpr double kHitTailMaxMs       = 600.0;    // ASSUMED: tails longer than this, or cut off by the next hit, are not counted
-inline constexpr double kAvgPreMs           = 20.0;     // ASSUMED: hit averager window before the hit
-inline constexpr double kAvgPostMs          = 400.0;    // ASSUMED: and after it
-inline constexpr double kEchoMinMs          = 20.0;     // ASSUMED: shortest repeat looked for
-inline constexpr double kEchoMaxMs          = 600.0;    // ASSUMED: longest
-inline constexpr double kEchoMinStrength    = 0.12;     // ASSUMED: repeat strength (0 to 1) needed to call a repeat
-inline constexpr double kEchoMinContrast    = 4.0;      // ASSUMED: the repeat peak must be this many times the typical size at other lags
-inline constexpr double kWobbleBandLoHz     = 10000.0;  // ASSUMED: high-band wobble meter band
-inline constexpr double kWobbleBandHiHz     = 16000.0;  // ASSUMED
-inline constexpr double kWobbleEnvHz        = 200.0;    // ASSUMED: rate of the loudness curve
-inline constexpr double kWobbleMinHz        = 0.5;      // ASSUMED
-inline constexpr double kWobbleMaxHz        = 60.0;     // ASSUMED
-inline constexpr double kWobbleMinSeconds   = 10.0;     // ASSUMED: shorter clips are refused
-inline constexpr double kWobbleCalibDepth   = 0.20;     // ASSUMED: size of the known wobble the meter adds to calibrate itself on a clip
-inline constexpr double kWobbleHarmonicShare = 0.10;     // ASSUMED: a line is called rhythm-like if the power at 2x or 3x its rate is at least this share of its own
-inline constexpr double kWobbleContrastDb   = 9.0;      // ASSUMED: the wobble line must stand this far above the typical modulation level
-inline constexpr double kPhaseMinCoherence  = 0.30;     // ASSUMED: below this agreement between left and right, a phase angle means nothing and is not given
+inline constexpr double kClickPeriodTolMs   = 0.5;      // DEFINITION: an interval counts as "40 ms" if it is within this (information only, no decision uses it)
+inline constexpr double kClickAbsFloor      = 5.96e-8;  // DEFINITION: one step of 24-bit audio; below this a sample is treated as silence
+inline constexpr double kNotchBandLoHz      = 8000.0;   // DEFINITION: notch search band
+inline constexpr double kNotchBandHiHz      = 18000.0;  // DEFINITION
+inline constexpr int    kNotchFft           = 4096;     // DEFINITION (frequency step = rate / 4096)
+inline constexpr int    kNotchAvgFrames     = 8;        // DEFINITION: frames averaged per reading (about 0.34 s at 48 kHz)
+inline constexpr double kNotchWideHz        = 600.0;    // DEFINITION: "normal level" is the median within this distance
+inline constexpr double kNotchNarrowHz      = 30.0;     // DEFINITION: a dip is read over this width
+inline constexpr double kEnvHz              = 500.0;    // DEFINITION: rate of the band loudness curve the hit tools use (2 ms)
+inline constexpr double kHitBandLoHz        = 6000.0;   // DEFINITION: band that carries cymbal and hat hits
+inline constexpr double kHitBandHiHz        = 16000.0;  // DEFINITION
+inline constexpr double kHitRefractoryMs    = 60.0;     // DEFINITION: two rises closer than this are one hit
+inline constexpr double kHitTailDb          = 20.0;     // DEFINITION: "tail time" = time for the band to fall this far from the peak
+inline constexpr double kHitTailMaxMs       = 600.0;    // DEFINITION: tails longer than this, or cut off by the next hit, are not counted
+inline constexpr double kAvgPreMs           = 20.0;     // DEFINITION: hit averager window before the hit
+inline constexpr double kAvgPostMs          = 400.0;    // DEFINITION: and after it
+inline constexpr double kEchoMinMs          = 40.0;     // DEFINITION: shortest repeat looked for. Below this a hit's own onset looks like a repeat (measured: 5 of 80 clean clips were accused at 20-24 ms)
+inline constexpr double kEchoMaxMs          = 600.0;    // DEFINITION: longest
+inline constexpr double kWobbleBandLoHz     = 10000.0;  // DEFINITION: high-band wobble meter band
+inline constexpr double kWobbleBandHiHz     = 16000.0;  // DEFINITION
+inline constexpr double kWobbleEnvHz        = 200.0;    // DEFINITION: rate of the loudness curve
+inline constexpr double kWobbleMinHz        = 0.5;      // DEFINITION: slowest wobble looked for
+inline constexpr double kWobbleMaxHz        = 60.0;     // DEFINITION: fastest
+inline constexpr double kWobbleMinSeconds   = 10.0;     // DEFINITION: shorter clips are refused (slowest wobble must show 5 cycles)
+inline constexpr double kWobbleCalibSmall   = 0.05;     // DEFINITION: size of the first known wobble the meter adds to measure its own gain
+inline constexpr double kWobbleCalibBig     = 0.20;     // DEFINITION: size of the second one; the gap between the two gains widens the reported range
+inline constexpr double kWobbleNearMinHz    = 0.5;      // DEFINITION: the "nearby rates" used as the null sit this far or more from the line...
+inline constexpr double kWobbleNearMaxHz    = 3.0;      // DEFINITION: ...and no further than this
+inline constexpr double kWobbleNearStepHz   = 0.05;     // DEFINITION: and are tried every this many Hz
 inline constexpr double kFlutterTrustedDepth  = 0.15;    // from METERS-WIRING.md: below this the flutter meter's accuracy is UNKNOWN
-inline constexpr int    kPhaseFft           = 4096;     // ASSUMED
-inline constexpr double kMaskOffsetDb       = 14.5;     // ASSUMED: tone-like hearing threshold sits this far under the masker (textbook starting point, not measured here)
-inline constexpr double kMaskSlopeLowDb     = 25.0;     // ASSUMED: masking fades this many dB per Bark below the masker
-inline constexpr double kMaskSlopeHighDb    = 10.0;     // ASSUMED: ... and this many per Bark above it
+inline constexpr int    kPhaseFft           = 4096;     // DEFINITION
+inline constexpr int    kPhaseMaxFrames     = 600;      // DEFINITION: at most this many frames (spread across the whole clip) are used, to bound memory
+
+// ---- PUBLISHED (masking only; never used to accept or reject a finding) ----
+inline constexpr double kMaskOffsetDb       = 14.5;     // PUBLISHED: textbook tone-masker offset. Not derived or measured here.
+inline constexpr double kMaskSlopeLowDb     = 25.0;     // PUBLISHED: textbook spread, below the masker, per Bark
+inline constexpr double kMaskSlopeHighDb    = 10.0;     // PUBLISHED: ... and above it
+
+// ---- ASSUMED (real guesses left in the lab) ----
+//  none that change a yes/no decision. See LAB-REPORT.md "what is still a guess" for the count and the list.
 
 // =============================================================================
 //  UNKNOWN — nobody has measured these. No numbers are invented for them.
