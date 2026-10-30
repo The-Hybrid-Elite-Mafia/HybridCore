@@ -74,7 +74,11 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force out | Out-Null
           & .\build\hiss\Release\hc_hiss_ui_tests.exe 2>&1 | Tee-Object -FilePath out\ui_test_log.txt
-          if ($LASTEXITCODE -ne 0) { throw "window logic tests failed ($LASTEXITCODE)" }
+          if ($LASTEXITCODE -ne 0) {
+            $why = (Get-Content out\ui_test_log.txt | Select-String -Pattern 'FAIL|info' | ForEach-Object { $_.Line }) -join ' | '
+            Write-Host "::error title=window logic tests::exit $LASTEXITCODE : $why"
+            exit 1
+          }
 
       - name: Comb and Click Finder window - take pictures of the real program
         shell: pwsh
@@ -83,8 +87,8 @@ jobs:
           $exe = (Resolve-Path ".\build\hiss\Release\hem_comb_click.exe").Path
           function Shot($name, $argList) {
             $p = Start-Process -FilePath $exe -ArgumentList $argList -Wait -PassThru
-            if ($p.ExitCode -ne 0) { throw "snapshot $name failed (exit $($p.ExitCode))" }
-            if (-not (Test-Path "out\ui\$name.png")) { throw "snapshot $name was not written" }
+            if ($p.ExitCode -ne 0) { Write-Host "::error title=picture $name::exit $($p.ExitCode) (2 = GDI+ did not start, 3 = picture not saved)"; exit 1 }
+            if (-not (Test-Path "out\ui\$name.png")) { Write-Host "::error title=picture $name::not written"; exit 1 }
             Write-Host ("{0}: {1} bytes" -f $name, (Get-Item "out\ui\$name.png").Length)
           }
           $o = (Resolve-Path out\ui).Path
@@ -183,7 +187,7 @@ jobs:
             Notice "hiss: tests" (@($t | Select-String -Pattern 'FAIL|checks,|latency') | ForEach-Object { $_.Line })
             Notice "hiss: measured" (@($t | Select-String -Pattern 'MEASURED') | ForEach-Object { $_.Line.Trim() })
           }
-          foreach ($lf in "lab_test_log","tools_test_log") {
+          foreach ($lf in "lab_test_log","tools_test_log","ui_test_log") {
             if (Test-Path "out\$lf.txt") {
               $t = Get-Content "out\$lf.txt"
               Notice "hiss: $lf" (@($t | Select-String -Pattern 'FAIL|checks,') | ForEach-Object { $_.Line })
