@@ -100,7 +100,8 @@ static void testBlind() {
     HCHECK(!contains(outPath, "tagged") && !contains(outPath, "secret") && contains(fsys::path(outPath).filename().string(), "HEM-"), "the stripped file name says nothing about the source");
     wav::File g; wav::read(outPath, g, e3);
     HCHECK(g.left == f.left && g.right == f.right, "the audio is bit for bit the same after stripping");
-    fsys::remove_all(dir);
+    kf.close(); cf.close(); sf.close();           // Windows cannot delete a file that is still open
+    std::error_code ec; fsys::remove_all(dir, ec);
 }
 
 static void testGate() {
