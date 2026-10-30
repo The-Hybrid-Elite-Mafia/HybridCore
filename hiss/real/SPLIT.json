@@ -1,0 +1,102 @@
+{
+ "decided": "2026-10-28, BEFORE any file was opened or measured",
+ "rule": "split by SONG, never by file: all stems/mixes of one song are on the same side",
+ "TUNING": [
+  {
+   "file": "No Brakes on This Trip.wav",
+   "bytes": 29351440,
+   "sha256": "912137cafb98e40c1b2ccdda9d123351db5f9dfbf0606e0c26b5bfeaf1241b09"
+  },
+  {
+   "file": "No Brakes on This Trip Stems/0 Lead Vocals.wav",
+   "bytes": 29337720,
+   "sha256": "f99fbbd9de09e53d98bf9d07b0d5fc22e3375ee4f0a53542cd61e8d70d349d28"
+  },
+  {
+   "file": "No Brakes on This Trip Stems/1 Backing Vocals.wav",
+   "bytes": 29337720,
+   "sha256": "34417ca7a7a95bc37c469cc662d22a74cc0f4fbb46c8d1f7f8944e5ddb3809ff"
+  },
+  {
+   "file": "No Brakes on This Trip Stems/2 Drums.wav",
+   "bytes": 29337720,
+   "sha256": "48999cc8366be92c1c70dc16b2666f3bac5a0255d01c6fc711480c7ad7006b3e"
+  },
+  {
+   "file": "No Brakes on This Trip Stems/3 Bass.wav",
+   "bytes": 29337720,
+   "sha256": "17ad9a1dec66c718f5629107935d405cc6caefb560caad2f4d9ba2a613cf43fe"
+  },
+  {
+   "file": "No Brakes on This Trip Stems/4 Guitar.wav",
+   "bytes": 29337720,
+   "sha256": "bfc2b6d48c5d65c27ded04093e2e48d048bd793e9f1b126aec8cd5f48c02529b"
+  },
+  {
+   "file": "No Brakes on This Trip Stems/5 Percussion.wav",
+   "bytes": 29337720,
+   "sha256": "df46802434387e83d898fd7753615da202d81994c4a6ca9f5ba0321d44d0f4f4"
+  },
+  {
+   "file": "No Brakes on This Trip Stems/6 Synth.wav",
+   "bytes": 29337720,
+   "sha256": "c4cfdbd980bb0eeab29d17a6c8d78f7b9c0dadf2f43aae29e9f206e3ea80e574"
+  },
+  {
+   "file": "Suno Downloads/The Hybrid Elite Mafia - Welcome to the Cosmic Abyss \u2014 Vocal Clarity Mix.mp3",
+   "bytes": 5472396,
+   "sha256": "b679cd5ff6b12025ab7194d07f0a55792de97b4382f49f1857a8cfdf81ff0a2b"
+  },
+  {
+   "file": "Suno Downloads/The Hybrid Elite Mafia - Welcome to the Cosmic Abyss \u2014 Vocal Clarity Mix.wav",
+   "bytes": 43010520,
+   "sha256": "41c4c5b47d066ee370e81c9089849256c5c3de3b4d4a2fba94d99ebb787f2674"
+  }
+ ],
+ "HOLD_OUT": [
+  {
+   "file": "Two hundred forty days Stems/Two hundred forty days (Bass).wav",
+   "bytes": 50442412
+  },
+  {
+   "file": "Two hundred forty days Stems/Two hundred forty days (Drums).wav",
+   "bytes": 50442412
+  },
+  {
+   "file": "Two hundred forty days Stems/Two hundred forty days (Guitar).wav",
+   "bytes": 50442412
+  },
+  {
+   "file": "Two hundred forty days Stems/Two hundred forty days (Keyboard).wav",
+   "bytes": 50442412
+  },
+  {
+   "file": "Two hundred forty days Stems/Two hundred forty days (Percussion).wav",
+   "bytes": 50442412
+  },
+  {
+   "file": "Two hundred forty days Stems/Two hundred forty days (Synth).wav",
+   "bytes": 50442412
+  },
+  {
+   "file": "Two hundred forty days Stems/Two hundred forty days (Vocals).wav",
+   "bytes": 50442412
+  }
+ ],
+ "not_used": [
+  "'Two hundred forty days - HEM Master.wav' and the '(Keyboard) - HEM M...Master' file (Steven's own mastered mixes, not Suno originals)",
+  "'No Brakes - ... test export.wav' (exports from our own tools)",
+  "all other zips/folders in Downloads (not named by Steven)"
+ ],
+ "note": "Cosmic Abyss is in TUNING because the MP3-vs-WAV question needs it during characterisation. HOLD_OUT is one song (7 stems); the 240-days full mix is not a Suno original, so a stem-sum stands in for it and is labelled as such.",
+ "extra_not_used_for_tuning": {
+  "note": "Added by Steven after tuning was frozen. Measured only; nothing was tuned on these.",
+  "Steady Whistle (Suno test tone)": "no comb found",
+  "Room Tone (Suno test)": "comb found, same line pattern",
+  "Circle Jerk Boys": "12 stems are empty (all zeros); mix only, comb hidden by music",
+  "Inspired by Sound only": "1 of 6 files shows a comb (Keyboard); fix refused (no quiet floor)",
+  "Reading the Same Letter": "0 of 6 files with a clear comb",
+  "There's a Difference": "0 of 6 files with a clear comb",
+  "metronome track": "not received, dropped by Steven"
+ }
+}

@@ -1,0 +1,453 @@
+{
+ "plan_written": "2026-10-30, before any Phase 2 measurement",
+ "rows": [
+  {
+   "song": "AngelaThomasWade_MilkCowBlues",
+   "file": "02_Snare.wav",
+   "role": "snare",
+   "rate": 44100,
+   "seconds": 29.1,
+   "cutoff": {
+    "sample_rate": 44100,
+    "ref_5_10k_db": -73.4,
+    "shape": "GENTLE",
+    "cutoff_hz": 18647,
+    "level_at_nyquist_minus_1k_db": -34.9
+   },
+   "status": "EXCLUDED_CUTOFF_BELOW_19K"
+  },
+  {
+   "song": "AngelaThomasWade_MilkCowBlues",
+   "file": "04_Overheads.wav",
+   "role": "overheads",
+   "rate": 44100,
+   "seconds": 29.1,
+   "cutoff": {
+    "sample_rate": 44100,
+    "ref_5_10k_db": -63.5,
+    "shape": "GENTLE",
+    "cutoff_hz": 21926,
+    "level_at_nyquist_minus_1k_db": -23.1
+   },
+   "metrics": {
+    "n_frames": 2499,
+    "n_loud": 978,
+    "A_5_10k_db": -32.908999560249285,
+    "B_16_20k_db": -49.51247451351854,
+    "C_8_20k_db": -35.19330220713209,
+    "ratio_16_20_over_5_10_db": -16.603474953269256,
+    "ratio_16_19_over_5_10_db": -17.130389700087065
+   },
+   "status": "OK"
+  },
+  {
+   "song": "AngelaThomasWade_MilkCowBlues",
+   "file": "03_Tom.wav",
+   "role": "toms",
+   "rate": 44100,
+   "seconds": 29.1,
+   "cutoff": {
+    "sample_rate": 44100,
+    "ref_5_10k_db": -82.5,
+    "shape": "GENTLE",
+    "cutoff_hz": 15654,
+    "level_at_nyquist_minus_1k_db": -33.8
+   },
+   "status": "EXCLUDED_CUTOFF_BELOW_19K"
+  },
+  {
+   "song": "TheLongWait_DarkHorses",
+   "file": "02_Snare.wav",
+   "role": "snare",
+   "rate": 44100,
+   "seconds": 21.6,
+   "cutoff": {
+    "sample_rate": 44100,
+    "ref_5_10k_db": -89.4,
+    "shape": "WALL",
+    "drop_db_in_500hz": 47.1,
+    "cutoff_hz": 21317,
+    "level_at_nyquist_minus_1k_db": -35.3
+   },
+   "metrics": {
+    "n_frames": 1854,
+    "n_loud": 602,
+    "A_5_10k_db": -55.517534373475506,
+    "B_16_20k_db": -84.97676882500942,
+    "C_8_20k_db": -61.80832155983961,
+    "ratio_16_20_over_5_10_db": -29.45923445153391,
+    "ratio_16_19_over_5_10_db": -29.710643079950138
+   },
+   "status": "OK"
+  },
+  {
+   "song": "TheLongWait_DarkHorses",
+   "file": "03_Overheads.wav",
+   "role": "overheads",
+   "rate": 44100,
+   "seconds": 21.6,
+   "cutoff": {
+    "sample_rate": 44100,
+    "ref_5_10k_db": -79.2,
+    "shape": "WALL",
+    "drop_db_in_500hz": 44.1,
+    "cutoff_hz": 21425,
+    "level_at_nyquist_minus_1k_db": -20.6
+   },
+   "metrics": {
+    "n_frames": 1854,
+    "n_loud": 647,
+    "A_5_10k_db": -48.431939126438515,
+    "B_16_20k_db": -61.5302851336834,
+    "C_8_20k_db": -49.98127869758413,
+    "ratio_16_20_over_5_10_db": -13.098346007244885,
+    "ratio_16_19_over_5_10_db": -13.528082206151744
+   },
+   "status": "OK"
+  },
+  {
+   "song": "TheLongWait_DarkHorses",
+   "file": "04_DrumsRoom.wav",
+   "role": "drum_room",
+   "rate": 44100,
+   "seconds": 21.6,
+   "cutoff": {
+    "sample_rate": 44100,
+    "ref_5_10k_db": -74.6,
+    "shape": "WALL",
+    "drop_db_in_500hz": 44.4,
+    "cutoff_hz": 21436,
+    "level_at_nyquist_minus_1k_db": -30.9
+   },
+   "metrics": {
+    "n_frames": 1854,
+    "n_loud": 648,
+    "A_5_10k_db": -43.677254011410625,
+    "B_16_20k_db": -63.86884671744561,
+    "C_8_20k_db": -43.92243996796885,
+    "ratio_16_20_over_5_10_db": -20.19159270603498,
+    "ratio_16_19_over_5_10_db": -20.33400536902238
+   },
+   "status": "OK"
+  },
+  {
+   "song": "Kangoro_Animal",
+   "file": "04_Snare1.wav",
+   "role": "snare",
+   "rate": 44100,
+   "seconds": 20.0,
+   "cutoff": {
+    "sample_rate": 44100,
+    "ref_5_10k_db": -67.5,
+    "shape": "NONE",
+    "cutoff_hz": 22050,
+    "level_at_nyquist_minus_1k_db": -20.3
+   },
+   "metrics": {
+    "n_frames": 1719,
+    "n_loud": 214,
+    "A_5_10k_db": -29.31163729013869,
+    "B_16_20k_db": -50.286948979435934,
+    "C_8_20k_db": -37.05894198694823,
+    "ratio_16_20_over_5_10_db": -20.975311689297243,
+    "ratio_16_19_over_5_10_db": -21.780004691095996
+   },
+   "status": "OK"
+  },
+  {
+   "song": "Kangoro_Animal",
+   "file": "05_Snare2.wav",
+   "role": "snare",
+   "rate": 44100,
+   "seconds": 20.0,
+   "cutoff": {
+    "sample_rate": 44100,
+    "ref_5_10k_db": -77.6,
+    "shape": "WALL",
+    "drop_db_in_500hz": 56.2,
+    "cutoff_hz": 21473,
+    "level_at_nyquist_minus_1k_db": -17.5
+   },
+   "metrics": {
+    "n_frames": 1719,
+    "n_loud": 73,
+    "A_5_10k_db": -37.27205187284669,
+    "B_16_20k_db": -47.31282781077354,
+    "C_8_20k_db": -34.18558009436086,
+    "ratio_16_20_over_5_10_db": -10.040775937926853,
+    "ratio_16_19_over_5_10_db": -10.122363104876605
+   },
+   "status": "OK"
+  },
+  {
+   "song": "Kangoro_Animal",
+   "file": "06_Crash.wav",
+   "role": "cymbal_crash",
+   "rate": 44100,
+   "seconds": 20.0,
+   "cutoff": {
+    "sample_rate": 44100,
+    "ref_5_10k_db": -59.9,
+    "shape": "GENTLE",
+    "cutoff_hz": 19928,
+    "level_at_nyquist_minus_1k_db": -30.7
+   },
+   "metrics": {
+    "n_frames": 1719,
+    "n_loud": 606,
+    "A_5_10k_db": -29.439673933079607,
+    "B_16_20k_db": -50.25652596966859,
+    "C_8_20k_db": -32.151959331180024,
+    "ratio_16_20_over_5_10_db": -20.81685203658898,
+    "ratio_16_19_over_5_10_db": -21.102186370977417
+   },
+   "status": "OK"
+  },
+  {
+   "song": "Kangoro_Animal",
+   "file": "07_DrumsRoom.wav",
+   "role": "drum_room",
+   "rate": 44100,
+   "seconds": 20.0,
+   "cutoff": {
+    "sample_rate": 44100,
+    "ref_5_10k_db": -69.5,
+    "shape": "GENTLE",
+    "cutoff_hz": 20063,
+    "level_at_nyquist_minus_1k_db": -32.8
+   },
+   "metrics": {
+    "n_frames": 1719,
+    "n_loud": 614,
+    "A_5_10k_db": -38.74879054646534,
+    "B_16_20k_db": -61.63925871437935,
+    "C_8_20k_db": -44.98339307112584,
+    "ratio_16_20_over_5_10_db": -22.890468167914015,
+    "ratio_16_19_over_5_10_db": -23.124271340952156
+   },
+   "status": "OK"
+  },
+  {
+   "song": "Kangoro_Animal",
+   "file": "08_Tambourine.wav",
+   "role": "tambourine",
+   "rate": 44100,
+   "seconds": 20.0,
+   "cutoff": {
+    "sample_rate": 44100,
+    "ref_5_10k_db": -72.7,
+    "shape": "NONE",
+    "cutoff_hz": 22050,
+    "level_at_nyquist_minus_1k_db": -19.2
+   },
+   "metrics": {
+    "n_frames": 1719,
+    "n_loud": 298,
+    "A_5_10k_db": -34.77199130616842,
+    "B_16_20k_db": -51.98752057280152,
+    "C_8_20k_db": -38.11002894698573,
+    "ratio_16_20_over_5_10_db": -17.215529266633105,
+    "ratio_16_19_over_5_10_db": -19.17143368930259
+   },
+   "status": "OK"
+  },
+  {
+   "song": "Kangoro_Animal",
+   "file": "09_Loops.wav",
+   "role": "drum_loop",
+   "rate": 44100,
+   "seconds": 20.0,
+   "cutoff": {
+    "sample_rate": 44100,
+    "ref_5_10k_db": -75.4,
+    "shape": "GENTLE",
+    "cutoff_hz": 16838,
+    "level_at_nyquist_minus_1k_db": -55.3
+   },
+   "status": "EXCLUDED_CUTOFF_BELOW_19K"
+  },
+  {
+   "song": "KarlHungus_GotYourLove",
+   "file": "03_Snare01.wav",
+   "role": "snare",
+   "rate": 44100,
+   "seconds": 28.3,
+   "cutoff": {
+    "sample_rate": 44100,
+    "ref_5_10k_db": -65.3,
+    "shape": "NONE",
+    "cutoff_hz": 22050,
+    "level_at_nyquist_minus_1k_db": -13.9
+   },
+   "metrics": {
+    "n_frames": 2436,
+    "n_loud": 218,
+    "A_5_10k_db": -27.362867510950252,
+    "B_16_20k_db": -41.81627620570331,
+    "C_8_20k_db": -32.465776519553195,
+    "ratio_16_20_over_5_10_db": -14.453408694753058,
+    "ratio_16_19_over_5_10_db": -15.47916957909571
+   },
+   "status": "OK"
+  },
+  {
+   "song": "KarlHungus_GotYourLove",
+   "file": "04_Snare02.wav",
+   "role": "snare",
+   "rate": 44100,
+   "seconds": 28.7,
+   "cutoff": {
+    "sample_rate": 44100,
+    "ref_5_10k_db": -63.4,
+    "shape": "NONE",
+    "cutoff_hz": 22050,
+    "level_at_nyquist_minus_1k_db": -22.2
+   },
+   "metrics": {
+    "n_frames": 2466,
+    "n_loud": 299,
+    "A_5_10k_db": -26.692076385714785,
+    "B_16_20k_db": -38.089162904037494,
+    "C_8_20k_db": -25.77320577500068,
+    "ratio_16_20_over_5_10_db": -11.397086518322709,
+    "ratio_16_19_over_5_10_db": -11.833982526580364
+   },
+   "status": "OK"
+  },
+  {
+   "song": "KarlHungus_GotYourLove",
+   "file": "09_Hat_SFX.wav",
+   "role": "hihat",
+   "rate": 44100,
+   "seconds": 26.3,
+   "cutoff": {
+    "sample_rate": 44100,
+    "ref_5_10k_db": -55.4,
+    "shape": "WALL",
+    "drop_db_in_500hz": 44.9,
+    "cutoff_hz": 16941,
+    "level_at_nyquist_minus_1k_db": -133.3
+   },
+   "status": "EXCLUDED_CUTOFF_BELOW_19K"
+  },
+  {
+   "song": "KarlHungus_GotYourLove",
+   "file": "07_Claps01.wav",
+   "role": "claps",
+   "rate": 44100,
+   "seconds": 27.5,
+   "cutoff": {
+    "sample_rate": 44100,
+    "ref_5_10k_db": -65.0,
+    "shape": "NONE",
+    "cutoff_hz": 22050,
+    "level_at_nyquist_minus_1k_db": -19.9
+   },
+   "metrics": {
+    "n_frames": 2366,
+    "n_loud": 244,
+    "A_5_10k_db": -28.185920904497944,
+    "B_16_20k_db": -42.219794797196215,
+    "C_8_20k_db": -30.68009294737601,
+    "ratio_16_20_over_5_10_db": -14.03387389269827,
+    "ratio_16_19_over_5_10_db": -14.725911123931741
+   },
+   "status": "OK"
+  },
+  {
+   "song": "KarlHungus_GotYourLove",
+   "file": "12_Chimes.wav",
+   "role": "chimes",
+   "rate": 44100,
+   "seconds": 25.5,
+   "cutoff": {
+    "sample_rate": 44100,
+    "ref_5_10k_db": -78.3,
+    "shape": "WALL",
+    "drop_db_in_500hz": 27.6,
+    "cutoff_hz": 18556,
+    "level_at_nyquist_minus_1k_db": -14.1
+   },
+   "status": "EXCLUDED_CUTOFF_BELOW_19K"
+  }
+ ],
+ "summary_by_role": {
+  "chimes": {
+   "n_ok": 0,
+   "n_listed": 1,
+   "interval_95": "no interval (n too small)"
+  },
+  "claps": {
+   "n_ok": 1,
+   "n_listed": 1,
+   "ratio_median_db": -14.03387389269827,
+   "ratio_min_db": -14.03387389269827,
+   "ratio_max_db": -14.03387389269827,
+   "air_16_20k_median_db": -42.219794797196215,
+   "interval_95": "no interval (n too small)"
+  },
+  "cymbal_crash": {
+   "n_ok": 1,
+   "n_listed": 1,
+   "ratio_median_db": -20.81685203658898,
+   "ratio_min_db": -20.81685203658898,
+   "ratio_max_db": -20.81685203658898,
+   "air_16_20k_median_db": -50.25652596966859,
+   "interval_95": "no interval (n too small)"
+  },
+  "drum_loop": {
+   "n_ok": 0,
+   "n_listed": 1,
+   "interval_95": "no interval (n too small)"
+  },
+  "drum_room": {
+   "n_ok": 2,
+   "n_listed": 2,
+   "ratio_median_db": -21.5410304369745,
+   "ratio_min_db": -22.890468167914015,
+   "ratio_max_db": -20.19159270603498,
+   "air_16_20k_median_db": -62.75405271591248,
+   "interval_95": "no interval (n too small)"
+  },
+  "hihat": {
+   "n_ok": 0,
+   "n_listed": 1,
+   "interval_95": "no interval (n too small)"
+  },
+  "overheads": {
+   "n_ok": 2,
+   "n_listed": 2,
+   "ratio_median_db": -14.85091048025707,
+   "ratio_min_db": -16.603474953269256,
+   "ratio_max_db": -13.098346007244885,
+   "air_16_20k_median_db": -55.52137982360097,
+   "interval_95": "no interval (n too small)"
+  },
+  "snare": {
+   "n_ok": 5,
+   "n_listed": 6,
+   "ratio_median_db": -14.453408694753058,
+   "ratio_min_db": -29.45923445153391,
+   "ratio_max_db": -10.040775937926853,
+   "air_16_20k_median_db": -47.31282781077354,
+   "interval_95": [
+    -29.45923445153391,
+    -10.040775937926853
+   ]
+  },
+  "tambourine": {
+   "n_ok": 1,
+   "n_listed": 1,
+   "ratio_median_db": -17.215529266633105,
+   "ratio_min_db": -17.215529266633105,
+   "ratio_max_db": -17.215529266633105,
+   "air_16_20k_median_db": -51.98752057280152,
+   "interval_95": "no interval (n too small)"
+  },
+  "toms": {
+   "n_ok": 0,
+   "n_listed": 1,
+   "interval_95": "no interval (n too small)"
+  }
+ }
+}

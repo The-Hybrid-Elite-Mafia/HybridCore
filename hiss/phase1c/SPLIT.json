@@ -1,0 +1,81 @@
+{
+ "_what_this_is": "Written and committed BEFORE any Phase 1C measurement. It fixes the plan, the pass/fail numbers and what would prove me wrong. Nothing here may be changed after results exist; a change is a new dated file, never an edit.",
+ "written": "2026-10-28",
+ "branch": "hiss-tamer-1 (never merged to main)",
+ "assets": "assets.json (SHA-256, size, ffprobe facts, tag). Original names are not in it. The key (hash -> path) is kept outside the repo and stays closed until RESULTS.json is committed.",
+ "asset_count": 182,
+ "primary_outcome": {
+  "definition": "Excess high-frequency energy in the 5-50 ms after drum onsets, measured in the 8-20 kHz band, level-matched and bandwidth-matched, compared with the distribution over human-recorded cymbals.",
+  "band_hz": [
+   8000,
+   20000
+  ],
+  "window_after_onset_ms": [
+   5,
+   50
+  ],
+  "bandwidth_rule": "A file takes part only if its sound reaches at least 19 kHz (cutoff >= 19000 Hz). Files with a lower cutoff are DISQUALIFIED from the primary outcome and listed in a table.",
+  "level_match": "every file is loudness-matched (BS.1770 integrated, same loud-frame definition) before band comparison; absolute band levels are reported next to every ratio",
+  "multiple_comparisons": "Holm correction across the secondary measures; the primary outcome is tested alone, at alpha = 0.05 two-sided"
+ },
+ "loud_part_definition": "Frames of 1024 samples, hop 256, band 5-16 kHz energy. A frame becomes LOUD when energy >= the 70th percentile of that file's non-silent frames, and stays LOUD until it falls below the 60th percentile (hysteresis). Non-silent = above -80 dBFS.",
+ "intervals": "95 % bootstrap intervals, 2000 resamples, resampling blocks of 1 s so neighbouring frames stay together",
+ "phase1_gates": {
+  "1_bandwidth_audit": {
+   "pass": "audit runs on 100 % of assets; on synthetic known-cutoff tests (brick-wall FIR at 16, 18, 20 kHz; MP3 128 kbps; full-band) the cutoff is recovered within +/-300 Hz and classed correctly (wall / gentle / none)",
+   "wall_rule": "WALL = level falls by >= 20 dB within 500 Hz; GENTLE = falls by >= 20 dB over more than 500 Hz and within 6 kHz; NONE = no 20 dB fall below Nyquist"
+  },
+  "2_metric_sanity": {
+   "pass": "with a synthetic cut of the 5-10 kHz band by X dB (X = 3, 6, 10), the 16-20 over 5-10 kHz ratio rises by X +/-0.5 dB while the absolute 16-20 kHz level changes by <= 0.3 dB, showing the ratio alone can mislead; absolute levels, ratio, loudness-normalised ratio, level- and bandwidth-matched comparison, n files, n frames, medians and intervals all reported"
+  },
+  "3_line_level_sanity": {
+   "pass": "narrow-band demodulation and the averaged spectrum agree within +/-1.0 dB on injected known 25 Hz lines at -110, -100 and -90 dBFS per line; every line level is reported with its measurement bandwidth; masking threshold and 16-bit noise floor shown beside it",
+   "assumptions": {
+    "playback_level": "ASSUMED: -20 dBFS RMS pink noise = 83 dB SPL (a common mixing level), so 0 dBFS full-scale sine = 103 dB SPL",
+    "hearing_threshold": "ASSUMED: Terhardt absolute threshold of hearing formula",
+    "masking_offset_db": "ASSUMED: a noise-like masker hides a narrow tone when the tone is below the masker band level by 6 dB or more",
+    "critical_bands": "ASSUMED: Bark scale"
+   }
+  },
+  "4_synthetic_injection": {
+   "pass": "for each injected effect the measured value is within tolerance of the injected value in at least 9 of 10 trials: air +/-1.0 dB; post-onset HF excess +/-1.5 dB; 25 Hz flutter depth +/-20 % (relative); moving notch centre frequency +/-200 Hz and direction of movement correct",
+   "effects": [
+    "extra air above 16 kHz",
+    "post-onset smear (decaying tail 5-50 ms)",
+    "25 Hz amplitude flutter on 5-15 kHz",
+    "slowly moving spectral notch"
+   ]
+  },
+  "5_sensitivity_floor": {
+   "pass": "for each metric and for the comb, a table of the smallest effect that is detected in at least 9 of 10 trials (shift larger than the 95 % interval); comb floor given in silence (16-bit noise floor) and under loud human cymbals"
+  },
+  "6_independent_tool_check": {
+   "pass": "headline numbers (RMS, integrated loudness, true peak, band levels) agree between my Python and ffmpeg within 0.2 dB (loudness 0.1 LU); sox is used if it can be installed; Sonic Visualiser by hand is a desktop program and cannot be run here, so it is reported UNKNOWN, not faked"
+  }
+ },
+ "gate_rule": "All six must pass. If any fails, Phase 1 stops and the failure is the result.",
+ "decision_rules": {
+  "air_claim": "The claim 'v6 has more air than v5.5 / than human cymbals' is DROPPED if, after bandwidth and level matching, the gap is inside the human spread (interval overlaps the human 5th-95th percentile range) or if fewer than 5 qualifying v6-era and 3 qualifying v5.5-era renders exist.",
+  "comb_audibility": "The comb is DROPPED as a cause of what Steven hears if, in every loud passage, the summed line power in every critical band is below the masker level minus the assumed offset, and in quiet passages below the format noise floor. Kept only if it clears both.",
+  "chain_vs_suno": "If human multitracks pushed through our own export path or a free splitter show the same swish metrics, the cause is the chain, not Suno, and the project changes direction.",
+  "model_claim": "No 'the model causes it' without: unit = render, >= 5 renders per arm, effect outside the render-to-render spread, survives analysis on name-stripped hashed copies."
+ },
+ "falsifiers": [
+  "Air gap vanishes after bandwidth + level matching",
+  "Metric recovers injected values worse than tolerance (then the metric is dropped)",
+  "Swish metrics rise in human multitracks passed through our own chain",
+  "Comb below masking and noise floor in every case",
+  "Files tagged v6 and v5.5 overlap completely on the primary outcome",
+  "The 25 Hz seam click is not found in files where the known-answer test says it should be visible"
+ ],
+ "predictions_written_before_measuring": {
+  "comb_audible": "No (about 90 % sure; guess)",
+  "air_is_model_property": "Lean yes, about 65 % (guess)",
+  "fix_passes_negative_known_answer_test": "About 40 % (guess)"
+ },
+ "human_reference_note": "Phase 1 uses only the 51 Cambridge-MT stems (3 songs, 44.1 kHz, 24 bit; test use only, never shipped, never uploaded). Phase 2 must add 20-40 references from other source families; three songs is a thin yardstick.",
+ "ci_note": "CI cannot hold the human or Suno files. CI reproduces only the synthetic parts (checks 2, 4, 5 and the cutoff tests in check 1) using generated cymbal-like signals. Real-file numbers are reproduced locally from the hashes and listed with their SHA-256.",
+ "limits": [
+  "Dates for most Suno files are file dates on Steven's PC, not creation dates. Models are what Steven told us. Neither is checked from the audio."
+ ]
+}

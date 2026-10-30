@@ -63,6 +63,7 @@ add_subdirectory(params)
 add_subdirectory(forge)
 add_subdirectory(engine)
 add_subdirectory(media)
+add_subdirectory(hiss)     # hem_hiss_tamer_engine + hem_hiss_auto (needs nothing else from the framework)
 add_subdirectory(ui)
 
 # OFF = the framework libraries only (hc::core, hc::io, hc::dsp, hc::fx, hc::engine, hc::media, hc::ui ...),

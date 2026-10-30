@@ -1,0 +1,33 @@
+{
+ "file": "1 Backing Vocals.wav",
+ "rate": 48000,
+ "seconds": 152.8,
+ "mid": {
+  "bump_hz": 17976.5625,
+  "bump_db_over_3k_median": 6.329787877421168,
+  "q10_level_db_at_bump": -116.50318799216252,
+  "quiet_level_db_at_bump": -115.14307610314447,
+  "avg_level_db_at_bump": -83.82484049659588,
+  "tones": [],
+  "spectral_cutoff_hz": 18826.171875,
+  "quiet_frames": 124,
+  "live_frames": 828
+ },
+ "band_env": {
+  "rate_hz": 2.5348663330078125,
+  "prominence_db": 20.07552339078414,
+  "depth_db_5_95": 22.04592759512148,
+  "steadiness_q10_over_median": 1.0
+ },
+ "side": {
+  "bump_hz": 14402.34375,
+  "bump_db_over_3k_median": 5.489213997646601,
+  "q10_level_db_at_bump": -118.38429998608575,
+  "quiet_level_db_at_bump": -116.41700867442671,
+  "avg_level_db_at_bump": -65.99311823981839,
+  "tones": [],
+  "spectral_cutoff_hz": 16001.953125,
+  "quiet_frames": 124,
+  "live_frames": 828
+ }
+}

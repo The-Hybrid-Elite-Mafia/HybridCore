@@ -1,0 +1,653 @@
+{
+ "tolerances": {
+  "air_db": 1.0,
+  "smear_db": 1.5,
+  "flutter_rel": 0.2,
+  "notch_hz": 200.0
+ },
+ "air": [
+  {
+   "seg": "c96244c5",
+   "true_db": 6.0,
+   "measured_db": 5.03,
+   "ok": true
+  },
+  {
+   "seg": "c96244c5",
+   "true_db": 6.0,
+   "measured_db": 4.96,
+   "ok": false
+  },
+  {
+   "seg": "44beedc4",
+   "true_db": 6.0,
+   "measured_db": 6.04,
+   "ok": true
+  },
+  {
+   "seg": "44beedc4",
+   "true_db": 6.0,
+   "measured_db": 5.74,
+   "ok": true
+  },
+  {
+   "seg": "d5244dc6",
+   "true_db": 6.0,
+   "measured_db": 6.03,
+   "ok": true
+  },
+  {
+   "seg": "d5244dc6",
+   "true_db": 6.0,
+   "measured_db": 5.98,
+   "ok": true
+  },
+  {
+   "seg": "3293dabf",
+   "true_db": 6.0,
+   "measured_db": 5.85,
+   "ok": true
+  },
+  {
+   "seg": "30c51bf9",
+   "true_db": 6.0,
+   "measured_db": 5.91,
+   "ok": true
+  },
+  {
+   "seg": "f7dc78d9",
+   "true_db": 6.0,
+   "measured_db": 5.87,
+   "ok": true
+  },
+  {
+   "seg": "3c792646",
+   "true_db": 6.0,
+   "measured_db": 6.03,
+   "ok": true
+  }
+ ],
+ "air_fixed_mask": [
+  {
+   "seg": "c96244c5",
+   "true_db": 6.0,
+   "measured_db": 6.0,
+   "ok": true
+  },
+  {
+   "seg": "c96244c5",
+   "true_db": 6.0,
+   "measured_db": 6.22,
+   "ok": true
+  },
+  {
+   "seg": "44beedc4",
+   "true_db": 6.0,
+   "measured_db": 6.07,
+   "ok": true
+  },
+  {
+   "seg": "44beedc4",
+   "true_db": 6.0,
+   "measured_db": 5.98,
+   "ok": true
+  },
+  {
+   "seg": "d5244dc6",
+   "true_db": 6.0,
+   "measured_db": 6.03,
+   "ok": true
+  },
+  {
+   "seg": "d5244dc6",
+   "true_db": 6.0,
+   "measured_db": 5.98,
+   "ok": true
+  },
+  {
+   "seg": "3293dabf",
+   "true_db": 6.0,
+   "measured_db": 6.0,
+   "ok": true
+  },
+  {
+   "seg": "30c51bf9",
+   "true_db": 6.0,
+   "measured_db": 5.95,
+   "ok": true
+  },
+  {
+   "seg": "f7dc78d9",
+   "true_db": 6.0,
+   "measured_db": 5.94,
+   "ok": true
+  },
+  {
+   "seg": "3c792646",
+   "true_db": 6.0,
+   "measured_db": 6.06,
+   "ok": true
+  }
+ ],
+ "flutter_v2_1_setC_fresh": [
+  {
+   "seg": "f140ec40",
+   "true_depth": 0.3,
+   "measured_depth": 0.262,
+   "baseline_depth": 0.004,
+   "recovered_rel_err": 0.139,
+   "ok": true,
+   "v1_ok_same_segment": true
+  },
+  {
+   "seg": "f140ec40",
+   "true_depth": 0.3,
+   "measured_depth": 0.242,
+   "baseline_depth": 0.007,
+   "recovered_rel_err": 0.217,
+   "ok": false,
+   "v1_ok_same_segment": true
+  },
+  {
+   "seg": "a8fe532f",
+   "true_depth": 0.3,
+   "measured_depth": 0.233,
+   "baseline_depth": 0.019,
+   "recovered_rel_err": 0.287,
+   "ok": false,
+   "v1_ok_same_segment": true
+  },
+  {
+   "seg": "a8fe532f",
+   "true_depth": 0.3,
+   "measured_depth": 0.232,
+   "baseline_depth": 0.013,
+   "recovered_rel_err": 0.27,
+   "ok": false,
+   "v1_ok_same_segment": true
+  },
+  {
+   "seg": "909e4572",
+   "true_depth": 0.3,
+   "measured_depth": 0.258,
+   "baseline_depth": 0.016,
+   "recovered_rel_err": 0.192,
+   "ok": true,
+   "v1_ok_same_segment": true
+  },
+  {
+   "seg": "f048a8e4",
+   "true_depth": 0.3,
+   "measured_depth": 0.0,
+   "baseline_depth": 0.0,
+   "recovered_rel_err": 1.0,
+   "ok": false,
+   "v1_ok_same_segment": false
+  },
+  {
+   "seg": "f048a8e4",
+   "true_depth": 0.3,
+   "measured_depth": 0.0,
+   "baseline_depth": 0.0,
+   "recovered_rel_err": 1.0,
+   "ok": false,
+   "v1_ok_same_segment": false
+  },
+  {
+   "seg": "8ab9814e",
+   "true_depth": 0.3,
+   "measured_depth": 0.093,
+   "baseline_depth": 0.0,
+   "recovered_rel_err": 0.691,
+   "ok": false,
+   "v1_ok_same_segment": false
+  },
+  {
+   "seg": "8ab9814e",
+   "true_depth": 0.3,
+   "measured_depth": 0.04,
+   "baseline_depth": 0.0,
+   "recovered_rel_err": 0.867,
+   "ok": false,
+   "v1_ok_same_segment": false
+  },
+  {
+   "seg": "f544057c",
+   "true_depth": 0.3,
+   "measured_depth": 0.003,
+   "baseline_depth": 0.0,
+   "recovered_rel_err": 0.991,
+   "ok": false,
+   "v1_ok_same_segment": false
+  }
+ ],
+ "smear": [
+  {
+   "seg": "c96244c5",
+   "true_db": 1.76,
+   "measured_db": 1.73,
+   "onsets_before": 18,
+   "onsets_after": 38,
+   "ok": true
+  },
+  {
+   "seg": "c96244c5",
+   "true_db": 1.76,
+   "measured_db": 1.84,
+   "onsets_before": 12,
+   "onsets_after": 26,
+   "ok": true
+  },
+  {
+   "seg": "44beedc4",
+   "true_db": 1.76,
+   "measured_db": 1.8,
+   "onsets_before": 53,
+   "onsets_after": 57,
+   "ok": true
+  },
+  {
+   "seg": "44beedc4",
+   "true_db": 1.76,
+   "measured_db": 2.03,
+   "onsets_before": 49,
+   "onsets_after": 53,
+   "ok": true
+  },
+  {
+   "seg": "d5244dc6",
+   "true_db": 1.76,
+   "measured_db": 2.12,
+   "onsets_before": 48,
+   "onsets_after": 49,
+   "ok": true
+  },
+  {
+   "seg": "d5244dc6",
+   "true_db": 1.76,
+   "measured_db": 1.91,
+   "onsets_before": 53,
+   "onsets_after": 57,
+   "ok": true
+  },
+  {
+   "seg": "3293dabf",
+   "true_db": 1.76,
+   "measured_db": 0.32,
+   "onsets_before": 41,
+   "onsets_after": 50,
+   "ok": true
+  },
+  {
+   "seg": "30c51bf9",
+   "true_db": 1.76,
+   "measured_db": -1.64,
+   "onsets_before": 37,
+   "onsets_after": 45,
+   "ok": false
+  },
+  {
+   "seg": "f7dc78d9",
+   "true_db": 1.76,
+   "measured_db": 1.07,
+   "onsets_before": 40,
+   "onsets_after": 48,
+   "ok": true
+  },
+  {
+   "seg": "3c792646",
+   "true_db": 1.76,
+   "measured_db": 1.44,
+   "onsets_before": 58,
+   "onsets_after": 62,
+   "ok": true
+  }
+ ],
+ "flutter": [
+  {
+   "seg": "c96244c5",
+   "true_depth": 0.3,
+   "measured_depth": 0.246,
+   "baseline_depth": 0.0,
+   "recovered_rel_err": 0.18,
+   "ok": true
+  },
+  {
+   "seg": "c96244c5",
+   "true_depth": 0.3,
+   "measured_depth": 0.239,
+   "baseline_depth": 0.0,
+   "recovered_rel_err": 0.202,
+   "ok": false
+  },
+  {
+   "seg": "44beedc4",
+   "true_depth": 0.3,
+   "measured_depth": 0.308,
+   "baseline_depth": 0.116,
+   "recovered_rel_err": 0.361,
+   "ok": false
+  },
+  {
+   "seg": "44beedc4",
+   "true_depth": 0.3,
+   "measured_depth": 0.251,
+   "baseline_depth": 0.023,
+   "recovered_rel_err": 0.24,
+   "ok": false
+  },
+  {
+   "seg": "d5244dc6",
+   "true_depth": 0.3,
+   "measured_depth": 0.307,
+   "baseline_depth": 0.0,
+   "recovered_rel_err": 0.024,
+   "ok": true
+  },
+  {
+   "seg": "d5244dc6",
+   "true_depth": 0.3,
+   "measured_depth": 0.25,
+   "baseline_depth": 0.05,
+   "recovered_rel_err": 0.335,
+   "ok": false
+  },
+  {
+   "seg": "3293dabf",
+   "true_depth": 0.3,
+   "measured_depth": 0.2,
+   "baseline_depth": 0.067,
+   "recovered_rel_err": 0.557,
+   "ok": false
+  },
+  {
+   "seg": "30c51bf9",
+   "true_depth": 0.3,
+   "measured_depth": 0.324,
+   "baseline_depth": 0.055,
+   "recovered_rel_err": 0.102,
+   "ok": true
+  },
+  {
+   "seg": "f7dc78d9",
+   "true_depth": 0.3,
+   "measured_depth": 0.253,
+   "baseline_depth": 0.047,
+   "recovered_rel_err": 0.312,
+   "ok": false
+  },
+  {
+   "seg": "3c792646",
+   "true_depth": 0.3,
+   "measured_depth": 0.29,
+   "baseline_depth": 0.0,
+   "recovered_rel_err": 0.035,
+   "ok": true
+  }
+ ],
+ "flutter_v2_setA": [
+  {
+   "seg": "c96244c5",
+   "true_depth": 0.3,
+   "measured_depth": 0.029,
+   "baseline_depth": 0.0,
+   "recovered_rel_err": 0.904,
+   "ok": false
+  },
+  {
+   "seg": "c96244c5",
+   "true_depth": 0.3,
+   "measured_depth": 0.0,
+   "baseline_depth": 0.0,
+   "recovered_rel_err": 1.0,
+   "ok": false
+  },
+  {
+   "seg": "44beedc4",
+   "true_depth": 0.3,
+   "measured_depth": 0.25,
+   "baseline_depth": 0.036,
+   "recovered_rel_err": 0.286,
+   "ok": false
+  },
+  {
+   "seg": "44beedc4",
+   "true_depth": 0.3,
+   "measured_depth": 0.197,
+   "baseline_depth": 0.0,
+   "recovered_rel_err": 0.345,
+   "ok": false
+  },
+  {
+   "seg": "d5244dc6",
+   "true_depth": 0.3,
+   "measured_depth": 0.278,
+   "baseline_depth": 0.0,
+   "recovered_rel_err": 0.072,
+   "ok": true
+  },
+  {
+   "seg": "d5244dc6",
+   "true_depth": 0.3,
+   "measured_depth": 0.266,
+   "baseline_depth": 0.02,
+   "recovered_rel_err": 0.182,
+   "ok": true
+  },
+  {
+   "seg": "3293dabf",
+   "true_depth": 0.3,
+   "measured_depth": 0.225,
+   "baseline_depth": 0.002,
+   "recovered_rel_err": 0.259,
+   "ok": false
+  },
+  {
+   "seg": "30c51bf9",
+   "true_depth": 0.3,
+   "measured_depth": 0.276,
+   "baseline_depth": 0.025,
+   "recovered_rel_err": 0.161,
+   "ok": true
+  },
+  {
+   "seg": "f7dc78d9",
+   "true_depth": 0.3,
+   "measured_depth": 0.229,
+   "baseline_depth": 0.014,
+   "recovered_rel_err": 0.283,
+   "ok": false
+  },
+  {
+   "seg": "3c792646",
+   "true_depth": 0.3,
+   "measured_depth": 0.234,
+   "baseline_depth": 0.005,
+   "recovered_rel_err": 0.235,
+   "ok": false
+  }
+ ],
+ "flutter_v2_setB_fresh": [
+  {
+   "seg": "9fbffa2d",
+   "true_depth": 0.3,
+   "measured_depth": 0.256,
+   "baseline_depth": 0.025,
+   "recovered_rel_err": 0.229,
+   "ok": false,
+   "v1_ok_same_segment": true
+  },
+  {
+   "seg": "756f809c",
+   "true_depth": 0.3,
+   "measured_depth": 0.0,
+   "baseline_depth": 0.0,
+   "recovered_rel_err": 1.0,
+   "ok": false,
+   "v1_ok_same_segment": false
+  },
+  {
+   "seg": "756f809c",
+   "true_depth": 0.3,
+   "measured_depth": NaN,
+   "baseline_depth": NaN,
+   "recovered_rel_err": NaN,
+   "ok": false,
+   "v1_ok_same_segment": false
+  },
+  {
+   "seg": "c472fe1f",
+   "true_depth": 0.3,
+   "measured_depth": 0.282,
+   "baseline_depth": 0.01,
+   "recovered_rel_err": 0.092,
+   "ok": true,
+   "v1_ok_same_segment": true
+  },
+  {
+   "seg": "c472fe1f",
+   "true_depth": 0.3,
+   "measured_depth": 0.272,
+   "baseline_depth": 0.009,
+   "recovered_rel_err": 0.122,
+   "ok": true,
+   "v1_ok_same_segment": true
+  },
+  {
+   "seg": "1dcab4d2",
+   "true_depth": 0.3,
+   "measured_depth": 0.268,
+   "baseline_depth": 0.0,
+   "recovered_rel_err": 0.105,
+   "ok": true,
+   "v1_ok_same_segment": true
+  },
+  {
+   "seg": "4a169a1b",
+   "true_depth": 0.3,
+   "measured_depth": 0.243,
+   "baseline_depth": 0.0,
+   "recovered_rel_err": 0.19,
+   "ok": true,
+   "v1_ok_same_segment": true
+  },
+  {
+   "seg": "4a169a1b",
+   "true_depth": 0.3,
+   "measured_depth": 0.234,
+   "baseline_depth": 0.005,
+   "recovered_rel_err": 0.237,
+   "ok": false,
+   "v1_ok_same_segment": true
+  },
+  {
+   "seg": "2ba7b27e",
+   "true_depth": 0.3,
+   "measured_depth": 0.197,
+   "baseline_depth": 0.0,
+   "recovered_rel_err": 0.345,
+   "ok": false,
+   "v1_ok_same_segment": true
+  },
+  {
+   "seg": "2ba7b27e",
+   "true_depth": 0.3,
+   "measured_depth": 0.168,
+   "baseline_depth": 0.011,
+   "recovered_rel_err": 0.477,
+   "ok": false,
+   "v1_ok_same_segment": true
+  }
+ ],
+ "notch": [
+  {
+   "seg": "c96244c5",
+   "median_err_hz": 121.0,
+   "corr_with_truth": 0.529,
+   "direction_ok": true,
+   "ok": true
+  },
+  {
+   "seg": "c96244c5",
+   "median_err_hz": 776.0,
+   "corr_with_truth": 0.121,
+   "direction_ok": true,
+   "ok": false
+  },
+  {
+   "seg": "44beedc4",
+   "median_err_hz": 80.0,
+   "corr_with_truth": 0.997,
+   "direction_ok": true,
+   "ok": true
+  },
+  {
+   "seg": "44beedc4",
+   "median_err_hz": 44.0,
+   "corr_with_truth": 0.999,
+   "direction_ok": true,
+   "ok": true
+  },
+  {
+   "seg": "d5244dc6",
+   "median_err_hz": 52.0,
+   "corr_with_truth": 0.999,
+   "direction_ok": true,
+   "ok": true
+  },
+  {
+   "seg": "d5244dc6",
+   "median_err_hz": 37.0,
+   "corr_with_truth": 1.0,
+   "direction_ok": true,
+   "ok": true
+  },
+  {
+   "seg": "3293dabf",
+   "median_err_hz": 38.0,
+   "corr_with_truth": 0.999,
+   "direction_ok": true,
+   "ok": true
+  },
+  {
+   "seg": "30c51bf9",
+   "median_err_hz": 49.0,
+   "corr_with_truth": 0.999,
+   "direction_ok": true,
+   "ok": true
+  },
+  {
+   "seg": "f7dc78d9",
+   "median_err_hz": 68.0,
+   "corr_with_truth": 0.999,
+   "direction_ok": true,
+   "ok": true
+  },
+  {
+   "seg": "3c792646",
+   "median_err_hz": 70.0,
+   "corr_with_truth": 0.999,
+   "direction_ok": true,
+   "ok": true
+  }
+ ],
+ "air_pass_count": 9,
+ "air_pass": true,
+ "air_fixed_mask_pass_count": 10,
+ "air_fixed_mask_pass": true,
+ "smear_pass_count": 9,
+ "smear_pass": true,
+ "flutter_pass_count": 4,
+ "flutter_pass": false,
+ "flutter_v2_setA_pass_count": 3,
+ "flutter_v2_setA_pass": false,
+ "flutter_v2_setB_fresh_pass_count": 4,
+ "flutter_v2_setB_fresh_pass": false,
+ "flutter_v2_1_setC_fresh_pass_count": 2,
+ "flutter_v2_1_setC_fresh_pass": false,
+ "notch_pass_count": 9,
+ "notch_pass": true,
+ "gate_pass_with_v1_flutter": false,
+ "gate_pass_with_v2_1_flutter": false,
+ "note": "Flutter v1 failed (set A). v2 had a numeric bug (divided by ~0) and failed on sets A and B. v2.1 fixes the bug and is judged only on set C, fresh excerpts it was never run on."
+}

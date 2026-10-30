@@ -1,0 +1,117 @@
+name: Hiss Tamer
+
+# Builds ONLY the Hiss module (no app, no UI, no audio devices), runs its tests, runs the demo
+# files through AUTO FIX, checks the results again with separately written Python measurements,
+# and uploads the before / after / removed WAVs, pictures, and the plain-words report.
+on:
+  push:
+    branches: ['hiss-tamer-*']
+    paths: ['hiss/**', '.github/workflows/hiss-tamer.yml', 'cmake/**']
+  pull_request:
+    branches: ['**']
+    paths: ['hiss/**', '.github/workflows/hiss-tamer.yml']
+  workflow_dispatch:
+
+jobs:
+  not-main:
+    name: Guard (fails if this is main)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail on main
+        shell: bash
+        run: |
+          ref="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          base="${GITHUB_BASE_REF:-}"
+          echo "branch=$ref base=$base"
+          if [ "$ref" = "main" ]; then
+            echo "Hiss Tamer work must stay on a hiss-tamer-* branch. It must never be on main."
+            exit 1
+          fi
+
+  hiss:
+    name: Hiss Tamer (Windows, MSVC Release)
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Branding check (no other company's names in the Hiss files)
+        shell: pwsh
+        run: |
+          $bad = Select-String -Path (Get-ChildItem hiss -Recurse -File -Include *.hpp,*.cpp,*.py,*.md,*.txt,*.json,*.cmake,CMakeLists.txt,*.yml | ForEach-Object FullName) -Pattern '\b(ssl|waves|soundtoys|api)\b|solid state logic' -CaseSensitive:$false
+          if ($bad) { $bad | ForEach-Object { Write-Host "$($_.Path):$($_.LineNumber): $($_.Line)" }; throw "Another company's name was found." }
+          Write-Host "clean"
+
+      - name: Configure
+        run: cmake -S hiss -B build/hiss -G "Visual Studio 17 2022" -A x64
+
+      - name: Build Release
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force out | Out-Null
+          cmake --build build/hiss --config Release --parallel 2>&1 | Tee-Object -FilePath out\build_log.txt
+          if ($LASTEXITCODE -ne 0) { throw "build failed" }
+
+      - name: Tests
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force out | Out-Null
+          & .\build\hiss\Release\hc_hiss_tests.exe 2>&1 | Tee-Object -FilePath out\test_log.txt
+          if ($LASTEXITCODE -ne 0) { throw "tests failed ($LASTEXITCODE)" }
+
+      - name: Demo files through AUTO FIX
+        shell: pwsh
+        run: |
+          & .\build\hiss\Release\hc_hiss_cli.exe demo out\demo 2>&1 | Tee-Object -FilePath out\demo_log.txt
+          if ($LASTEXITCODE -ne 0) { throw "demo failed ($LASTEXITCODE)" }
+
+      - name: Python check (separately written measurements)
+        shell: pwsh
+        run: |
+          python -m pip install --quiet numpy matplotlib
+          Push-Location hiss\python
+          python hiss_compare.py ..\..\out\demo 2>&1 | Tee-Object -FilePath ..\..\out\python_compare.txt
+          $code = $LASTEXITCODE
+          python hiss_report.py ..\..\out\demo ..\..\out\test_log.txt ..\include\hybrid\hiss\HissConfig.hpp ..\..\out\report
+          Pop-Location
+          if ($code -ne 0) { throw "python check found a problem" }
+
+      - name: Phase 1C synthetic checks (the parts that need no audio files)
+        shell: pwsh
+        run: |
+          python -m pip install --quiet numpy scipy pyloudnorm
+          if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) { choco install ffmpeg -y --no-progress | Out-Null }
+          $out = New-Object System.Collections.Generic.List[string]
+          foreach ($n in 1,2,3) {
+            $r = python -I hiss\python\phase1c\check$n.py $env:TEMP $env:TEMP synthetic 2>&1 | Select-Object -Last 1
+            Write-Host $r; $out.Add([string]$r)
+            if ($LASTEXITCODE -ne 0) { throw "Phase 1C synthetic check $n failed" }
+          }
+          Write-Host "::notice title=hiss: phase 1C synthetic checks::$($out -join '%0A')"
+
+      - name: Summary (also published as a notice so it can be read without downloading)
+        if: always()
+        shell: pwsh
+        run: |
+          function Notice($title, $lines) {
+            $t = ($lines -join "`n"); if ($t.Length -gt 3800) { $t = $t.Substring(0, 3800) }
+            $enc = $t.Replace('%', '%25').Replace("`r", '').Replace("`n", '%0A')
+            Write-Host "::notice title=$title::$enc"
+          }
+          $warn = @(); if (Test-Path out\build_log.txt) { $warn = Select-String -Path out\build_log.txt -Pattern 'warning C\d+' | ForEach-Object { $_.Line.Trim() } | Sort-Object -Unique }
+          Notice "hiss: compiler warnings ($($warn.Count) unique)" ($warn | Select-Object -First 25)
+          if (Test-Path out\test_log.txt) {
+            $t = Get-Content out\test_log.txt
+            Notice "hiss: tests" (@($t | Select-String -Pattern 'FAIL|checks,|latency') | ForEach-Object { $_.Line })
+            Notice "hiss: measured" (@($t | Select-String -Pattern 'MEASURED') | ForEach-Object { $_.Line.Trim() })
+          }
+          if (Test-Path out\python_compare.txt) { Notice "hiss: python check" (Get-Content out\python_compare.txt) }
+          if (Test-Path out\demo\stems_report.txt) { }
+          Get-ChildItem out\demo -Filter *_report.txt -ErrorAction SilentlyContinue | ForEach-Object { Notice ("hiss: " + $_.Name) (Get-Content $_.FullName) }
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hiss-tamer-results
+          path: out
+          if-no-files-found: warn

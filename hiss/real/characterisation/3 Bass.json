@@ -1,0 +1,55 @@
+{
+ "file": "3 Bass.wav",
+ "rate": 48000,
+ "seconds": 152.8,
+ "mid": {
+  "bump_hz": 14402.34375,
+  "bump_db_over_3k_median": 7.559909624875033,
+  "q10_level_db_at_bump": -101.0888087609423,
+  "quiet_level_db_at_bump": -98.33295285334194,
+  "avg_level_db_at_bump": -77.94344503268081,
+  "tones": [
+   [
+    14402.34375,
+    7.184587138389659
+   ],
+   [
+    13201.171875,
+    6.577227024567151
+   ],
+   [
+    8923.828125,
+    6.229570122199476
+   ]
+  ],
+  "spectral_cutoff_hz": 18650.390625,
+  "quiet_frames": 255,
+  "live_frames": 1705
+ },
+ "band_env": {
+  "rate_hz": 4.506111145019531,
+  "prominence_db": 29.45679658660191,
+  "depth_db_5_95": 9.881350635014606,
+  "steadiness_q10_over_median": 0.008652781177547864
+ },
+ "side": {
+  "bump_hz": 14402.34375,
+  "bump_db_over_3k_median": 11.06950059766649,
+  "q10_level_db_at_bump": -100.27414596093254,
+  "quiet_level_db_at_bump": -97.99076741765978,
+  "avg_level_db_at_bump": -83.11253582000519,
+  "tones": [
+   [
+    14402.34375,
+    10.909751732333277
+   ],
+   [
+    16001.953125,
+    8.719634282201085
+   ]
+  ],
+  "spectral_cutoff_hz": 6398.4375,
+  "quiet_frames": 255,
+  "live_frames": 1705
+ }
+}
