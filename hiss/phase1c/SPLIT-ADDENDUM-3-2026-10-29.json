@@ -1,0 +1,18 @@
+{
+ "written": "2026-10-29",
+ "about": "Flutter meter v5. Written and committed BEFORE v5 is run on its test clips. SPLIT.json is not edited. The v4 FAIL stays on the record.",
+ "why_v4_failed_in_part": "v4 read the 25 Hz line from the nearest FFT bin of a 19.5 s clip. 25 Hz x 19.5 s = 487.5, exactly half way between two bins, so the Hann window reads the line about 15 % low (scalloping). The earlier 20.0 s development clips had the line exactly on a bin, so development looked fine and the test looked bad. That was my slip, not a property of the idea.",
+ "meter_v5": {
+  "reading": "Same band (5-15 kHz, 4th order Butterworth, zero phase), same Hilbert envelope, same 200 Hz low-pass as v4. The 25 Hz line is then read at EXACTLY 25.000 Hz by a direct sum over the Hann-windowed, mean-removed envelope (complex value A, divided by the mean envelope). No FFT bin is used.",
+  "self_calibration (standard addition)": "The meter adds a known extra flutter of depth 0.20 to the clip twice, once with phase 0 and once with phase 90 degrees, reads A1 and A2, and sets g = mean(|A1 - A0|, |A2 - A0|) / 0.20. g is 'reading per unit of true depth' for THIS clip. Depth reported = |A0| / g. If |A1-A0| and |A2-A0| differ by more than 15 %, the meter says 'not linear on this clip' and reports nothing.",
+  "refuses_when": ["clip shorter than 19.5 s", "5-15 kHz band below -90 dBFS rms", "the two calibration readings differ by more than 15 %"]
+ },
+ "test": {
+  "clips": "The 9 human reference files that no flutter test or development run has used: ranked by 8-20 kHz share minus 5-10 kHz share, indices 24 and up, excluding the 10 clips of check 4b. First 19.5 s of each.",
+  "trials": "Each clip gets a flutter of depth 0.15, 0.30 and 0.45 added (random phase, seed 5150): 27 trials. Only 9 unused clips exist, so there are 27 trials, not 10 clips.",
+  "ok_when": "|estimated depth - injected depth| <= 0.20 x injected depth + natural depth of that clip, where natural depth is the meter's own estimate on the clip with nothing added. (Human cymbals already wobble a little, and that wobble adds to or takes from the injected one by up to its own size.)",
+  "pass": "at least 25 of 27 trials ok",
+  "if_it_fails": "Flutter stays detect-only. The failure goes in FAILURES.md. The meter is not changed again on these clips."
+ },
+ "also_reported": "The natural depth found in every clip, and the g value per clip. Both are results, not pass/fail."
+}
