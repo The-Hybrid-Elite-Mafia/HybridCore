@@ -1,0 +1,71 @@
+name: ASIO build (Steven's PC)
+
+# The Hybrid Core WITH Steinberg ASIO, built here because private repositories have no free
+# Actions minutes on this account (Steven chose this on 2026-10-29).
+# Licence: The Hybrid Core is GPLv3, and the ASIO SDK is used under Steinberg's GPLv3 option.
+# The SDK is downloaded at build time (SHA-512 checked) and never committed. Its LICENSE.txt is
+# installed with the app. Source for every build: this repository at the commit named in the release.
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch, tag or commit to build"
+        default: "main"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  asio:
+    name: ASIO + WASAPI + VST3 build, tests, installer
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Fetch ASIO SDK (Steinberg, checked by SHA-512, never committed)
+        run: |
+          tools\ci\run-and-report.ps1 -Title "asio: fetch sdk" -Exe powershell -ArgList '-ExecutionPolicy','Bypass','-File','tools\fetch-asio-sdk.ps1'
+
+      - name: Configure (ASIO + VST3)
+        run: |
+          tools\ci\run-and-report.ps1 -Title "asio: configure" -Exe cmake -ArgList '--preset','rig-full'
+
+      - name: Build Release
+        run: |
+          tools\ci\run-and-report.ps1 -Title "asio: build" -Exe cmake -ArgList '--build','--preset','rig-full-release' -WarningSummary
+
+      - name: Unit tests
+        run: |
+          tools\ci\run-and-report.ps1 -Title "asio: unit tests" -Exe ctest -ArgList '--test-dir','build/rig-full','-C','Release','-V'
+
+      - name: Device probe (lists ASIO drivers; the runner has none)
+        run: |
+          tools\ci\run-and-report.ps1 -Title "asio: device probe" -Exe .\build\rig-full\tools\device_probe\Release\hc_device_probe.exe -ArgList '--no-audio-ok'
+
+      - name: Build installer (with ASIO)
+        env:
+          GITHUB_REF: refs/heads/main
+        run: |
+          tools\ci\run-and-report.ps1 -Title "asio: installer" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\build-installer.ps1','-BuildDir','build\rig-full','-PrivateAsio'
+
+      - name: Verify installer (install, self-test, upgrade, uninstall)
+        run: |
+          tools\ci\run-and-report.ps1 -Title "asio: verify installer" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\verify-installer.ps1','-Installer',"$env:HC_INSTALLER"
+
+      - name: Publish pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $repo = '${{ github.repository }}'
+          $tag  = "v$($env:HC_VERSION)-asio"
+          $src  = git rev-parse HEAD
+          $sha  = (Get-FileHash $env:HC_INSTALLER -Algorithm SHA256).Hash.ToLowerInvariant()
+          $notes = "The Hybrid Core $($env:HC_VERSION) WITH ASIO (for Steven's PC).`n`nLicence: GPLv3. Uses the Steinberg ASIO SDK under its GPLv3 option; the SDK licence is installed with the app. Source: this repository @ $src. ASIO is a trademark of Steinberg Media Technologies GmbH.`n`nSHA-256: $sha"
+          gh release view $tag -R $repo *> $null
+          if ($LASTEXITCODE -eq 0) { gh release delete $tag -R $repo --yes --cleanup-tag }
+          gh release create $tag "$env:HC_INSTALLER" -R $repo --prerelease --title "The Hybrid Core $($env:HC_VERSION) with ASIO" --notes $notes
+          if ($LASTEXITCODE -ne 0) { throw "gh release create failed ($LASTEXITCODE)" }
+          Write-Host "::notice::Published $tag ($(Split-Path $env:HC_INSTALLER -Leaf)) SHA-256 $sha"
