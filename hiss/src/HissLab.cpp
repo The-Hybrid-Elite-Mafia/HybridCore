@@ -215,11 +215,21 @@ SeamResult seamClicks(const float* x, std::size_t n, double fs, double periodMs)
         if (r.foldSigned) { for (std::size_t q = 0; q < SB.size(); ++q) if (std::fabs(SB[q]) > std::fabs(SB[pk])) pk = q; }
         else pk = static_cast<std::size_t>(std::max_element(SB.begin(), SB.end()) - SB.begin());
         r.foldPhaseMs = 1000.0 * static_cast<double>(pk) / fs;
+        {   // picture of the winning fold for the screen: how far each position stands above the middle one, max-pooled to at most 1000 bins
+            std::vector<double> mag(SB.size());
+            for (std::size_t q = 0; q < SB.size(); ++q) mag[q] = r.foldSigned ? std::fabs(SB[q]) : SB[q];
+            const double base = r.foldSigned ? 0.0 : stats::median(mag);   // same units as the null: signed = largest |mean|, energy = largest minus median
+            const std::size_t bins = std::min<std::size_t>(1000, mag.size());
+            r.foldProfile.assign(bins, 0.0f);
+            for (std::size_t q = 0; q < mag.size(); ++q) { const std::size_t b = q * bins / mag.size(); r.foldProfile[b] = std::max(r.foldProfile[b], static_cast<float>(std::max(mag[q] - base, 0.0))); }
+            r.foldProfileMs = 1000.0 * static_cast<double>(P0) / fs;
+        }
         r.foldLevelDb = r.foldSigned ? 20.0 * std::log10(std::max(std::fabs(SB[pk]), 1e-12)) : (ME > 0 ? 10.0 * std::log10(ME / Eh) : -200.0);
         std::sort(nE.begin(), nE.end()); std::sort(nS.begin(), nS.end());
         const std::size_t qi = std::min(nE.size() - 1, static_cast<std::size_t>(std::ceil((1.0 - cfg::kAlpha / 2.0) * static_cast<double>(nE.size() + 1))) - 1);
         r.detectLimitAnySignDb = nE[qi] > 0 ? 10.0 * std::log10(nE[qi] / Eh) : -200.0;
         r.detectLimitDb = nS[qi] > 0 ? 20.0 * std::log10(nS[qi]) : -200.0;
+        r.foldBar = static_cast<float>(r.foldSigned ? nS[qi] : nE[qi]);
     }
 
     // ---- single clicks (information: where they sit). The size rule comes from the clip length, assuming the local noise is bell-shaped. ----

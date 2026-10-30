@@ -56,3 +56,19 @@ if(HC_BUILD_HISS_TOOLS)
   target_compile_definitions(hc_hiss_tools_tests PRIVATE _CRT_SECURE_NO_WARNINGS)
   add_test(NAME hiss_tools_tests COMMAND hc_hiss_tools_tests)
 endif()
+
+# ---- Windows programs with a real front panel (pure C++, Win32 + GDI+, no JUCE, no web pages) ----
+option(HC_BUILD_HISS_UI "Build the HEM Hiss tool windows (Windows only)" ON)
+if(HC_BUILD_HISS_UI AND HC_BUILD_HISS_TOOLS)
+  # Window logic tests: the knob, and that the knob really changes what the engine does. No window needed.
+  add_executable(hc_hiss_ui_tests tests/ui_logic_tests.cpp)
+  target_include_directories(hc_hiss_ui_tests PRIVATE ui tools)
+  target_link_libraries(hc_hiss_ui_tests PRIVATE hc::hiss)
+  target_compile_definitions(hc_hiss_ui_tests PRIVATE _CRT_SECURE_NO_WARNINGS)
+  add_test(NAME hiss_ui_tests COMMAND hc_hiss_ui_tests)
+
+  add_executable(hem_comb_click WIN32 ui/CombClickApp.cpp ui/HemUi.cpp)
+  target_include_directories(hem_comb_click PRIVATE ui tools)
+  target_link_libraries(hem_comb_click PRIVATE hc::hiss)
+  target_compile_definitions(hem_comb_click PRIVATE _CRT_SECURE_NO_WARNINGS)
+endif()

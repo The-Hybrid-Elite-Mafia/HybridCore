@@ -135,11 +135,11 @@ static void testTools() {
     double combLine = 0; bool pattern = false;
     for (const auto& f : cc.findings) {
         if (f.name.rfind("Comb line level", 0) == 0) combLine = f.value;
-        if (f.name.rfind("40 ms pattern", 0) == 0 && f.value > 0.5) pattern = true;
+        if (f.name.rfind("Repeating click pattern", 0) == 0 && f.value > 0.5) pattern = true;
     }
     HMEASURED("Comb and Click Finder: comb line read (injected -75)", combLine, "dBFS");
     HCHECK(std::fabs(combLine + 75.0) < 1.5, "the comb line is read within 1.5 dB of the injected -75 dBFS");
-    HCHECK(pattern && contains(cc.text, "YES, a 40 ms pattern"), "the 40 ms click train is called a pattern");
+    HCHECK(pattern && contains(cc.text, "YES, a repeating pattern at this period"), "the 40 ms click train is called a pattern");
     const auto al = tools::airAndSmearLab(l.data(), r.data(), n, fs, "madeup");
     double wobRate = 0, tail = 0;
     for (const auto& f : al.findings) {

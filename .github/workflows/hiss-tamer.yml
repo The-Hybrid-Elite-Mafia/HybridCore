@@ -31,6 +31,8 @@ jobs:
   hiss:
     name: Hiss Tamer (Windows, MSVC Release)
     runs-on: windows-2022
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v5
 
@@ -66,6 +68,45 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "lab tests failed ($LASTEXITCODE)" }
           & .\build\hiss\Release\hc_hiss_tools_tests.exe 2>&1 | Tee-Object -FilePath out\tools_test_log.txt
           if ($LASTEXITCODE -ne 0) { throw "tools tests failed ($LASTEXITCODE)" }
+
+      - name: Window logic tests (knob, and that the knob changes what the engine does)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force out | Out-Null
+          & .\build\hiss\Release\hc_hiss_ui_tests.exe 2>&1 | Tee-Object -FilePath out\ui_test_log.txt
+          if ($LASTEXITCODE -ne 0) { throw "window logic tests failed ($LASTEXITCODE)" }
+
+      - name: Comb and Click Finder window - take pictures of the real program
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force out\ui | Out-Null
+          $exe = (Resolve-Path ".\build\hiss\Release\hem_comb_click.exe").Path
+          function Shot($name, $argList) {
+            $p = Start-Process -FilePath $exe -ArgumentList $argList -Wait -PassThru
+            if ($p.ExitCode -ne 0) { throw "snapshot $name failed (exit $($p.ExitCode))" }
+            if (-not (Test-Path "out\ui\$name.png")) { throw "snapshot $name was not written" }
+            Write-Host ("{0}: {1} bytes" -f $name, (Get-Item "out\ui\$name.png").Length)
+          }
+          $o = (Resolve-Path out\ui).Path
+          Shot "combclick_idle"          "--snapshot `"$o\combclick_idle.png`" --idle"
+          Shot "combclick_55ms_found"    "--snapshot `"$o\combclick_55ms_found.png`" --made-up 55 --period 55"
+          Shot "combclick_40ms_notfound" "--snapshot `"$o\combclick_40ms_notfound.png`" --made-up 55 --period 40"
+          Copy-Item $exe out\ui\hem_comb_click.exe
+
+      - name: Publish pictures and program to the hiss-ui-shots branch
+        if: github.event_name == 'push'
+        shell: pwsh
+        run: |
+          git config user.name "hem-build"
+          git config user.email "hem-build@users.noreply.github.com"
+          $sha = (git rev-parse --short HEAD)
+          Copy-Item -Recurse out\ui "$env:RUNNER_TEMP\ui"
+          git checkout --orphan hiss-ui-shots
+          git rm -rf . --quiet
+          Copy-Item "$env:RUNNER_TEMP\ui\*" . -Recurse
+          git add -A
+          git commit -m "Windows build pictures and program from $sha" --quiet
+          git push -f origin hiss-ui-shots
 
       - name: Demo files through AUTO FIX
         shell: pwsh

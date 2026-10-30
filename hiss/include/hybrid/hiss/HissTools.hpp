@@ -8,6 +8,7 @@
 //    Proof Bench           engines 17 (maker), 18 (blind plan), 19 (fingerprint), 20 (report)
 //  Offline only. Mono inputs are the average of left and right; stereo is used where an engine needs it (phase).
 // =============================================================================
+#include "hybrid/hiss/HissConfig.hpp"
 #include "hybrid/hiss/HissReport.hpp"
 
 #include <cstddef>
@@ -22,7 +23,7 @@ struct ToolOutput {
 };
 
 [[nodiscard]] ToolOutput hissScanner(const float* left, const float* right, std::size_t n, double fs, const std::string& name);
-[[nodiscard]] ToolOutput combAndClickFinder(const float* left, const float* right, std::size_t n, double fs, const std::string& name);
+[[nodiscard]] ToolOutput combAndClickFinder(const float* left, const float* right, std::size_t n, double fs, const std::string& name, double clickPeriodMs = cfg::kClickPeriodMs);
 // artifactDb < -150 means "no artifact level given": the masking line is then reported as not run.
 [[nodiscard]] ToolOutput airAndSmearLab(const float* left, const float* right, std::size_t n, double fs, const std::string& name,
                                         double artifactLoHz = 11000.0, double artifactHiHz = 12000.0, double artifactDb = -200.0);

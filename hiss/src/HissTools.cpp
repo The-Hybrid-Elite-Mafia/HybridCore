@@ -58,7 +58,7 @@ ToolOutput hissScanner(const float* left, const float* right, std::size_t n, dou
     return o;
 }
 
-ToolOutput combAndClickFinder(const float* left, const float* right, std::size_t n, double fs, const std::string& name) {
+ToolOutput combAndClickFinder(const float* left, const float* right, std::size_t n, double fs, const std::string& name, double clickPeriodMs) {
     ToolOutput o;
     const auto x = mono(left, right, n);
     auto& f = o.findings;
@@ -70,30 +70,30 @@ ToolOutput combAndClickFinder(const float* left, const float* right, std::size_t
         f.push_back(report::withAbsRange("Comb line level (median, 3-20 kHz)", cb.medianLineDb, 1.0, "dBFS", kSyn, b));
         f.push_back(report::withAbsRange("Lines beating neighbours", cb.onGreaterThanOffPct, 5.0, "%", "ASSUMED", "about 45 for no comb; the +/-5 is a guess"));
     }
-    const auto sc = lab::seamClicks(x.data(), n, fs);
-    if (!sc.valid) f.push_back(report::refused("40 ms seam clicks", "clip shorter than 0.5 s"));
+    const auto sc = lab::seamClicks(x.data(), n, fs, clickPeriodMs);
+    if (!sc.valid) f.push_back(report::refused("Seam clicks", "clip shorter than 0.5 s"));
     else {
         char b[260];
-        std::snprintf(b, sizeof b, "40 ms fold test: chance a clean file looks this periodic = %.4f (%d other frame lengths used as the null). Call: %s", sc.foldP, sc.nullFolds, sc.pattern ? "YES, a 40 ms pattern" : "no pattern shown");
-        f.push_back(report::noRange("40 ms pattern", sc.pattern ? 1.0 : 0.0, "(1 = yes)", kSyn, b));
+        std::snprintf(b, sizeof b, "%.4g ms fold test: chance a clean file looks this periodic = %.4f (%d other frame lengths used as the null). Call: %s", clickPeriodMs, sc.foldP, sc.nullFolds, sc.pattern ? "YES, a repeating pattern at this period" : "no pattern shown");
+        f.push_back(report::noRange("Repeating click pattern at the chosen period", sc.pattern ? 1.0 : 0.0, "(1 = yes)", kSyn, b));
         if (sc.nullFolds > 0) {
             std::snprintf(b, sizeof b, "worked out from THIS file's own high-frequency noise: a single-sample click smaller than this is not shown as a pattern");
             f.push_back(report::noRange("Smallest click this file can show (all same direction)", sc.detectLimitDb, "dBFS", kSyn, b));
             f.push_back(report::noRange("Smallest click this file can show (either direction)", sc.detectLimitAnySignDb, "dBFS", kSyn, b));
             if (sc.pattern) {
                 f.push_back(report::withAbsRange("Click size (single-sample peak)", sc.foldLevelDb, 3.0, "dBFS", kSyn, "read from the fold; range from tests on made-up clips"));
-                f.push_back(report::withAbsRange("Click position inside the 40 ms frame", sc.foldPhaseMs, 0.5, "ms", kSyn));
+                f.push_back(report::withAbsRange("Click position inside the frame", sc.foldPhaseMs, 0.5, "ms", kSyn));
             }
         }
         std::snprintf(b, sizeof b, "single-click rule for this clip: %.1f times the local typical size (from clip length at 1 in 100; assumes bell-shaped local noise)", sc.clickThresholdRatio);
         f.push_back(report::withAbsRange("Single clicks found", static_cast<double>(sc.clicks.size()), 0.05 * static_cast<double>(sc.clicks.size()), "clicks", kSyn, b));
         if (sc.clicks.size() >= 2) {
             f.push_back(report::withAbsRange("Median gap between clicks", sc.medianIntervalMs, 0.1, "ms", kSyn));
-            f.push_back(report::withAbsRange("Share of gaps at 40 ms (or multiple)", 100.0 * sc.periodicShare, 5.0, "%", kSyn, "information only; the pattern call uses the fold test above"));
+            f.push_back(report::withAbsRange("Share of gaps at the chosen period (or multiple)", 100.0 * sc.periodicShare, 5.0, "%", kSyn, "information only; the pattern call uses the fold test above"));
         }
     }
     o.text = report::makeReport("Comb and Click Finder: " + name, f, {
-        "The click finder was tested on clicks we put into noise. Music with sharp drum attacks above 3 kHz can look like clicks. The smallest click it can show is worked out per file (line above). Music with a steady beat that divides evenly by 40 ms can also fold strongly. Real files: UNKNOWN.",
+        "The click finder was tested on clicks we put into noise. Music with sharp drum attacks above 3 kHz can look like clicks. The smallest click it can show is worked out per file (line above). Music with a steady beat that divides evenly by the chosen period can also fold strongly. Real files: UNKNOWN.",
         "The 25 Hz comb meter confuses grid music with comb unless lines are compared to their neighbours; it does that (FAILURES.md F6)."});
     return o;
 }

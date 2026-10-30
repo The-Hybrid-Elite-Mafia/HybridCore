@@ -58,6 +58,9 @@ struct SeamResult {
     bool foldSigned = false;              // true: the matched (same-direction) fold gave the stronger answer
     double detectLimitDb = -200;          // smallest single-sample click, all pointing the same way, this file would show as a pattern (about half the time), from the file's own noise
     double detectLimitAnySignDb = -200;   // same, for clicks that point either way (energy fold)
+    std::vector<float> foldProfile;       // for the screen: the winning fold, how far each position stands above the middle one (at most 1000 bins across one frame)
+    double foldProfileMs = 0;             // frame length the profile covers
+    float foldBar = 0;                    // the level in the same units a clean file would beat 1 time in 100 (draw it as a line)
     double clickThresholdRatio = 0;       // single-click rule used in this clip: how many times the local typical size (computed from the clip length)
 };
 [[nodiscard]] SeamResult seamClicks(const float* x, std::size_t n, double fs, double periodMs = cfg::kClickPeriodMs);
