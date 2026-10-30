@@ -1,0 +1,127 @@
+{
+ "written": "2026-10-30, before any Phase 2 measurement",
+ "branch": "hiss-tamer-1",
+ "what_this_is": "Phase 2 SMALL version. Human air table from the only human songs on Steven's PC. NOT the 20-40 references from several sources that PROMPT.md asks for. That need stays OPEN.",
+ "why_small": "Steven declined the ~40 GB MUSDB18-HQ download. The workspace cannot reach music sites.",
+ "source_family": "Cambridge-MT multitrack library only (1 family). Test use only. Never shipped, never uploaded to the repo.",
+ "songs": 4,
+ "damaged_input": "KarlHungus_GotYourLove.zip on Steven's PC is cut off (no end record). 15 of 18 files recovered with CRC match; files after 16_Synth01 are lost. Not a design choice.",
+ "role_map_note": "Roles come from the public Cambridge-MT file names, written here before measuring. This is not the closed Suno key. Karl Hungus is a programmed (sample/808) production, not played drums: noted as 'programmed' in the table.",
+ "included_files": [
+  {
+   "song": "AngelaThomasWade_MilkCowBlues",
+   "file": "02_Snare.wav",
+   "role": "snare",
+   "sha256": "a826d0d46e1487f241051d4ba1d9fdaa19467d612cc1b9c21f61a22217c84aa9"
+  },
+  {
+   "song": "AngelaThomasWade_MilkCowBlues",
+   "file": "04_Overheads.wav",
+   "role": "overheads",
+   "sha256": "c472fe1fccc336efbd189ec8b413a2950f5ea0a83d4c9cfd2be7cc5168c15213"
+  },
+  {
+   "song": "AngelaThomasWade_MilkCowBlues",
+   "file": "03_Tom.wav",
+   "role": "toms",
+   "sha256": "59cb0c285af6bce0ee780c04b31c86cd89fea39e60312d09ff956735ecefcaea"
+  },
+  {
+   "song": "TheLongWait_DarkHorses",
+   "file": "02_Snare.wav",
+   "role": "snare",
+   "sha256": "909e457281cdf30331114ff1ac2df213159fc0b622ee294906b9afe80ad3a023"
+  },
+  {
+   "song": "TheLongWait_DarkHorses",
+   "file": "03_Overheads.wav",
+   "role": "overheads",
+   "sha256": "9fbffa2dee5b71e54eaa011c4763e528bdaf01716755321f0232e309c890b8b6"
+  },
+  {
+   "song": "TheLongWait_DarkHorses",
+   "file": "04_DrumsRoom.wav",
+   "role": "drum_room",
+   "sha256": "d5244dc66bb0911350ab7e35a0e31824613b65515be2cec86bd7cb7b33ce1f22"
+  },
+  {
+   "song": "Kangoro_Animal",
+   "file": "04_Snare1.wav",
+   "role": "snare",
+   "sha256": "8ab9814edc68f9a14727f3a561e5804f7b9985bb7de0033889edec87d6a4a591"
+  },
+  {
+   "song": "Kangoro_Animal",
+   "file": "05_Snare2.wav",
+   "role": "snare",
+   "sha256": "c96244c5dcd4792270c3d789cd962a133335344da8e7bbfaa5b5beae83b99c9a"
+  },
+  {
+   "song": "Kangoro_Animal",
+   "file": "06_Crash.wav",
+   "role": "cymbal_crash",
+   "sha256": "1dcab4d2b7d7caadb0dfbc7817864af48e9de2f46a60380669f89314113231b4"
+  },
+  {
+   "song": "Kangoro_Animal",
+   "file": "07_DrumsRoom.wav",
+   "role": "drum_room",
+   "sha256": "f140ec409f0609dcb5f26ae8dab2929f322a173ca5aff91acbd7ccdf5aa1d21b"
+  },
+  {
+   "song": "Kangoro_Animal",
+   "file": "08_Tambourine.wav",
+   "role": "tambourine",
+   "sha256": "2ba7b27e4efe362baf15dc9c61b7e1c5211d4b58d77194f5d15ee635b5f52adb"
+  },
+  {
+   "song": "Kangoro_Animal",
+   "file": "09_Loops.wav",
+   "role": "drum_loop",
+   "sha256": "ca35937afba0f05a5449398e6b2d7fcec7edfddc4c3406ced0e902e6af4b5ea2"
+  },
+  {
+   "song": "KarlHungus_GotYourLove",
+   "file": "03_Snare01.wav",
+   "role": "snare",
+   "sha256": "0447604eb54626548325de8493c20fda9bb19b2c3ff09082fd79c369f7995af3"
+  },
+  {
+   "song": "KarlHungus_GotYourLove",
+   "file": "04_Snare02.wav",
+   "role": "snare",
+   "sha256": "17159e9e8eceb7ca088ef2e433ede80701e8c68d716d9adc471dd7e79ddbdbe7"
+  },
+  {
+   "song": "KarlHungus_GotYourLove",
+   "file": "09_Hat_SFX.wav",
+   "role": "hihat",
+   "sha256": "e9a18fc84cc0399d35d5fda0602c84d81b961381af105050efaca7a1c6037083"
+  },
+  {
+   "song": "KarlHungus_GotYourLove",
+   "file": "07_Claps01.wav",
+   "role": "claps",
+   "sha256": "f20a04aee217fa873650385e78e0de7b434bf80e33b022c37c311a734d7ef1df"
+  },
+  {
+   "song": "KarlHungus_GotYourLove",
+   "file": "12_Chimes.wav",
+   "role": "chimes",
+   "sha256": "1b34ffee5f9ed31b92c2f1c9cdb994879f4699334bf2bcf12cb6aa98077770bf"
+  }
+ ],
+ "rules": {
+  "metric": "h1c.ratio_metrics over loud frames (hysteresis P70/P60, silence -80 dB). Report 5-10 kHz level, 16-20 kHz level, ratio, n frames, n loud frames. Absolute levels always shown next to the ratio.",
+  "bandwidth": "h1c.cutoff_audit on every file. Files whose cutoff is below 19 kHz are listed but excluded from the table (Phase 1 rule).",
+  "too_quiet": "Files with fewer than 20 loud frames get no ratio (Phase 1 rule).",
+  "summary": "Per role: n, median, min, max. A bootstrap interval is given ONLY when n >= 5, else 'no interval (n too small)'. No pooled all-roles median is claimed as a yardstick (Phase 1 lesson).",
+  "no_claims": "No claim about Suno versus human is made from this table. Suno comparison is a separate step after the human table is committed. The closed key stays closed.",
+  "level_note": "Stems are not loudness-matched; absolute levels are stem levels, not mix levels. Ratio is the comparable number; absolute levels are context."
+ },
+ "limits": [
+  "1 source family, 4 songs, 14 stems: THIN.",
+  "Stems are single tracks, not full mixes.",
+  "Genre spread is narrow: blues/country, rock, hip-hop/electronic-ish, programmed."
+ ]
+}
