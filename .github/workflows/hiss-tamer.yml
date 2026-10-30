@@ -99,6 +99,8 @@ jobs:
           if (Test-Path out\tools\tamer_refused) { Fail "the Tamer wrote files while refusing" }
           Write-Host "::notice title=hiss tools smoke::scanner, combclick, airlab, inject, hash, pack and the Tamer refusal all ran on $($wav.Name)"
           Get-ChildItem out\tools | ForEach-Object { Write-Host $_.Name }
+          $global:LASTEXITCODE = 0     # the Tamer exit code 3 above is the expected answer; do not let it become the step's result
+          exit 0
 
       - name: Python check (separately written measurements)
         shell: pwsh
