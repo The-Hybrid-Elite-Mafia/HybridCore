@@ -46,7 +46,7 @@ The plan, the file list and every file's SHA-256 were committed **before** I mea
 ## What this shows (TESTED, on these files only)
 - **Real human stems vary a lot.** Across the files that pass, the ratio runs from about -29 dB to about -10 dB. That is a spread of about 19 dB. Any Suno number inside that spread would not be "wrong" by this table.
 - **Snare is the widest** (one snare at about -29, another at about -10). Different mics, different samples and different processing explain a spread like that. That is a guess (ASSUMED), not tested.
-- **6 of 17 stems were excluded** because the sound ends below 19 kHz (Phase 1 rule). That includes the only hi-hat (it stops at about 16.9 kHz), so **there is no human hi-hat reference in this table at all.** The drum loop, a tom and a snare also stop early. Part of that may be MP3-style processing in the source or the way the samples were made. Cause UNKNOWN.
+- **5 of 17 stems were excluded** because the sound ends below 19 kHz (Phase 1 rule). That includes the only hi-hat (it stops at about 16.9 kHz), so **there is no human hi-hat reference in this table at all.** The drum loop, a tom, a snare and the chimes also stop early. Part of that may be MP3-style processing in the source or the way the samples were made. Cause UNKNOWN.
 - **Only the snare has 5 usable files.** Every other role has 0 to 2. The "95 % interval" printed for snare is just the lowest and highest file; with 5 files it says almost nothing.
 - **Crash cymbal: 1 file. Tambourine: 1 file. Drum room: 2. Overheads: 2.** One file is an example, not a yardstick.
 
