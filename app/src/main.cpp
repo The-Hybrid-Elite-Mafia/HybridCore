@@ -57,7 +57,10 @@ std::filesystem::path exeDir() {
 }
 
 const char* kindName(app::DeviceChoice::Kind k) {
-    return k == app::DeviceChoice::Kind::Asio ? "asio" : k == app::DeviceChoice::Kind::Offline ? "offline" : "wasapi";
+    return k == app::DeviceChoice::Kind::Asio           ? "asio"
+           : k == app::DeviceChoice::Kind::Offline      ? "offline"
+           : k == app::DeviceChoice::Kind::WasapiShared ? "wasapi-shared"
+                                                        : "wasapi";
 }
 
 int findDevice(const std::vector<app::DeviceChoice>& list, const std::string& kind, const std::string& id) {

@@ -1,3 +1,13 @@
+## The Hybrid Core — 0.14.2: sound on every output (HDMI soundbars, TVs, Bluetooth)
+
+- **Fixed: no sound on outputs that can't run 48 kHz exclusive.** Many HDMI soundbars, TVs and Bluetooth
+  headphones only run at 44.1 kHz. The app used to hide those outputs from the DEVICE list, and when Windows'
+  default output was one of them it silently switched to a different output (often the laptop speakers),
+  so you heard nothing. Now every output is listed. Outputs without a 48 kHz exclusive mode play in
+  **WASAPI shared** mode: the engine still runs at 48 kHz and Windows converts to the device's rate.
+  The status line says "WASAPI shared · engine 48000 Hz · device 44100 Hz".
+- If an output is held by another app in exclusive mode, it now plays in shared mode instead of failing.
+
 ## The Hybrid Core — 0.14.1 (rebuilt): safe to share — no ASIO code
 
 This installer is the **public** build: it plays through WASAPI (Windows' own audio, exclusive mode) and contains **no Steinberg ASIO code**, so it can be shared. Everything else is the same as 0.14.1 below, including the HEM plug-ins (VST3).

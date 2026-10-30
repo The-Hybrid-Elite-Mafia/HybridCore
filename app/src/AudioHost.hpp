@@ -1,12 +1,13 @@
 #pragma once
 // =============================================================================
 //  AudioHost — owns the engine, the 13-stem MixerProcessor and the current
-//  hardware stream (WASAPI exclusive or ASIO). Message-thread only.
+//  hardware stream (WASAPI exclusive, WASAPI shared or ASIO). Message-thread only.
 // =============================================================================
 #include "hybrid/engine/Engine.hpp"
 #include "hybrid/engine/MixerProcessor.hpp"
 #include "hybrid/io/OfflineStream.hpp"
 #include "hybrid/io/WasapiExclusiveOutput.hpp"
+#include "hybrid/io/WasapiSharedOutput.hpp"
 #if defined(HC_HAS_ASIO_SDK)
 #include "hybrid/io/AsioDuplex.hpp"
 #endif
@@ -18,7 +19,8 @@
 namespace hc::app {
 
 struct DeviceChoice {
-    enum class Kind : std::uint8_t { Wasapi, Asio, Offline };
+    // Wasapi = exclusive 48 kHz; WasapiShared = Windows mixes it (any device rate, e.g. 44.1 kHz HDMI / Bluetooth).
+    enum class Kind : std::uint8_t { Wasapi, Asio, Offline, WasapiShared };
     Kind         kind = Kind::Wasapi;
     std::wstring id;      // WASAPI endpoint id ("" = default output) or ASIO driver name
     std::string  label;   // UTF-8 for the UI ("WASAPI · Speakers")
@@ -32,7 +34,7 @@ struct HostStatus {
     std::string line1;      // format / buffer / latency
     std::string line2;      // CPU / overruns / problems
     // Live numbers for the glass display (valid while running).
-    std::string   driver;              // "WASAPI EXCLUSIVE", "ASIO", "OFFLINE CLOCK"
+    std::string   driver;              // "WASAPI EXCLUSIVE", "WASAPI SHARED", "ASIO", "OFFLINE CLOCK"
     std::string   deviceName;
     double        sampleRate   = 0.0;
     std::uint32_t blockFrames  = 0;
@@ -85,12 +87,14 @@ public:
 
 private:
     bool installMixerOnce();
+    bool openShared(const std::wstring& id, const std::string& note);
     void refreshLine2();
 
     engine::Engine                          engine_;
     engine::MixerProcessor*                 mixer_ = nullptr;          // owned by engine_ once installed
     std::unique_ptr<engine::AudioProcessor> pendingMixer_;
     std::unique_ptr<io::WasapiExclusiveOutput> wasapi_;
+    std::unique_ptr<io::WasapiSharedOutput> shared_;
     std::unique_ptr<io::OfflineStream>      offline_;
 #if defined(HC_HAS_ASIO_SDK)
     std::unique_ptr<io::AsioDuplex>         asio_;

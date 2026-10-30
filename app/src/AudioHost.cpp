@@ -38,8 +38,10 @@ std::vector<DeviceChoice> AudioHost::listDevices() {
     if (auto eps = io::enumerateWasapi()) {
         for (const auto& ep : *eps) {
             if (ep.flow != io::Flow::Render) continue;
-            if (!(ep.excl48kFloat32 || ep.excl48kInt24in32 || ep.excl48kInt16)) continue;
-            out.push_back({DeviceChoice::Kind::Wasapi, ep.id, "WASAPI \xC2\xB7 " + toUtf8(ep.name), toUtf8(ep.name)});
+            if (ep.excl48kFloat32 || ep.excl48kInt24in32 || ep.excl48kInt16)
+                out.push_back({DeviceChoice::Kind::Wasapi, ep.id, "WASAPI \xC2\xB7 " + toUtf8(ep.name), toUtf8(ep.name)});
+            else   // no 48 kHz exclusive mode (many HDMI soundbars, TVs, Bluetooth): still playable, Windows converts
+                out.push_back({DeviceChoice::Kind::WasapiShared, ep.id, "WASAPI shared \xC2\xB7 " + toUtf8(ep.name), toUtf8(ep.name)});
         }
     }
 #if defined(HC_HAS_ASIO_SDK)
@@ -59,6 +61,7 @@ bool AudioHost::installMixerOnce() {
 
 void AudioHost::close() noexcept {
     if (wasapi_) { wasapi_->close(); wasapi_.reset(); }
+    if (shared_) { shared_->close(); shared_.reset(); }
     if (offline_) { offline_->close(); offline_.reset(); }
 #if defined(HC_HAS_ASIO_SDK)
     if (asio_) { asio_->close(); asio_.reset(); }
@@ -86,38 +89,14 @@ bool AudioHost::open(const DeviceChoice& choice) {
             return wasapi_->open(opt, engine_);
         };
         auto cfg = tryOpen(choice.id);
-        if (!cfg && choice.id.empty()) {
-            // Windows' default output can be a device that has no 48 kHz exclusive mode (HDMI, a
-            // monitor, Bluetooth). Fall back to the first output that does, and say which one.
-            if (auto eps = io::enumerateWasapi()) {
-                for (const auto& ep : *eps) {
-                    if (ep.flow != io::Flow::Render || ep.id.empty()) continue;
-                    if (!(ep.excl48kFloat32 || ep.excl48kInt24in32 || ep.excl48kInt16)) continue;
-                    wasapi_->close();
-                    auto again = tryOpen(ep.id);
-                    if (again) {
-                        cfg = std::move(again);
-                        status_.device = "Default â " + toUtf8(ep.name);
-                        status_.deviceName = toUtf8(ep.name);
-                        break;
-                    }
-                }
-            }
-        }
         if (!cfg) {
+            // No 48 kHz exclusive mode on this output (many HDMI soundbars/TVs and Bluetooth only run at 44.1 kHz),
+            // or another app holds it exclusively. Play it in shared mode instead: the engine stays at 48 kHz and
+            // Windows converts. Same device the person chose (or Windows' default) - never a different one.
             const auto code = static_cast<unsigned long>(cfg.error().code);
-            if (code == 0x88890008ul)   // AUDCLNT_E_UNSUPPORTED_FORMAT
-                std::snprintf(buf, sizeof(buf), "This output cannot play 48 kHz in exclusive mode - pick another device with the DEVICE arrows");
-            else if (code == 0x8889000Aul)   // AUDCLNT_E_DEVICE_IN_USE
-                std::snprintf(buf, sizeof(buf), "Another app is using this output in exclusive mode - close it or pick another device");
-            else
-                std::snprintf(buf, sizeof(buf), "WASAPI exclusive open failed at %s (0x%08lX)", cfg.error().stage, code);
-            problem_ = buf;
+            wasapi_->close();
             wasapi_.reset();
-            status_.alert = true;
-            status_.line1 = "No audio";
-            refreshLine2();
-            return false;
+            return openShared(choice.id, code == 0x8889000Aul ? "held by another app" : "no 48 kHz exclusive mode");
         }
         if (!installMixerOnce()) { problem_ = "could not install mixer"; status_.alert = true; refreshLine2(); return false; }
         if (auto s = wasapi_->start(); !s) {
@@ -135,6 +114,8 @@ bool AudioHost::open(const DeviceChoice& choice) {
         status_.sampleRate = cfg->sampleRate;
         status_.blockFrames = cfg->blockFrames;
         status_.outLatencyMs = cfg->outputLatencyMs;
+    } else if (choice.kind == DeviceChoice::Kind::WasapiShared) {
+        return openShared(choice.id, "");
     } else if (choice.kind == DeviceChoice::Kind::Offline) {
         offline_ = std::make_unique<io::OfflineStream>();
         const io::StreamConfig cfg = offline_->open({}, engine_);
@@ -190,6 +171,43 @@ bool AudioHost::open(const DeviceChoice& choice) {
     return true;
 }
 
+bool AudioHost::openShared(const std::wstring& id, const std::string& note) {
+    char buf[256];
+    shared_ = std::make_unique<io::WasapiSharedOutput>();
+    io::WasapiSharedOutput::Options opt;
+    opt.deviceId = id;
+    auto cfg = shared_->open(opt, engine_);
+    if (!cfg) {
+        std::snprintf(buf, sizeof(buf), "This output could not be opened (%s, 0x%08lX) - pick another device with the DEVICE button",
+                      cfg.error().stage, static_cast<unsigned long>(cfg.error().code));
+        problem_ = buf;
+        shared_.reset();
+        status_.alert = true;
+        status_.line1 = "No audio";
+        refreshLine2();
+        return false;
+    }
+    if (!installMixerOnce()) { problem_ = "could not install mixer"; status_.alert = true; refreshLine2(); return false; }
+    if (auto s = shared_->start(); !s) {
+        std::snprintf(buf, sizeof(buf), "WASAPI shared start failed at %s (0x%08lX)", s.error().stage, static_cast<unsigned long>(s.error().code));
+        problem_ = buf;
+        status_.alert = true;
+        refreshLine2();
+        return false;
+    }
+    const unsigned mix = shared_->deviceMixRate();
+    std::snprintf(buf, sizeof(buf), "WASAPI shared%s%s \xC2\xB7 engine %u Hz \xC2\xB7 device %u Hz (Windows converts) \xC2\xB7 out %.2f ms",
+                  note.empty() ? "" : " - ", note.c_str(), cfg->sampleRate, mix, cfg->outputLatencyMs);
+    status_.line1 = buf;
+    status_.driver = "WASAPI SHARED";
+    status_.sampleRate = cfg->sampleRate;
+    status_.blockFrames = cfg->blockFrames;
+    status_.outLatencyMs = cfg->outputLatencyMs;
+    status_.running = true;
+    refreshLine2();
+    return true;
+}
+
 void AudioHost::refreshLine2() {
     char buf[256];
     status_.loadAvg  = lastTelemetry_.loadAvg;
@@ -220,6 +238,7 @@ void AudioHost::poll() {
 
     std::uint32_t ev = 0;
     if (wasapi_) ev |= wasapi_->takeEvents();
+    if (shared_) ev |= shared_->takeEvents();
 #if defined(HC_HAS_ASIO_SDK)
     if (asio_) ev |= asio_->takeEvents();
 #endif
