@@ -146,30 +146,31 @@ void drawVerdict(Graphics& g, RectF gl, const View& v) {
     if (!v.haveRes || !v.res.ok) { text(g, v.phase == Phase::Scanning ? L"SCANNING" : L"NOT RUN", RectF(gl.X, gl.Y + 30, gl.Width, 60), Face::MonoBold, 28.0f, v.phase == Phase::Scanning ? kAmber : kDim, Gdiplus::StringAlignmentCenter, Gdiplus::StringAlignmentCenter); return; }
     const auto& s = v.res.seam;
     if (!s.valid || s.nullFolds == 0) { text(g, L"TOO SHORT", RectF(gl.X, gl.Y + 30, gl.Width, 60), Face::MonoBold, 28.0f, kAmber, Gdiplus::StringAlignmentCenter, Gdiplus::StringAlignmentCenter); return; }
-    text(g, s.pattern ? L"REPEATING CLICKS" : L"NONE SHOWN", RectF(gl.X, gl.Y + 26, gl.Width, 40), Face::MonoBold, s.pattern ? 25.0f : 27.0f, s.pattern ? kRed : kGreen, Gdiplus::StringAlignmentCenter, Gdiplus::StringAlignmentCenter);
-    text(g, fmt(L"chance on a clean file %.4f", s.foldP), RectF(gl.X + 14, gl.Y + 72, gl.Width - 28, 20), Face::Mono, 15.0f, kText);
-    text(g, fmt2(L"period %.4g ms   %.0f null folds", v.res.periodMs, static_cast<double>(s.nullFolds)), RectF(gl.X + 14, gl.Y + 94, gl.Width - 28, 20), Face::Mono, 15.0f, kDim);
+    text(g, s.pattern ? L"REPEATING CLICKS" : L"NONE SHOWN", RectF(gl.X, gl.Y + 30, gl.Width, 44), Face::MonoBold, s.pattern ? 25.0f : 27.0f, s.pattern ? kRed : kGreen, Gdiplus::StringAlignmentCenter, Gdiplus::StringAlignmentCenter);
+    text(g, fmt(L"chance on clean file: %.4f", s.foldP), RectF(gl.X + 14, gl.Y + 90, gl.Width - 28, 20), Face::Mono, 14.0f, kText);
+    text(g, fmt(L"period tested: %.4g ms", v.res.periodMs), RectF(gl.X + 14, gl.Y + 112, gl.Width - 28, 20), Face::Mono, 14.0f, kDim);
+    text(g, fmt(L"compared with %.0f other periods", static_cast<double>(s.nullFolds)), RectF(gl.X + 14, gl.Y + 134, gl.Width - 28, 20), Face::Mono, 14.0f, kDim);
 }
 
 void drawLimits(Graphics& g, RectF gl, const View& v) {
-    text(g, L"SMALLEST CLICK THIS FILE CAN SHOW", RectF(gl.X + 14, gl.Y + 8, gl.Width - 28, 20), Face::Legend, 14.0f, kDim);
+    text(g, L"SMALLEST CLICK IT CAN SHOW", RectF(gl.X + 14, gl.Y + 8, gl.Width - 28, 20), Face::Legend, 14.0f, kDim);
     if (!v.haveRes || !v.res.ok || v.res.seam.nullFolds == 0) { text(g, L"--", gl, Face::MonoBold, 30.0f, kDim, Gdiplus::StringAlignmentCenter, Gdiplus::StringAlignmentCenter); return; }
     const auto& s = v.res.seam;
-    text(g, L"all one direction", RectF(gl.X + 14, gl.Y + 34, 160, 20), Face::Mono, 15.0f, kDim);
-    text(g, fmt(L"%.1f dBFS", s.detectLimitDb), RectF(gl.X + 120, gl.Y + 30, gl.Width - 134, 28), Face::MonoBold, 22.0f, kAmber, Gdiplus::StringAlignmentFar);
-    text(g, L"either direction", RectF(gl.X + 14, gl.Y + 66, 160, 20), Face::Mono, 15.0f, kDim);
-    text(g, fmt(L"%.1f dBFS", s.detectLimitAnySignDb), RectF(gl.X + 120, gl.Y + 62, gl.Width - 134, 28), Face::MonoBold, 22.0f, kAmber, Gdiplus::StringAlignmentFar);
-    if (s.pattern) text(g, fmt(L"click found: %.1f dBFS peak", s.foldLevelDb), RectF(gl.X + 14, gl.Y + 100, gl.Width - 28, 22), Face::MonoBold, 16.0f, kRed);
-    else text(g, L"worked out from this file's own noise", RectF(gl.X + 14, gl.Y + 102, gl.Width - 28, 20), Face::Mono, 13.0f, kDim);
+    text(g, L"all one direction", RectF(gl.X + 14, gl.Y + 38, 150, 22), Face::Mono, 14.0f, kDim, Gdiplus::StringAlignmentNear, Gdiplus::StringAlignmentCenter);
+    text(g, fmt(L"%.1f dBFS", s.detectLimitDb), RectF(gl.X + 150, gl.Y + 34, gl.Width - 164, 30), Face::MonoBold, 20.0f, kAmber, Gdiplus::StringAlignmentFar, Gdiplus::StringAlignmentCenter);
+    text(g, L"either direction", RectF(gl.X + 14, gl.Y + 74, 150, 22), Face::Mono, 14.0f, kDim, Gdiplus::StringAlignmentNear, Gdiplus::StringAlignmentCenter);
+    text(g, fmt(L"%.1f dBFS", s.detectLimitAnySignDb), RectF(gl.X + 150, gl.Y + 70, gl.Width - 164, 30), Face::MonoBold, 20.0f, kAmber, Gdiplus::StringAlignmentFar, Gdiplus::StringAlignmentCenter);
+    if (s.pattern) text(g, fmt(L"click found: %.1f dBFS peak", s.foldLevelDb), RectF(gl.X + 14, gl.Y + 112, gl.Width - 28, 22), Face::MonoBold, 15.0f, kRed);
+    text(g, L"worked out from this file's own noise", RectF(gl.X + 14, gl.Y + 136, gl.Width - 28, 20), Face::Mono, 12.5f, kDim);
 }
 
 void drawComb(Graphics& g, RectF gl, const View& v) {
     text(g, L"25 Hz COMB LINES, 3 TO 20 kHz", RectF(gl.X + 14, gl.Y + 8, gl.Width - 28, 20), Face::Legend, 14.0f, kDim);
-    const RectF plot(gl.X + 14, gl.Y + 34, gl.Width - 28, gl.Height - 84);
+    const RectF plot(gl.X + 14, gl.Y + 34, gl.Width - 28, gl.Height - 96);
     Gdiplus::Pen grid(rgba(40, 60, 72), 1.0f);
     g.DrawRectangle(&grid, plot.X, plot.Y, plot.Width, plot.Height);
     if (!v.haveRes || !v.res.ok || !v.res.comb.valid || v.res.comb.lineDb.size() < 8) {
-        text(g, v.haveRes && v.res.ok ? L"CLIP TOO SHORT, OR RATE NOT A MULTIPLE OF 25 Hz" : L"--", plot, Face::Mono, 14.0f, kDim, Gdiplus::StringAlignmentCenter, Gdiplus::StringAlignmentCenter);
+        text(g, v.haveRes && v.res.ok ? L"CLIP TOO SHORT, OR RATE NOT A MULTIPLE OF 25 Hz" : L"--", plot, Face::Mono, 13.0f, kDim, Gdiplus::StringAlignmentCenter, Gdiplus::StringAlignmentCenter);
         return;
     }
     const auto& d = v.res.comb.lineDb;
@@ -187,8 +188,9 @@ void drawComb(Graphics& g, RectF gl, const View& v) {
     }
     Gdiplus::Pen line(kGreen, 1.2f);
     g.DrawLines(&line, pts.data(), static_cast<INT>(pts.size()));
-    text(g, fmt2(L"%.1f %% of lines beat their neighbours   median %.1f dBFS", v.res.comb.onGreaterThanOffPct, v.res.comb.medianLineDb), RectF(gl.X + 14, gl.GetBottom() - 40, gl.Width - 28, 22), Face::Mono, 13.5f, kText);
-    text(g, L"about 45-50 % = no comb. clearly higher = comb.", RectF(gl.X + 14, gl.GetBottom() - 22, gl.Width - 28, 18), Face::Mono, 12.0f, kDim);
+    text(g, fmt(L"%.1f %% of lines beat their neighbours", v.res.comb.onGreaterThanOffPct), RectF(gl.X + 14, plot.GetBottom() + 6, gl.Width - 28, 20), Face::Mono, 13.5f, kText);
+    text(g, fmt(L"median line %.1f dBFS", v.res.comb.medianLineDb), RectF(gl.X + 14, plot.GetBottom() + 26, gl.Width - 28, 18), Face::Mono, 13.5f, kDim);
+    text(g, L"about 45-50 % = no comb, clearly higher = comb", RectF(gl.X + 14, plot.GetBottom() + 44, gl.Width - 28, 16), Face::Mono, 11.5f, kDim);
 }
 
 void drawStatus(Graphics& g, RectF gl, const View& v) {
@@ -217,7 +219,7 @@ void render(Graphics& g, const View& v, Gdiplus::Bitmap& plate) {
 
     drawKnob(g, v.knob, fmt(L"%.0f ms", v.knob.value));
     drawButton(g, v.bOpen); drawButton(g, v.bScan); drawButton(g, v.bSave);
-    engraved(g, L"HYBRID ELITE MAFIA  ·  THE HYBRID CORE", 836.0f, 878.0f, 15.0f, Gdiplus::StringAlignmentCenter);
+    engraved(g, L"HYBRID ELITE MAFIA  ·  THE HYBRID CORE", 836.0f, 898.0f, 15.0f, Gdiplus::StringAlignmentCenter);
 }
 
 // ---------------------------------------------------------------- loading and scanning

@@ -109,13 +109,17 @@ jobs:
           G config user.name "hem-build"
           G config user.email "hem-build@users.noreply.github.com"
           $sha = (git rev-parse --short HEAD)
-          Copy-Item -Recurse out\ui "$env:RUNNER_TEMP\ui"
+          # work in a separate folder so the build folder is left exactly as it was
+          $pub = Join-Path $env:RUNNER_TEMP "pub"
+          G worktree add --detach $pub
+          Push-Location $pub
           G checkout --orphan hiss-ui-shots
           G rm -rf . --quiet
-          Copy-Item "$env:RUNNER_TEMP\ui\*" . -Recurse
+          Copy-Item "$env:GITHUB_WORKSPACE\out\ui\*" . -Recurse
           G add -A
           G commit -m "Windows build pictures and program from $sha" --quiet
           G push -f origin hiss-ui-shots
+          Pop-Location
 
       - name: Demo files through AUTO FIX
         shell: pwsh

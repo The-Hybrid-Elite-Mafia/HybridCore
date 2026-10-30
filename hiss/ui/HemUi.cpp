@@ -129,15 +129,15 @@ void drawPlateDressing(Graphics& g, int w, int h) {
     }
 }
 
-RectF drawWindowFrame(Graphics& g, RectF o, bool withScrews) {
+RectF drawWindowFrame(Graphics& g, RectF o, bool withScrews, float bezel) {
     // drop shadow of the frame onto the plate
     for (int i = 6; i >= 1; --i) { SolidBrush s(rgba(0, 0, 0, 16)); fillRounded(g, s, RectF(o.X - i + 2.0f, o.Y - i + 4.0f, o.Width + 2.0f * i, o.Height + 2.0f * i), 14.0f + i); }
     LinearGradientBrush bevel(o, rgba(150, 156, 164), rgba(15, 17, 19), LinearGradientModeForwardDiagonal);
     fillRounded(g, bevel, o, 12.0f);
-    RectF a = inset(o, 7.0f);
+    RectF a = inset(o, bezel * 0.47f);
     SolidBrush well(rgba(9, 11, 13));
     fillRounded(g, well, a, 8.0f);
-    RectF glass = inset(o, 15.0f);
+    RectF glass = inset(o, bezel);
     LinearGradientBrush gl(glass, rgba(13, 20, 25), rgba(4, 6, 8), LinearGradientModeVertical);
     fillRounded(g, gl, glass, 4.0f);
     if (withScrews) {
@@ -154,8 +154,8 @@ void drawGlassSheen(Graphics& g, RectF glass) {
     // inner edge shadow
     for (int i = 0; i < 9; ++i) { Pen p(rgba(0, 0, 0, 120 - i * 12), 2.0f); g.DrawRectangle(&p, glass.X + i, glass.Y + i, glass.Width - 2.0f * i, glass.Height - 2.0f * i); }
     // reflection: a soft diagonal wedge across the upper left
-    PointF wedge[4] = {PointF(glass.X, glass.Y), PointF(glass.X + glass.Width * 0.55f, glass.Y), PointF(glass.X + glass.Width * 0.25f, glass.GetBottom()), PointF(glass.X, glass.GetBottom())};
-    LinearGradientBrush shine(PointF(glass.X, glass.Y), PointF(glass.X + glass.Width * 0.5f, glass.Y + glass.Height * 0.6f), rgba(255, 255, 255, 22), rgba(255, 255, 255, 0));
+    PointF wedge[4] = {PointF(glass.X, glass.Y), PointF(glass.X + glass.Width * 0.5f, glass.Y), PointF(glass.X + glass.Width * 0.3f, glass.GetBottom()), PointF(glass.X, glass.GetBottom())};
+    LinearGradientBrush shine(PointF(glass.X, glass.Y), PointF(glass.X + glass.Width * 0.5f, glass.Y), rgba(255, 255, 255, 20), rgba(255, 255, 255, 0));
     g.FillPolygon(&shine, wedge, 4);
     g.Restore(st);
 }
@@ -248,8 +248,8 @@ void drawKnob(Graphics& g, const Knob& k, const std::wstring& readout) {
 
     // legend and the numeric readout window under it
     engraved(g, k.legend, cx, cy + r * 1.72f + 22.0f, 20.0f, StringAlignmentCenter);
-    RectF lcd(cx - 66.0f, cy + r * 1.72f + 54.0f, 132.0f, 38.0f);
-    RectF in = drawWindowFrame(g, lcd, false);
+    RectF lcd(cx - 72.0f, cy + r * 1.72f + 52.0f, 144.0f, 50.0f);
+    RectF in = drawWindowFrame(g, lcd, false, 8.0f);
     text(g, readout, in, Face::MonoBold, 24.0f, rgba(255, 176, 64), StringAlignmentCenter, StringAlignmentCenter);
     drawGlassSheen(g, in);
 }

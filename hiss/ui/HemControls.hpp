@@ -47,14 +47,14 @@ namespace layout {
 inline constexpr int kW = 1673, kH = 940;
 struct R { float x, y, w, h; };
 inline constexpr R kBig    {180, 80, 1360, 340};
-inline constexpr R kSmall0 {180, 480, 270, 140};
-inline constexpr R kSmall1 {490, 480, 270, 140};
-inline constexpr R kSmall2 {800, 480, 300, 140};
-inline constexpr R kStatus {750, 760, 790, 76};
-inline constexpr float kKnobX = 1335, kKnobY = 548, kKnobR = 70;
-inline constexpr R kBtn0 {180, 760, 150, 76};
-inline constexpr R kBtn1 {360, 760, 150, 76};
-inline constexpr R kBtn2 {540, 760, 190, 76};
+inline constexpr R kSmall0 {180, 470, 310, 190};
+inline constexpr R kSmall1 {510, 470, 330, 190};
+inline constexpr R kSmall2 {860, 470, 310, 190};
+inline constexpr R kStatus {750, 800, 790, 76};
+inline constexpr float kKnobX = 1360, kKnobY = 560, kKnobR = 70;
+inline constexpr R kBtn0 {180, 800, 150, 76};
+inline constexpr R kBtn1 {360, 800, 150, 76};
+inline constexpr R kBtn2 {540, 800, 190, 76};
 } // namespace layout
 
 } // namespace hem::ui
