@@ -17,7 +17,10 @@ add_library(hc_hiss STATIC
     src/HissAuto.cpp
     src/HissCombEngine.cpp
     src/HissCombAuto.cpp
-    src/HissMeters.cpp)
+    src/HissMeters.cpp
+    src/HissLab.cpp
+    src/HissReport.cpp
+    src/HissTools.cpp)
 add_library(hc::hiss ALIAS hc_hiss)
 target_include_directories(hc_hiss PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_link_libraries(hc_hiss PUBLIC hc::build_flags)
@@ -35,4 +38,21 @@ if(HC_BUILD_HISS_TOOLS)
   target_include_directories(hc_hiss_tests PRIVATE tests)
   target_link_libraries(hc_hiss_tests PRIVATE hc::hiss)
   add_test(NAME hiss_tests COMMAND hc_hiss_tests)
+
+  # The five HEM hiss tools (command line), and the tests for the lab engines and the four measuring tools.
+  add_executable(hc_hiss_tools tools/hiss_tools_cli.cpp)
+  target_include_directories(hc_hiss_tools PRIVATE tools)
+  target_link_libraries(hc_hiss_tools PRIVATE hc::hiss)
+  target_compile_definitions(hc_hiss_tools PRIVATE _CRT_SECURE_NO_WARNINGS)
+
+  add_executable(hc_hiss_lab_tests tests/lab_tests.cpp)
+  target_include_directories(hc_hiss_lab_tests PRIVATE tests)
+  target_link_libraries(hc_hiss_lab_tests PRIVATE hc::hiss)
+  add_test(NAME hiss_lab_tests COMMAND hc_hiss_lab_tests)
+
+  add_executable(hc_hiss_tools_tests tests/tools_tests.cpp)
+  target_include_directories(hc_hiss_tools_tests PRIVATE tests tools)
+  target_link_libraries(hc_hiss_tools_tests PRIVATE hc::hiss)
+  target_compile_definitions(hc_hiss_tools_tests PRIVATE _CRT_SECURE_NO_WARNINGS)
+  add_test(NAME hiss_tools_tests COMMAND hc_hiss_tools_tests)
 endif()

@@ -58,11 +58,43 @@ jobs:
           & .\build\hiss\Release\hc_hiss_tests.exe 2>&1 | Tee-Object -FilePath out\test_log.txt
           if ($LASTEXITCODE -ne 0) { throw "tests failed ($LASTEXITCODE)" }
 
+      - name: Lab engine tests and measuring-tool tests
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force out | Out-Null
+          & .\build\hiss\Release\hc_hiss_lab_tests.exe 2>&1 | Tee-Object -FilePath out\lab_test_log.txt
+          if ($LASTEXITCODE -ne 0) { throw "lab tests failed ($LASTEXITCODE)" }
+          & .\build\hiss\Release\hc_hiss_tools_tests.exe 2>&1 | Tee-Object -FilePath out\tools_test_log.txt
+          if ($LASTEXITCODE -ne 0) { throw "tools tests failed ($LASTEXITCODE)" }
+
       - name: Demo files through AUTO FIX
         shell: pwsh
         run: |
           & .\build\hiss\Release\hc_hiss_cli.exe demo out\demo 2>&1 | Tee-Object -FilePath out\demo_log.txt
           if ($LASTEXITCODE -ne 0) { throw "demo failed ($LASTEXITCODE)" }
+
+      - name: Five tools, command line, on the demo files (smoke run, reports saved)
+        shell: pwsh
+        run: |
+          $tools = ".\build\hiss\Release\hc_hiss_tools.exe"
+          New-Item -ItemType Directory -Force out\tools | Out-Null
+          $wav = Get-ChildItem out\demo -Filter *_before.wav | Select-Object -First 1
+          if (-not $wav) { throw "no demo file" }
+          foreach ($t in "scanner","combclick","airlab") {
+            & $tools $t $wav.FullName "out\tools\$t.md" | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw "$t failed ($LASTEXITCODE)" }
+          }
+          & $tools proof inject comb $wav.FullName out\tools\injected.wav -80 3000 20000 5
+          if ($LASTEXITCODE -ne 0) { throw "proof inject failed" }
+          & $tools proof hash $wav.FullName out\tools\injected.wav | Tee-Object -FilePath out\tools\hashes.txt
+          & $tools proof pack out\tools\pack salt1 $wav.FullName out\tools\injected.wav
+          if ($LASTEXITCODE -ne 0) { throw "proof pack failed" }
+          # The Tamer must REFUSE with no proof file, and must not write anything.
+          "" | Set-Content out\tools\empty_proof.txt
+          & $tools tamer $wav.FullName out\tools\tamer_refused out\tools\empty_proof.txt
+          if ($LASTEXITCODE -ne 3) { throw "the Tamer did not refuse without proof (exit $LASTEXITCODE)" }
+          if (Test-Path out\tools\tamer_refused) { throw "the Tamer wrote files while refusing" }
+          Get-ChildItem out\tools | ForEach-Object { Write-Host $_.Name }
 
       - name: Python check (separately written measurements)
         shell: pwsh
@@ -103,6 +135,13 @@ jobs:
             $t = Get-Content out\test_log.txt
             Notice "hiss: tests" (@($t | Select-String -Pattern 'FAIL|checks,|latency') | ForEach-Object { $_.Line })
             Notice "hiss: measured" (@($t | Select-String -Pattern 'MEASURED') | ForEach-Object { $_.Line.Trim() })
+          }
+          foreach ($lf in "lab_test_log","tools_test_log") {
+            if (Test-Path "out\$lf.txt") {
+              $t = Get-Content "out\$lf.txt"
+              Notice "hiss: $lf" (@($t | Select-String -Pattern 'FAIL|checks,') | ForEach-Object { $_.Line })
+              Notice "hiss: $lf measured" (@($t | Select-String -Pattern 'MEASURED') | ForEach-Object { $_.Line.Trim() })
+            }
           }
           if (Test-Path out\python_compare.txt) { Notice "hiss: python check" (Get-Content out\python_compare.txt) }
           if (Test-Path out\demo\stems_report.txt) { }
