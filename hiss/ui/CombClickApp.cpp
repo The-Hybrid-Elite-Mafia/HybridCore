@@ -177,8 +177,10 @@ void drawComb(Graphics& g, RectF gl, const View& v) {
     // show the middle 98 % of the levels so one odd line does not flatten the picture
     std::vector<double> sorted(d);
     std::sort(sorted.begin(), sorted.end());
-    const double lo = sorted[sorted.size() / 100], hi = sorted[sorted.size() - 1 - sorted.size() / 100];
-    const double span = std::max(hi - lo, 1.0);
+    // Each line is drawn as how far it stands above its two neighbours. A line no stronger than its neighbours has no level (floor).
+    // The picture shows the top 40 dB of what is there; lines at the floor sit on the bottom edge.
+    const double hi = sorted.back(), lo = hi - 40.0;
+    const double span = 40.0;
     const std::size_t cols = static_cast<std::size_t>(plot.Width);
     std::vector<PointF> pts;
     for (std::size_t c = 0; c < cols; ++c) {
@@ -188,16 +190,16 @@ void drawComb(Graphics& g, RectF gl, const View& v) {
     }
     Gdiplus::Pen line(kGreen, 1.2f);
     g.DrawLines(&line, pts.data(), static_cast<INT>(pts.size()));
-    text(g, fmt(L"%.1f %% of lines beat their neighbours", v.res.comb.onGreaterThanOffPct), RectF(gl.X + 14, plot.GetBottom() + 6, gl.Width - 28, 20), Face::Mono, 13.5f, kText);
-    text(g, fmt(L"median line %.1f dBFS", v.res.comb.medianLineDb), RectF(gl.X + 14, plot.GetBottom() + 26, gl.Width - 28, 18), Face::Mono, 13.5f, kDim);
-    text(g, L"about 45-50 % = no comb, clearly higher = comb", RectF(gl.X + 14, plot.GetBottom() + 44, gl.Width - 28, 16), Face::Mono, 11.5f, kDim);
+    text(g, fmt(L"%.1f %% of lines beat neighbours", v.res.comb.onGreaterThanOffPct), RectF(gl.X + 14, plot.GetBottom() + 6, gl.Width - 28, 20), Face::Mono, 13.5f, kText);
+    text(g, v.res.comb.medianLineDb <= -299.0 ? std::wstring(L"median line: not above neighbours") : fmt(L"median line %.1f dBFS", v.res.comb.medianLineDb), RectF(gl.X + 14, plot.GetBottom() + 26, gl.Width - 28, 18), Face::Mono, 13.5f, kDim);
+    text(g, L"45-50 % = no comb. clearly higher = comb", RectF(gl.X + 14, plot.GetBottom() + 44, gl.Width - 28, 16), Face::Mono, 11.5f, kDim);
 }
 
 void drawStatus(Graphics& g, RectF gl, const View& v) {
     std::wstring name = widen(v.name) + (v.madeUp ? L"   (MADE-UP CLIP, NOT A REAL SONG)" : L"");
-    text(g, name, RectF(gl.X + 14, gl.Y + 6, gl.Width - 28, 24), Face::MonoBold, 17.0f, v.madeUp ? kAmber : kText);
-    text(g, widen(v.fileInfo), RectF(gl.X + 14, gl.Y + 28, gl.Width - 28, 20), Face::Mono, 14.0f, kDim);
-    text(g, widen(v.message), RectF(gl.X + 14, gl.Y + 46, gl.Width - 28, 20), Face::Mono, 14.5f, v.phase == Phase::Failed ? kRed : kGreen);
+    text(g, name, RectF(gl.X + 14, gl.Y + 8, gl.Width - 28, 24), Face::MonoBold, 17.0f, v.madeUp ? kAmber : kText);
+    text(g, widen(v.fileInfo), RectF(gl.X + 14, gl.Y + 34, gl.Width - 28, 20), Face::Mono, 14.0f, kDim);
+    text(g, widen(v.message), RectF(gl.X + 14, gl.Y + 58, gl.Width - 28, 20), Face::Mono, 14.5f, v.phase == Phase::Failed ? kRed : kGreen);
 }
 
 void render(Graphics& g, const View& v, Gdiplus::Bitmap& plate) {
@@ -219,7 +221,7 @@ void render(Graphics& g, const View& v, Gdiplus::Bitmap& plate) {
 
     drawKnob(g, v.knob, fmt(L"%.0f ms", v.knob.value));
     drawButton(g, v.bOpen); drawButton(g, v.bScan); drawButton(g, v.bSave);
-    engraved(g, L"HYBRID ELITE MAFIA  ·  THE HYBRID CORE", 836.0f, 898.0f, 15.0f, Gdiplus::StringAlignmentCenter);
+    engraved(g, L"HYBRID ELITE MAFIA  ·  THE HYBRID CORE", 836.0f, 906.0f, 15.0f, Gdiplus::StringAlignmentCenter);
 }
 
 // ---------------------------------------------------------------- loading and scanning
@@ -407,6 +409,90 @@ int snapshot(const std::wstring& out, bool idle, double madeUpClickMs, double pe
     return savePng(bmp, out) ? 0 : 3;
 }
 
+// ---------------------------------------------------------------- self-test of the REAL window (no person needed)
+// Opens the real window (hidden), sends it real mouse messages (drag the knob, double-click, press buttons) and checks what the
+// engine did. Writes a plain log and a picture of the window after the interactions.
+int guiSelfTest(HINSTANCE inst, const std::wstring& logPath, const std::wstring& picPath) {
+    std::string log;
+    int failed = 0, total = 0;
+    auto check = [&](bool ok, const std::string& what) { ++total; if (!ok) ++failed; log += (ok ? "  PASS  " : "  FAIL  ") + what + "\n"; };
+    g_view = std::make_unique<View>();
+    g_plate = makePlate(LY::kW, LY::kH, 11);
+    WNDCLASSEXW wc{};
+    wc.cbSize = sizeof wc; wc.style = CS_DBLCLKS; wc.lpfnWndProc = wndProc; wc.hInstance = inst; wc.hCursor = LoadCursorW(nullptr, IDC_ARROW); wc.lpszClassName = L"HemCombClickTest";
+    RegisterClassExW(&wc);
+    g_hwnd = CreateWindowExW(0, wc.lpszClassName, L"test", WS_OVERLAPPEDWINDOW, 0, 0, 1280, 720, nullptr, nullptr, inst, nullptr);
+    View& v = *g_view;
+    g_scale = 1.0f; g_offX = 0.0f; g_offY = 0.0f;       // plate pixels = window pixels for the test
+    auto lp = [](float x, float y) { return MAKELPARAM(static_cast<int>(x), static_cast<int>(y)); };
+    auto mouse = [&](UINT msg, float x, float y, WPARAM w = 0) { SendMessageW(g_hwnd, msg, w, lp(x, y)); };
+    auto pump = [&](double seconds, auto done) { const auto t0 = GetTickCount64(); MSG m; while (!done() && GetTickCount64() - t0 < static_cast<ULONGLONG>(seconds * 1000.0)) { while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); } Sleep(10); } };
+    auto press = [&](const Button& b) { const float x = b.x + b.w * 0.5f, y = b.y + b.h * 0.5f; mouse(WM_LBUTTONDOWN, x, y, MK_LBUTTON); mouse(WM_LBUTTONUP, x, y); };
+    char b[200];
+
+    // 1 the knob: drag up, drag far down, double-click
+    const float kx = v.knob.cx, ky = v.knob.cy;
+    mouse(WM_LBUTTONDOWN, kx, ky, MK_LBUTTON); mouse(WM_MOUSEMOVE, kx, ky - 55.0f, MK_LBUTTON); mouse(WM_LBUTTONUP, kx, ky - 55.0f);
+    std::snprintf(b, sizeof b, "dragging the knob up 55 px moves it from 40 ms to %.0f ms (expected 63)", v.knob.value);
+    check(std::fabs(v.knob.value - 63.0) <= 1.0, b);
+    mouse(WM_LBUTTONDOWN, kx, ky, MK_LBUTTON); mouse(WM_MOUSEMOVE, kx, ky + 3000.0f, MK_LBUTTON); mouse(WM_LBUTTONUP, kx, ky + 3000.0f);
+    check(v.knob.value == 10.0, "dragging far down stops at 10 ms");
+    mouse(WM_LBUTTONDBLCLK, kx, ky);
+    mouse(WM_LBUTTONUP, kx, ky);
+    check(v.knob.value == 40.0, "double-click puts the knob back to 40 ms");
+    mouse(WM_LBUTTONDOWN, kx, ky, MK_LBUTTON); mouse(WM_MOUSEMOVE, kx, ky - 36.6667f, MK_LBUTTON); mouse(WM_LBUTTONUP, kx, ky - 36.6667f);
+    check(v.knob.value == 55.0, "knob set to 55 ms by the mouse");
+
+    // 2 buttons are dead until there is a file
+    check(!v.bScan.enabled && !v.bSave.enabled && v.bOpen.enabled, "before a file is loaded only OPEN works");
+    press(v.bScan);
+    check(v.phase == Phase::Idle, "pressing SCAN with no file does nothing");
+
+    // 3 load a made-up file, press SCAN
+    const auto tmp = std::filesystem::temp_directory_path() / "hem_combclick_selftest.wav";
+    {
+        wav::File f; f.sampleRate = 48000; f.channels = 2; f.bits = 24;
+        f.left = combclick::madeUpClip(48000.0, 12.0, 55.0, -30.0, -40.0, 7); f.right = f.left;
+        std::string err; wav::write(tmp.string(), f, err);
+    }
+    check(loadWav(v, tmp.wstring()) && v.bScan.enabled && v.phase == Phase::Idle, "a WAV file loads and SCAN switches on");
+    press(v.bScan);
+    check(v.phase == Phase::Scanning && !v.bOpen.enabled, "pressing SCAN starts the scan and locks OPEN while it runs");
+    pump(120.0, [&]() { return v.phase != Phase::Scanning; });
+    check(v.phase == Phase::Done && v.haveRes && v.res.ok, "the scan finishes");
+    check(v.res.periodMs == 55.0 && v.res.seam.pattern, "scan at the knob period 55 ms: the 55 ms click train is called a pattern");
+    std::snprintf(b, sizeof b, "the click is read at %.2f ms inside the frame (put at 20.35)", v.res.seam.foldPhaseMs);
+    check(std::fabs(v.res.seam.foldPhaseMs - 20.35) < 1.0, b);
+    check(v.bSave.enabled, "SAVE REPORT switches on after a scan");
+    if (!picPath.empty()) {
+        Gdiplus::Bitmap bmp(LY::kW, LY::kH, PixelFormat32bppARGB);
+        { Graphics g(&bmp); render(g, v, *g_plate); }
+        check(savePng(bmp, picPath), "a picture of the window after the real mouse steps was saved");
+    }
+    // 4 SAVE REPORT writes the report for the same period
+    press(v.bSave);
+    auto rp = tmp; rp.replace_extension(L""); rp += L"_combclick.md";
+    std::ifstream rf(rp, std::ios::binary); std::string rep((std::istreambuf_iterator<char>(rf)), std::istreambuf_iterator<char>());
+    check(rep.find("55 ms fold test") != std::string::npos, "SAVE REPORT wrote a report that names the 55 ms period");
+    // 5 turn the knob to 40 ms, the picture goes stale, SCAN again: no pattern
+    mouse(WM_LBUTTONDOWN, kx, ky, MK_LBUTTON); mouse(WM_MOUSEMOVE, kx, ky + 36.6667f, MK_LBUTTON); mouse(WM_LBUTTONUP, kx, ky + 36.6667f);
+    check(v.knob.value == 40.0 && v.res.periodMs == 55.0, "knob back to 40 ms; the screen still holds the 55 ms scan (it says so)");
+    press(v.bScan);
+    pump(120.0, [&]() { return v.phase != Phase::Scanning; });
+    check(v.phase == Phase::Done && v.res.periodMs == 40.0 && !v.res.seam.pattern, "scan again at 40 ms: the same file shows no 40 ms pattern");
+    // 6 the mouse wheel
+    mouse(WM_LBUTTONUP, 0, 0);
+    SendMessageW(g_hwnd, WM_MOUSEWHEEL, MAKEWPARAM(0, WHEEL_DELTA * 2), 0);   // position (0,0) is not on the knob: must do nothing
+    check(v.knob.value == 40.0, "the wheel away from the knob does nothing");
+    std::error_code ec; std::filesystem::remove(tmp, ec); std::filesystem::remove(rp, ec);
+    std::snprintf(b, sizeof b, "%d checks, %d failed\n", total, failed);
+    log += b;
+    std::ofstream(logPath, std::ios::binary) << log;
+    DestroyWindow(g_hwnd);
+    g_plate.reset();
+    return failed ? 1 : 0;
+}
+
 } // namespace
 
 int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int show) {
@@ -414,6 +500,10 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int show) {
     int argc = 0;
     LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
     for (int i = 1; argv && i < argc; ++i) {
+        if (std::wstring(argv[i]) == L"--gui-selftest" && i + 1 < argc) {
+            const int rc = guiSelfTest(inst, argv[i + 1], i + 2 < argc ? argv[i + 2] : L"");
+            LocalFree(argv); shutdown(); return rc;
+        }
         if (std::wstring(argv[i]) == L"--snapshot" && i + 1 < argc) {
             bool idle = false; double clickMs = 0.0, period = 40.0;
             for (int j = i + 2; j < argc; ++j) {

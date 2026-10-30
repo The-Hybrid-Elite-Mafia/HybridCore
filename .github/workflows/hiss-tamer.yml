@@ -95,6 +95,13 @@ jobs:
           Shot "combclick_idle"          "--snapshot `"$o\combclick_idle.png`" --idle"
           Shot "combclick_55ms_found"    "--snapshot `"$o\combclick_55ms_found.png`" --made-up 55 --period 55"
           Shot "combclick_40ms_notfound" "--snapshot `"$o\combclick_40ms_notfound.png`" --made-up 55 --period 40"
+          # The real window, driven by real mouse messages (knob drag, double-click, buttons, scan), then a picture of it
+          $p = Start-Process -FilePath $exe -ArgumentList "--gui-selftest `"$o\gui_selftest_log.txt`" `"$o\combclick_after_mouse_steps.png`"" -Wait -PassThru
+          if (Test-Path "$o\gui_selftest_log.txt") { Get-Content "$o\gui_selftest_log.txt" | Tee-Object -FilePath out\gui_test_log.txt }
+          if ($p.ExitCode -ne 0) {
+            $why = ""; if (Test-Path "$o\gui_selftest_log.txt") { $why = ((Get-Content "$o\gui_selftest_log.txt" | Select-String -Pattern 'FAIL|checks') | ForEach-Object { $_.Line }) -join ' | ' }
+            Write-Host "::error title=window self-test::exit $($p.ExitCode) $why"; exit 1
+          }
           Copy-Item $exe out\ui\hem_comb_click.exe
 
       - name: Publish pictures and program to the hiss-ui-shots branch
@@ -196,7 +203,7 @@ jobs:
             Notice "hiss: tests" (@($t | Select-String -Pattern 'FAIL|checks,|latency') | ForEach-Object { $_.Line })
             Notice "hiss: measured" (@($t | Select-String -Pattern 'MEASURED') | ForEach-Object { $_.Line.Trim() })
           }
-          foreach ($lf in "lab_test_log","tools_test_log","ui_test_log") {
+          foreach ($lf in "lab_test_log","tools_test_log","ui_test_log","gui_test_log") {
             if (Test-Path "out\$lf.txt") {
               $t = Get-Content "out\$lf.txt"
               Notice "hiss: $lf" (@($t | Select-String -Pattern 'FAIL|checks,') | ForEach-Object { $_.Line })
