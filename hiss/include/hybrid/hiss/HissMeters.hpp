@@ -9,6 +9,8 @@
 //
 //  Python twins (same maths, separately written): hiss/python/phase1c/h1c.py and check*.py
 // =============================================================================
+#include "hybrid/hiss/HissConfig.hpp"
+
 #include <cstddef>
 #include <vector>
 
@@ -23,10 +25,10 @@ struct Stft {
     [[nodiscard]] double binHz() const noexcept { return fs / static_cast<double>(nfft); }
     [[nodiscard]] double band(int frame, double loHz, double hiHz) const noexcept;   // sum of bins with lo <= f < hi
 };
-[[nodiscard]] Stft stftPower(const float* x, std::size_t n, double fs, int nfft = 2048, int hop = 512);
+[[nodiscard]] Stft stftPower(const float* x, std::size_t n, double fs, int nfft = cfg::kMeterFft, int hop = cfg::kMeterHop);
 
 // "Loud part": frames whose power sits above P70 of the non-silent frames, until they fall below P60 (hysteresis).
-[[nodiscard]] std::vector<char> loudMask(const std::vector<double>& framePower, double silenceDb = -80.0, double enterPct = 70.0, double leavePct = 60.0);
+[[nodiscard]] std::vector<char> loudMask(const std::vector<double>& framePower, double silenceDb = cfg::kSilenceDb, double enterPct = cfg::kLoudEnterPct, double leavePct = cfg::kLoudLeavePct);
 
 struct RatioResult {
     bool valid = false;        // false: fewer than 20 loud frames, nothing is reported
@@ -46,7 +48,7 @@ struct CutoffResult {
     double cutoffHz = 0;       // start of the fall (Wall), first 30 dB under the 5-10 kHz level (Gentle), Nyquist (None)
     double ref5to10Db = 0;
     double dropDbIn500Hz = 0;
-    [[nodiscard]] bool reaches19k() const noexcept { return valid && cutoffHz >= 19000.0; }   // SPLIT.json rule
+    [[nodiscard]] bool reaches19k() const noexcept { return valid && cutoffHz >= cfg::kBandMatchedTopHz; }   // SPLIT.json rule
 };
 [[nodiscard]] CutoffResult cutoffAudit(const float* x, std::size_t n, double fs);
 
@@ -62,7 +64,7 @@ struct CombResult {
     double onGreaterThanOffPct = 0;  // about 45 for no comb; clearly higher with a comb
     std::vector<double> lineDb;      // per line, 3.000 kHz upward in 25 Hz steps
 };
-[[nodiscard]] CombResult combLines(const float* x, std::size_t n, double fs, double loHz = 3000.0, double hiHz = 20000.0);
+[[nodiscard]] CombResult combLines(const float* x, std::size_t n, double fs, double loHz = cfg::kCombLoHz, double hiHz = cfg::kCombHiHz);
 
 // ---- Flutter (25 Hz loudness wobble of the 5-15 kHz band) -------------------------------------------
 // DETECT-ONLY. Pre-registered test (check 4b) FAILED the +/-20 % accuracy rule: readings run about 27 % low.
@@ -71,8 +73,8 @@ struct FlutterResult {
     bool valid = false;      // false: clip shorter than 19.5 s, or the band is empty (< -90 dBFS)
     double depth = 0;        // wobble amplitude / mean envelope (a true 0.30 AM reads about 0.22)
 };
-inline constexpr double kFlutterPresentThreshold = 0.161;   // highest no-injection reading seen on 20 human clips (POST-HOC)
-[[nodiscard]] FlutterResult flutterDepth(const float* x, std::size_t n, double fs, double modHz = 25.0);
+inline constexpr double kFlutterPresentThreshold = cfg::kFlutterPresentThreshold;   // see HissConfig.hpp
+[[nodiscard]] FlutterResult flutterDepth(const float* x, std::size_t n, double fs, double modHz = cfg::kCombFundamentalHz);
 
 // ---- Levels and loudness ---------------------------------------------------------------------------
 [[nodiscard]] double rmsDbfs(const float* x, std::size_t n);

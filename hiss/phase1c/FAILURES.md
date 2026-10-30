@@ -19,3 +19,5 @@ Format: what failed, how I know (TESTED), what I did, state now.
 | F13 | A first full run timed out in the foreground (2 minute limit); a loop used np.convolve with a huge window | var.py run | Moving averages use scipy uniform_filter1d. Long jobs run in the background and are polled | FIXED |
 | F14 | Advice pasted in on 2026-10-29 said to port to "C++23 using JUCE" | message | Not used. Your rule is pure C++, no JUCE | NOTED |
 | F16 | CI branding check failed on the plain computing word "API" inside a rule file | CI run on f747b2a | Reworded the line (no company involved). Green after | FIXED |
+| F17 | About 25 working-guess numbers (band edges, loud thresholds, wall rule, flutter limits) were typed straight into HissMeters.cpp, against the rule that guesses live in one config file | HEM Real Build fake-hunt, Step 6 | Moved to HissConfig.hpp (section METERS) marked ASSUMED. 20 tests still pass. Largest change in any real-file reading: 0 | FIXED |
+| F18 | Config numbers have no test that moves a dial and checks the reading changes the right amount | METERS-WIRING.md | Not fixed yet | OPEN |

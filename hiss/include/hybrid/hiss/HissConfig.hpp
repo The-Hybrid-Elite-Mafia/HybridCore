@@ -137,6 +137,41 @@ inline constexpr double kHighConfidenceDropShare = 0.8;  // ASSUMED: "High" need
 inline constexpr double kHighConfidenceBumpDb    = 5.0;  // ASSUMED: ... and the artifact to have been at least this loud
 inline constexpr double kLowConfidenceDropShare  = 0.5;  // ASSUMED: below half the target cut the rating is "Low"
 
+
+// =============================================================================
+//  METERS (HissMeters). Every number here is a working guess unless it says VERIFIED.
+//  Where a number came from is written beside it. Changing one changes what the meters report.
+// =============================================================================
+inline constexpr int    kMeterFft          = 2048;      // ASSUMED: frame size of the band meters (about 23 Hz per bin at 48 kHz)
+inline constexpr int    kMeterHop          = 512;       // ASSUMED: step between frames
+inline constexpr double kBandMidLoHz       = 5000.0;    // ASSUMED: "A" band, the bottom of the 16-20 over 5-10 kHz ratio
+inline constexpr double kBandMidHiHz       = 10000.0;   // ASSUMED
+inline constexpr double kBandAirLoHz       = 16000.0;   // ASSUMED: "B" band (air)
+inline constexpr double kBandAirHiHz       = 20000.0;   // ASSUMED
+inline constexpr double kBandWideLoHz      = 8000.0;    // ASSUMED: "C" band, the primary-outcome band 8-20 kHz (SPLIT.json)
+inline constexpr double kBandMatchedTopHz  = 19000.0;   // ASSUMED: top of the bandwidth-matched ratio, and the file-qualifies rule (SPLIT.json)
+inline constexpr double kLoudBandLoHz      = 5000.0;    // ASSUMED: band whose energy decides which frames are "loud"
+inline constexpr double kLoudBandHiHz      = 16000.0;   // ASSUMED
+inline constexpr double kLoudEnterPct      = 70.0;      // ASSUMED: a frame becomes loud at this percentile of the non-silent frames (SPLIT.json)
+inline constexpr double kLoudLeavePct      = 60.0;      // ASSUMED: and stays loud until it falls under this one
+inline constexpr double kSilenceDb         = -80.0;     // ASSUMED: frames under this are silent
+inline constexpr int    kMinLoudFrames     = 20;        // ASSUMED: fewer loud frames than this and the ratio is not reported
+inline constexpr int    kCutoffFft         = 8192;      // ASSUMED: frame size of the bandwidth audit
+inline constexpr double kCutoffSmoothHz    = 100.0;     // ASSUMED
+inline constexpr double kWallDropDb        = 20.0;      // ASSUMED: a fall of this much inside kWallSpanHz is a WALL (SPLIT.json)
+inline constexpr double kWallSpanHz        = 500.0;     // ASSUMED
+inline constexpr double kWallStartDropDb   = 6.0;       // ASSUMED: the cutoff of a wall is where the level first falls this far
+inline constexpr double kGentleDropDb      = 30.0;      // ASSUMED: a slope that reaches this far below the 5-10 kHz level is GENTLE
+inline constexpr double kCombFundamentalHz = 25.0;      // from Steven's finding: lines every 25 Hz (1920 samples at 48 kHz)
+inline constexpr double kCombLoHz          = 3000.0;    // ASSUMED: lowest line measured
+inline constexpr double kCombHiHz          = 20000.0;   // ASSUMED: highest line measured
+inline constexpr double kFlutterBandLoHz   = 5000.0;    // ASSUMED
+inline constexpr double kFlutterBandHiHz   = 15000.0;   // ASSUMED (never above 0.9 x Nyquist)
+inline constexpr double kFlutterEnvLowpassHz = 200.0;   // ASSUMED: speed limit of the loudness curve
+inline constexpr double kFlutterMinSeconds = 19.5;      // ASSUMED: shorter clips are refused (SPLIT-ADDENDUM-2-2026-10-29.json)
+inline constexpr double kFlutterMinBandDb  = -90.0;     // ASSUMED: a band quieter than this (dBFS rms) is "nothing to measure"
+inline constexpr double kFlutterPresentThreshold = 0.161; // POST-HOC: highest reading seen on 20 human clips with nothing added. Flutter under about 0.3 depth is NOT seen.
+
 // =============================================================================
 //  UNKNOWN — nobody has measured these. No numbers are invented for them.
 // =============================================================================
@@ -149,6 +184,7 @@ inline constexpr double kLowConfidenceDropShare  = 0.5;  // ASSUMED: below half 
 //  UNKNOWN: CPU use on the rig's i7-14700HX. CI numbers come from a GitHub Windows runner, a different machine.
 //  UNKNOWN: files where the artifact is outside 8 to 16 kHz, or two artifacts at once. AUTO only searches 8 to 16 kHz and fixes one.
 //  UNKNOWN: real Suno files at all. Every test file here is made by our own generator, so the tests prove the engine does what it says on those files, not that it matches real ones.
+//  UNKNOWN: whether the meter band edges and thresholds above are the right ones; they are the plan in SPLIT.json, not a finding.
 //  UNKNOWN: anything about 13-stem sessions that sit on top of each other (a cut on one stem may be masked by another).
 
 } // namespace hc::hiss::cfg

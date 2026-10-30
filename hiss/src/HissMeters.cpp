@@ -98,7 +98,7 @@ std::vector<char> loudMask(const std::vector<double>& e, double silenceDb, doubl
     std::vector<char> m(e.size(), 0), ns(e.size(), 0);
     std::vector<double> used;
     for (std::size_t i = 0; i < e.size(); ++i) if (dbOf(e[i]) > silenceDb) { ns[i] = 1; used.push_back(e[i]); }
-    if (used.size() < 20) return m;
+    if (used.size() < static_cast<std::size_t>(cfg::kMinLoudFrames)) return m;
     const double hi = percentile(used, enterPct), lo = percentile(used, leavePct);
     bool on = false;
     for (std::size_t i = 0; i < e.size(); ++i) {
@@ -114,12 +114,12 @@ RatioResult ratioMetrics(const float* x, std::size_t n, double fs, const std::ve
     const Stft s = stftPower(x, n, fs);
     if (s.frames < 1) return r;
     r.frames = s.frames;
-    const double top = std::min(20000.0, fs / 2.0), top19 = std::min(19000.0, fs / 2.0);
+    const double top = std::min(cfg::kBandAirHiHz, fs / 2.0), top19 = std::min(cfg::kBandMatchedTopHz, fs / 2.0);
     std::vector<double> A(static_cast<std::size_t>(s.frames)), B = A, C = A, B19 = A, E = A;
     for (int f = 0; f < s.frames; ++f) {
         const auto i = static_cast<std::size_t>(f);
-        A[i] = s.band(f, 5000, 10000); B[i] = s.band(f, 16000, top); C[i] = s.band(f, 8000, top);
-        B19[i] = s.band(f, 16000, top19); E[i] = s.band(f, 5000, 16000);
+        A[i] = s.band(f, cfg::kBandMidLoHz, cfg::kBandMidHiHz); B[i] = s.band(f, cfg::kBandAirLoHz, top); C[i] = s.band(f, cfg::kBandWideLoHz, top);
+        B19[i] = s.band(f, cfg::kBandAirLoHz, top19); E[i] = s.band(f, cfg::kLoudBandLoHz, cfg::kLoudBandHiHz);
     }
     const std::vector<char> m = mask ? *mask : loudMask(E);
     double a = 0, b = 0, c = 0, b19 = 0; int cnt = 0;
@@ -128,7 +128,7 @@ RatioResult ratioMetrics(const float* x, std::size_t n, double fs, const std::ve
         if (i < m.size() && m[i]) { a += A[i]; b += B[i]; c += C[i]; b19 += B19[i]; ++cnt; }
     }
     r.loud = cnt;
-    if (cnt < 20) return r;
+    if (cnt < cfg::kMinLoudFrames) return r;
     a /= cnt; b /= cnt; c /= cnt; b19 /= cnt;
     r.valid = true;
     r.a5to10Db = dbOf(a); r.b16to20Db = dbOf(b); r.c8to20Db = dbOf(c);
@@ -140,7 +140,7 @@ RatioResult ratioMetrics(const float* x, std::size_t n, double fs, const std::ve
 // ================================ bandwidth audit ================================
 CutoffResult cutoffAudit(const float* x, std::size_t n, double fs) {
     CutoffResult r;
-    constexpr int kN = 8192, kHop = 4096;
+    constexpr int kN = cfg::kCutoffFft, kHop = cfg::kCutoffFft / 2;
     if (n < static_cast<std::size_t>(kN)) return r;
     const int bins = kN / 2 + 1;
     const auto w = hann(kN);
@@ -158,7 +158,7 @@ CutoffResult cutoffAudit(const float* x, std::size_t n, double fs) {
     for (double& v : p) v = v / segs + 1e-24;
     const double df = fs / kN, nyq = fs / 2.0;
     // 100 Hz boxcar on power with mirrored edges (so the ends do not fake a fall); numpy "same" alignment
-    const int nk = std::max(1, static_cast<int>(std::lround(100.0 / df))), pad = nk / 2 + 1;
+    const int nk = std::max(1, static_cast<int>(std::lround(cfg::kCutoffSmoothHz / df))), pad = nk / 2 + 1;
     std::vector<double> pp;
     for (int i = pad; i >= 1; --i) pp.push_back(p[static_cast<std::size_t>(i)]);
     pp.insert(pp.end(), p.begin(), p.end());
@@ -173,27 +173,27 @@ CutoffResult cutoffAudit(const float* x, std::size_t n, double fs) {
         s[i] = 10.0 * std::log10(sum / nk + 1e-30);
     }
     std::vector<double> ref;
-    for (int b = 0; b < bins; ++b) { const double f = b * df; if (f >= 5000 && f < 10000) ref.push_back(s[static_cast<std::size_t>(b)]); }
+    for (int b = 0; b < bins; ++b) { const double f = b * df; if (f >= cfg::kBandMidLoHz && f < cfg::kBandMidHiHz) ref.push_back(s[static_cast<std::size_t>(b)]); }
     r.ref5to10Db = percentile(ref, 50.0);
-    const int span = std::max(1, static_cast<int>(std::lround(500.0 / df)));
+    const int span = std::max(1, static_cast<int>(std::lround(cfg::kWallSpanHz / df)));
     double bestDrop = 0; int bestI = -1;
     for (int i = 0; i < bins; ++i) {
         const double f = i * df;
-        if (f < 8000 || f > nyq * 0.995) continue;
+        if (f < cfg::kBandWideLoHz || f > nyq * 0.995) continue;
         if (i + span >= bins) break;
         const double d = s[static_cast<std::size_t>(i)] - s[static_cast<std::size_t>(i + span)];
         if (d > bestDrop) { bestDrop = d; bestI = i; }
     }
     r.valid = true;
-    if (bestDrop >= 20.0) {
+    if (bestDrop >= cfg::kWallDropDb) {
         r.shape = EndShape::Wall; r.dropDbIn500Hz = bestDrop;
-        const double lvl = s[static_cast<std::size_t>(std::max(0, bestI - static_cast<int>(std::lround(1000.0 / df))))];
+        const double lvl = s[static_cast<std::size_t>(std::max(0, bestI - static_cast<int>(std::lround(2.0 * cfg::kWallSpanHz / df))))];
         int k = bestI;
-        while (k < bins - 1 && s[static_cast<std::size_t>(k)] > lvl - 6.0) ++k;
+        while (k < bins - 1 && s[static_cast<std::size_t>(k)] > lvl - cfg::kWallStartDropDb) ++k;
         r.cutoffHz = k * df;
     } else {
         int first = -1;
-        for (int i = 0; i < bins; ++i) if (i * df >= 8000 && s[static_cast<std::size_t>(i)] < r.ref5to10Db - 30.0) { first = i; break; }
+        for (int i = 0; i < bins; ++i) if (i * df >= cfg::kBandWideLoHz && s[static_cast<std::size_t>(i)] < r.ref5to10Db - cfg::kGentleDropDb) { first = i; break; }
         if (first >= 0) { r.shape = EndShape::Gentle; r.cutoffHz = first * df; }
         else { r.shape = EndShape::None; r.cutoffHz = nyq; }
     }
@@ -203,8 +203,8 @@ CutoffResult cutoffAudit(const float* x, std::size_t n, double fs) {
 // ================================ comb ================================
 CombResult combLines(const float* x, std::size_t n, double fs, double loHz, double hiHz) {
     CombResult r;
-    const long P = std::lround(fs / 25.0);
-    if (std::fabs(static_cast<double>(P) * 25.0 - fs) > 1e-6) return r;     // fs must be a multiple of 25
+    const long P = std::lround(fs / cfg::kCombFundamentalHz);
+    if (std::fabs(static_cast<double>(P) * cfg::kCombFundamentalHz - fs) > 1e-6) return r;     // fs must be a multiple of the comb spacing
     const long Q = 2 * P, M = static_cast<long>(n) / Q;
     if (M < 2) return r;
     std::vector<double> y(static_cast<std::size_t>(Q), 0.0);
@@ -219,7 +219,7 @@ CombResult combLines(const float* x, std::size_t n, double fs, double loHz, doub
         re /= static_cast<double>(Q); im /= static_cast<double>(Q);
         return 2.0 * (re * re + im * im);
     };
-    const long k0 = static_cast<long>(std::ceil(loHz / 25.0)), k1 = static_cast<long>(std::floor(hiHz / 25.0));
+    const long k0 = static_cast<long>(std::ceil(loHz / cfg::kCombFundamentalHz)), k1 = static_cast<long>(std::floor(hiHz / cfg::kCombFundamentalHz));
     std::vector<double> on, off, lv;
     long gt = 0;
     for (long k = k0; k <= k1; ++k) {
@@ -239,12 +239,12 @@ CombResult combLines(const float* x, std::size_t n, double fs, double loHz, doub
 // ================================ flutter ================================
 FlutterResult flutterDepth(const float* x, std::size_t n, double fs, double modHz) {
     FlutterResult r;
-    if (static_cast<double>(n) < 19.5 * fs) return r;
+    if (static_cast<double>(n) < cfg::kFlutterMinSeconds * fs) return r;
     std::vector<double> b(x, x + n);
-    filtfilt4(b, true, 5000.0, fs);
-    filtfilt4(b, false, std::min(15000.0, fs / 2.0 * 0.9), fs);
+    filtfilt4(b, true, cfg::kFlutterBandLoHz, fs);
+    filtfilt4(b, false, std::min(cfg::kFlutterBandHiHz, fs / 2.0 * 0.9), fs);
     double ms = 0; for (double v : b) ms += v * v;
-    if (std::sqrt(ms / static_cast<double>(n)) < std::pow(10.0, -90.0 / 20.0)) return r;
+    if (std::sqrt(ms / static_cast<double>(n)) < std::pow(10.0, cfg::kFlutterMinBandDb / 20.0)) return r;
     // Hilbert envelope through a zero-padded power-of-2 FFT
     const int N = nextPow2(n);
     FftD fft; fft.prepare(N);
@@ -256,7 +256,7 @@ FlutterResult flutterDepth(const float* x, std::size_t n, double fs, double modH
     fft.inverse(z.data());
     std::vector<double> e(n);
     for (std::size_t i = 0; i < n; ++i) e[i] = std::abs(z[i]);
-    filtfilt4(e, false, 200.0, fs);
+    filtfilt4(e, false, cfg::kFlutterEnvLowpassHz, fs);
     double mean = 0; for (double v : e) mean += v;
     mean /= static_cast<double>(n);
     if (!(mean > 0)) return r;
@@ -306,7 +306,7 @@ double truePeakDbfs(const float* x, std::size_t n) {
 }
 
 double integratedLufs(const float* x, std::size_t n, double fs) {
-    // K-weighting: high shelf + high-pass (formulas as in BS.1770 reference code, valid for any sample rate)
+    // K-weighting: high shelf + high-pass. These constants are the published BS.1770 values, VERIFIED: loudness matches libebur128 to 4 decimals (check 7). Gates -70 / -10 LU are the standard, not guesses.
     auto shelf = [&] {
         const double f0 = 1681.974450955533, G = 3.999843853973347, Q = 0.7071752369554196;
         const double K = std::tan(kPi * f0 / fs), Vh = std::pow(10.0, G / 20.0), Vb = std::pow(Vh, 0.4996667741545416);
