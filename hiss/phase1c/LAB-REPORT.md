@@ -1,5 +1,7 @@
 # HEM Hiss tools: the five tools (Lab report, 2026-10-30, round 2: NO GUESSED LIMITS)
 
+**Windows result for round 2: run 41094654347, commit 70192d0, all steps green** (MSVC Release: lab tests 68 of 68, tool tests 41 of 41, command-line smoke run, Python check).
+
 ## Round 2 (this branch, after Steven said "we don't guess")
 The lab used to carry working-guess limits that decided yes or no (click 8x, notch 8 dB, hit 10 dB / 15 dB, echo 0.12 and 4x, wobble 9 dB and 10 % harmonic share, phase 0.30). **All of those are gone.** Each decision is now worked out from the file being checked:
 - The ONE chosen number is `kAlpha = 0.01`: a clean file may be wrongly accused at most 1 time in 100 per decision. Somebody has to pick it; it is not a property of audio.
