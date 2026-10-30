@@ -1,0 +1,18 @@
+  PASS  dragging the knob up 55 px moves it from 40 ms to 63 ms (expected 63)
+  PASS  dragging far down stops at 10 ms
+  PASS  double-click puts the knob back to 40 ms
+  PASS  knob set to 55 ms by the mouse
+  PASS  before a file is loaded only OPEN works
+  PASS  pressing SCAN with no file does nothing
+  PASS  a WAV file loads and SCAN switches on
+  PASS  pressing SCAN starts the scan and locks OPEN while it runs
+  PASS  the scan finishes
+  PASS  scan at the knob period 55 ms: the 55 ms click train is called a pattern
+  PASS  the click is read at 20.33 ms inside the frame (put at 20.35)
+  PASS  SAVE REPORT switches on after a scan
+  PASS  a picture of the window after the real mouse steps was saved
+  PASS  SAVE REPORT wrote a report that names the 55 ms period
+  PASS  knob back to 40 ms; the screen still holds the 55 ms scan (it says so)
+  PASS  scan again at 40 ms: the same file shows no 40 ms pattern
+  PASS  the wheel away from the knob does nothing
+17 checks, 0 failed
