@@ -165,10 +165,16 @@ static void testTools() {
 }
 
 int main() {
-    testReport();
-    testBlind();
-    testGate();
-    testTools();
+    std::setvbuf(stdout, nullptr, _IONBF, 0);     // so a crash cannot swallow what was already printed
+    try {
+        testReport();
+        testBlind();
+        testGate();
+        testTools();
+    } catch (const std::exception& e) {
+        std::printf("  FAIL  an exception stopped the tests: %s\n", e.what());
+        return 2;
+    }
     std::printf("\n%d checks, %d failed\n", test::gChecks, test::gFails);
     return test::gFails ? 1 : 0;
 }
