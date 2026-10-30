@@ -25,8 +25,9 @@ void strokeRounded(Graphics& g, Pen& pen, RectF r, float rad) { GraphicsPath p; 
 RectF inset(RectF r, float d) { return RectF(r.X + d, r.Y + d, r.Width - 2 * d, r.Height - 2 * d); }
 
 // Fonts are looked up once. Segoe UI and Consolas ship with Windows; if one is missing the generic face is used.
+std::map<std::uint64_t, std::unique_ptr<Font>>& fontCache() { static std::map<std::uint64_t, std::unique_ptr<Font>> c; return c; }
 Font* fontFor(Face f, float px) {
-    static std::map<std::uint64_t, std::unique_ptr<Font>> cache;
+    auto& cache = fontCache();
     const std::uint64_t key = (static_cast<std::uint64_t>(f) << 32) | static_cast<std::uint32_t>(px * 10.0f);
     auto it = cache.find(key);
     if (it != cache.end()) return it->second.get();
@@ -43,7 +44,7 @@ Font* fontFor(Face f, float px) {
 } // namespace
 
 bool startup() { GdiplusStartupInput in; return GdiplusStartup(&g_token, &in, nullptr) == Ok; }
-void shutdown() { if (g_token) GdiplusShutdown(g_token); g_token = 0; }
+void shutdown() { fontCache().clear(); if (g_token) GdiplusShutdown(g_token); g_token = 0; }   // GDI+ objects must be gone before GDI+ is shut down
 
 std::unique_ptr<Bitmap> makePlate(int w, int h, unsigned seed) {
     auto bmp = std::make_unique<Bitmap>(w, h, PixelFormat32bppARGB);

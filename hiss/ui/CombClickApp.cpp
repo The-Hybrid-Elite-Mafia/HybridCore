@@ -444,6 +444,7 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int show) {
     ShowWindow(g_hwnd, show);
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0) > 0) { TranslateMessage(&msg); DispatchMessageW(&msg); }
+    g_plate.reset();
     shutdown();
     return static_cast<int>(msg.wParam);
 }
