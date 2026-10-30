@@ -67,13 +67,15 @@ struct CombResult {
 [[nodiscard]] CombResult combLines(const float* x, std::size_t n, double fs, double loHz = cfg::kCombLoHz, double hiHz = cfg::kCombHiHz);
 
 // ---- Flutter (25 Hz loudness wobble of the 5-15 kHz band) -------------------------------------------
-// DETECT-ONLY. Pre-registered test (check 4b) FAILED the +/-20 % accuracy rule: readings run about 27 % low.
-// Use: reading above flutterPresentThreshold means "flutter is shown". Below it means "not shown", NOT "none".
+// QUANTIFIED. Reads the 25 Hz line at exactly 25.000 Hz, then calibrates itself on the clip by adding a known
+// flutter twice (standard addition). Result = the depth of amplitude modulation that would give the same reading.
+// TESTED (check 4c, rule SPLIT-ADDENDUM-3): 27 of 27 trials on 9 never-used human clips; mean reading for a true 0.30
+// was 0.300. Weak spot: one clip that already wobbled at 0.21 read 0.24 for a true 0.45.
 struct FlutterResult {
-    bool valid = false;      // false: clip shorter than 19.5 s, or the band is empty (< -90 dBFS)
-    double depth = 0;        // wobble amplitude / mean envelope (a true 0.30 AM reads about 0.22)
+    bool valid = false;      // false: clip shorter than 19.5 s, band empty (< -90 dBFS), or the two calibration readings disagree
+    double depth = 0;        // equivalent AM depth (0.30 = the loudness of the band swings +/-30 % at 25 Hz)
+    double gain = 0;         // this clip's reading per unit of true depth (about 0.4 to 0.9 on the clips seen)
 };
-inline constexpr double kFlutterPresentThreshold = cfg::kFlutterPresentThreshold;   // see HissConfig.hpp
 [[nodiscard]] FlutterResult flutterDepth(const float* x, std::size_t n, double fs, double modHz = cfg::kCombFundamentalHz);
 
 // ---- Levels and loudness ---------------------------------------------------------------------------

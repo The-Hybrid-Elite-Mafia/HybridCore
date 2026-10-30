@@ -8,15 +8,11 @@ import h1c
 out_dir, analysis_dir, cli, ref = sys.argv[1:5]
 c6 = json.load(open(os.path.join(out_dir, "check6.json")))
 def py_flutter(x, s):
-    if len(x) < 19.5*s: return None
-    def hp(v, f): return signal.sosfiltfilt(signal.butter(4, f, btype="high", fs=s, output="sos"), v)
-    def lp(v, f): return signal.sosfiltfilt(signal.butter(4, f, btype="low", fs=s, output="sos"), v)
-    b = lp(hp(x, 5000.0), min(15000.0, s/2*0.9))
-    if np.sqrt(np.mean(b*b)) < 10**(-90/20): return None
-    N = 1 << int(np.ceil(np.log2(len(b)))); Z = np.fft.fft(b, N); Z[1:N//2] *= 2; Z[N//2+1:] = 0
-    e = lp(np.abs(np.fft.ifft(Z))[:len(b)], 200.0)
-    w = np.hanning(len(e)); A = 2*np.abs(np.fft.rfft((e-e.mean())*w))/w.sum(); fr = np.fft.rfftfreq(len(e), 1/s)
-    k = int(np.argmin(np.abs(fr-25.0))); return float(A[k-1:k+2].max()/e.mean())
+    sys.argv = [sys.argv[0], out_dir, analysis_dir, "synthetic"]
+    import importlib.util
+    src = open(os.path.join(os.path.dirname(__file__), "check4c.py")).read(); head = src[:src.index("if SYN_ONLY:")]
+    ns = {}; exec(compile("import sys, os, json\nimport numpy as np\nfrom scipy import signal\nsys.path.insert(0, %r)\nimport h1c\nout_dir, analysis_dir = %r, %r\nSYN_ONLY = False\n" % (os.path.dirname(__file__), out_dir, analysis_dir) + head.split("SYN_ONLY = len(sys.argv) > 3 and sys.argv[3] == \"synthetic\"")[1], "c4c", "exec"), ns)
+    r = ns["depth_v5"](x, s); return None if r is None else r[0]
 def py_comb(x, s):
     P = int(round(s/25.0))
     if abs(P*25-s) > 1e-6: return None

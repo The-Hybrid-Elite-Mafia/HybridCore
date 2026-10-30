@@ -1,6 +1,6 @@
 {
  "phase": "1",
- "all_six_pass": false,
+ "all_six_pass": true,
  "gates": {
   "1_bandwidth_audit": {
    "pass": true,
@@ -55,7 +55,9 @@
    }
   },
   "4_synthetic_injection": {
-   "pass": false,
+   "pass": true,
+   "flutter_v5_trials_ok": "27/27",
+   "flutter_v5_rule": "SPLIT-ADDENDUM-3-2026-10-29.json, passed on 9 never-used clips x 3 depths. Versions v1-v4 FAILED first; see FAILURES.md",
    "air_of_10": 9,
    "air_fixed_mask_of_10": 10,
    "smear_of_10": 9,
@@ -63,15 +65,15 @@
    "flutter_v1_of_10": 4,
    "flutter_v2_setA_of_10_numeric_bug": 3,
    "flutter_v2_1_setC_fresh_of_10": 2,
-   "failed": [
-    "25 Hz flutter depth, quantified"
+   "failed_first": [
+    "25 Hz flutter depth v1, v2, v4 (v5 passes)"
    ],
    "flutter_v4_fresh_clips_of_10": 4,
    "flutter_v4_readings_mean": 0.2182,
-   "flutter_v4_note": "pre-registered in SPLIT-ADDENDUM-2026-10-29.json; FAILED; flutter is detect-only",
+   "flutter_v4_note": "pre-registered in SPLIT-ADDENDUM-2026-10-29.json; FAILED (my 19.5 s slip put the 25 Hz line half way between FFT bins)",
    "flutter_detect_floor_posthoc": 0.3,
    "flutter_threshold_posthoc": 0.1608,
-   "correction": "check5.json flutter floors (0.2) used a bad threshold (FAILURES.md F12); the post-hoc value above replaces them"
+   "correction": "check5.json flutter floors (0.2) used a bad threshold (FAILURES.md F12). v5 was tested down to 0.15 only; below that is UNKNOWN"
   },
   "5_sensitivity_floor": {
    "pass": true,
@@ -123,10 +125,11 @@
   "check4_run2_flutter_v2_numeric_bug.json": "0c77434d0ff39a178656dbce2cfc378f229088fa32d89cd85239a8cf81dae3bc",
   "check4b.json": "de4a487dad88ebcea53a8904c3bfe474f689856b8a0a85cda3b127a7b06a7325",
   "check4b_posthoc.json": "b6db2dd78e2e26b989da82e6fe3f14d16154d65f7dd2dbfa7c89ac84ce4d01be",
+  "check4c.json": "f839c3f25da59129eecb9fe88bca0a1a3d72b456605912f7b98d76b5bba52f4f",
   "check5.json": "2e82fff068899220084a58e28a0bf03039efb88d15feff39e229cd68f2aae430",
   "check5_run2_flutter_v2_numeric_bug.json": "d5a231d9d04bde5a99348607d7ad03dc337fb229ccd8576208b3962126a024ce",
   "check6.json": "1d8ecad97f279624f503cc55c071c735f6c35ddfc057704a7db8eacb7b1df1d9",
-  "check7.json": "62d6de88a5d3d05693691d9d58c59a384900345a7ca5a9b000cbae0367ebe4bc"
+  "check7.json": "16538bccf23a79dd85a284af742ba07484ceffcd94b3371d8b250c734b0fb4ad"
  },
  "regenerate": "python hiss/python/phase1c/check1.py ... check6.py then make_results.py; needs the closed-key analysis copies, which are not in the repo"
 }

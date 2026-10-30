@@ -170,7 +170,8 @@ inline constexpr double kFlutterBandHiHz   = 15000.0;   // ASSUMED (never above 
 inline constexpr double kFlutterEnvLowpassHz = 200.0;   // ASSUMED: speed limit of the loudness curve
 inline constexpr double kFlutterMinSeconds = 19.5;      // ASSUMED: shorter clips are refused (SPLIT-ADDENDUM-2-2026-10-29.json)
 inline constexpr double kFlutterMinBandDb  = -90.0;     // ASSUMED: a band quieter than this (dBFS rms) is "nothing to measure"
-inline constexpr double kFlutterPresentThreshold = 0.161; // POST-HOC: highest reading seen on 20 human clips with nothing added. Flutter under about 0.3 depth is NOT seen.
+inline constexpr double kFlutterCalibDepth    = 0.20;    // ASSUMED: size of the known flutter the meter adds to calibrate itself on a clip
+inline constexpr double kFlutterGainMismatch  = 0.15;    // ASSUMED: if the two calibration readings differ by more than this share, the clip is not linear and no number is given
 
 // =============================================================================
 //  UNKNOWN — nobody has measured these. No numbers are invented for them.

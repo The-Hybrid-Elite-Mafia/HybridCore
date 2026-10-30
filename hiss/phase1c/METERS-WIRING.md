@@ -16,8 +16,7 @@ Status words: WORKING = run on known-answer signals and real files, result shown
 | Ratio 16–20 over 5–10 | `ratioMetrics` | same cut, expect +10 dB | +10.0000 | WORKING |
 | Bandwidth audit | `cutoffAudit` | brick wall at 16 kHz; full band | found at 16 025 Hz; full band not called a wall | WORKING |
 | 25 Hz comb line level | `combLines` | −100 dBFS per line injected into noise | read −100.02; 100 % lines beat neighbours; 48.5 % with no comb | WORKING |
-| Flutter depth | `flutterDepth` | 0.30 AM on steady noise; none; 10 s clip; empty band | 0.303; 0.004; refused; refused | PARTLY: on real cymbals it reads about 27 % low (check 4b FAIL). Detect-only |
-| Flutter "shown" flag | threshold in config | same | 0.30 shown, none not shown | PARTLY: threshold 0.161 is POST-HOC |
+| Flutter depth (v5, self-calibrating) | `flutterDepth` | 0.30 on steady noise; none; 19.5 s at 44.1 kHz (the half-bin case); 10 s clip; empty band. Real: 9 never-used human clips x 3 depths | 0.328; 0.004; 0.319; refused; refused. Real: 27 of 27 ok, mean 0.300 for 0.30 | WORKING. Weak: strong flutter on a clip that already wobbles at 0.2; below 0.15 UNKNOWN |
 | Loud-frame mask | `loudMask` | used inside the ratio test | frames identical in cut and base | PARTLY: flips on peaky clips if air is added; fixed-mask option exists |
 
 ## Dials (numbers in `HissConfig.hpp`, section METERS)

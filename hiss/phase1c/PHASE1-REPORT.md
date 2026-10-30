@@ -3,19 +3,37 @@
 Branch `hiss-tamer-1`. Draft pull request only. Never merged to main.
 Every number comes from `RESULTS.json` and the `results/check*.json` files next to it. The plan was committed first, in `SPLIT.json` (commit dafe2ef), before any measurement.
 
-## UPDATE 2026-10-29 (you asked me to make Phase 1 work, everything)
+## UPDATE 2026-10-29 (you said: make Phase 1 work, no half-baked)
 
-**Result: five checks pass. Check 4 still fails on one thing: reading the flutter depth as an exact number.** Everything else in Phase 1 works, and the C++ meters you asked for now exist and are tested.
+**Result: all six checks now pass. It took five tries on flutter, and I want you to see the road, because two of the failures were my own mistakes.**
 
-1. **Flutter, new try (v4), judged on 10 never-used clips, rule written and committed first** (`SPLIT-ADDENDUM-2026-10-29.json`, then a second note fixing a 0.5 s length slip before any reading). **Result: 4 of 10 within 20 %. FAIL.** Readings ran low: mean 0.22 for a true 0.30, spread 0.05. That is mostly a steady bias, not random noise, so the smoother averaging in the advice you pasted would not fix it. I did not touch the meter again on those clips.
-2. **Flutter is now DETECT-ONLY.** After the fact (labelled POST-HOC in `check4b_posthoc.json`): a human clip with nothing added reads as high as 0.16. Injected 0.3 was above that in 9 of 10 clips, 0.2 in only 4 of 10. So **flutter below about 30 % depth cannot be seen with this meter.** Earlier I wrote 0.2; that was wrong (F12). The old "no 25 Hz flutter in loud cymbal parts" finding can only rule out flutter of about 30 % or more.
-3. **Bug found in my own table:** the "smallest flutter seen" threshold in check4b.json was 0.0001 (nonsense). Fixed in the post-hoc file. Logged as F12 in `FAILURES.md` (14 entries now).
-4. **C++ meter engine built** (`hiss/include/hybrid/hiss/HissMeters.hpp`, pure C++23, no JUCE; the advice you pasted said JUCE, so I left that out). It has: loud-part mask, band levels and the 16–20 over 5–10 ratio, bandwidth audit, 25 Hz comb lines, flutter (detect-only), RMS, true peak, loudness, band RMS. Command: `hc_hiss_cli meters <file.wav>`.
-   - **20 new known-answer tests, 20 pass** (locally): sine at −20 dBFS reads −23.0103 LUFS; a 10 dB cut in 5–10 kHz raises the ratio exactly 10.00 dB while the 16–20 kHz level moves 0.000 dB; a comb of −100 dBFS per line is read as −100.02; a brick wall at 16 kHz is found at 16 025 Hz; flutter 0.30 reads 0.303 and none reads 0.004 (on clean steady noise; real cymbals read lower); short or empty clips are refused.
-   - **Three-way check on 14 real files (check 7): C++, Python and libebur128 agree on all 14.** C++ vs libebur128 loudness: identical to 4 decimals. True peak differs by at most 0.008 dB. Band levels and ratios: identical to 0.0000 dB. Comb: within 0.0004 dB. Flutter: identical. Cutoff: within 6.5 Hz. C++ vs `pyloudnorm`: 0.061 LU (inside the 0.1 limit).
-   - **Not yet shown:** that the new tests pass on the Windows runner (the push does that), and the post-hit smear meter is not ported yet (Phase 2).
+**The flutter meter, in order**
+1. v1 on 8 s clips: 4 of 10. FAIL.
+2. v2 (had a divide-by-near-zero bug) and v2.1: 3 of 10, 4 of 10, 2 of 10. FAIL.
+3. v4 on 10 fresh clips (rule committed first): 4 of 10. FAIL. Readings ran low.
+4. **Cause found, my mistake:** I changed clips from 20.0 s to 19.5 s. That put the 25 Hz line exactly between two measuring slots of the FFT, so it read about 15 % low. My development clips happened to sit exactly on a slot, so they looked fine. The real test did not.
+5. **v5, rule committed first (`SPLIT-ADDENDUM-3`):**
+   - reads the 25 Hz line at exactly 25.000 Hz (no slot);
+   - **calibrates itself on every clip**: it adds a known 0.20 flutter twice, at 0 and 90 degrees, sees how far its own reading moves, and divides by that. This kills the "reads low by some clip-dependent amount" problem.
+   - Tested on the **9 human clips nothing had ever touched**, at 3 depths (0.15, 0.30, 0.45) = 27 trials. **27 of 27 within 20 % (plus the clip's own natural wobble). Even with no allowance for natural wobble: 25 of 27.**
+   - A true 0.30 read **0.300 on average** (range 0.28 to 0.32). A true 0.15 read 0.146 (0.09 to 0.18).
+   - **Weak spots (TESTED, not hidden):** one clip that already wobbles at 0.21 on its own read 0.24 for a true 0.45 (error 0.21). Strong flutter on top of strong natural flutter is where it is least sure. Below 0.15 is UNKNOWN (not tried).
+   - Human cymbals' own natural flutter on those 9 clips: 0.003 to 0.21 (most under 0.03).
 
-**What I need from you:** Phase 1 is now "five pass, one failed honestly, flutter detect-only". Reply **GO** to accept flutter as detect-only and start Phase 2. I will not call Phase 1 passed on my own.
+**Other things I fixed while at it**
+- C++ meter engine `HissMeters` (pure C++23, no JUCE; the advice you pasted said JUCE, so I left that out): loud-part mask, band levels and the 16–20 over 5–10 ratio, bandwidth audit, 25 Hz comb, **flutter v5 (now a real number, not a yes/no)**, RMS, true peak, loudness, band RMS. Command: `hc_hiss_cli meters <file.wav>`.
+- **21 known-answer tests, all pass.** One of my own new test limits (±10 %) failed (steady noise reads 0.33 for a true 0.30, about 9 % high). I did not hide that: I put back the registered ±20 % and wrote the high reading down.
+- **Three-way check on 14 real files: C++, Python and libebur128 agree on all 14.** Flutter differs by 0.0000. Loudness is identical to libebur128. A first try had one file off by 0.0075 (my limit is 0.005). Cause: the C++ band filter was a different design from the Python one that passed the test. I changed the C++ to the same design instead of loosening the limit.
+- **About 25 working-guess numbers had been typed into the code.** Moved into `HissConfig.hpp` as ASSUMED (your rule). No reading changed.
+- Windows runner: green on the last pushed commit (131 checks). The newest commit is pushed and the runner is being watched.
+
+**Still true and not hidden**
+- The smear and moving-notch meters are Python only. Not in C++ yet.
+- Config numbers (band edges, thresholds) have no test that moves a dial and checks the result. UNTESTED as dials (F18).
+- Flutter below 0.15, and the 0.45-on-top-of-0.21 case, are weak or UNKNOWN.
+- The old finding "no 25 Hz flutter in loud cymbal parts" came from the weak v1 meter. It should be re-measured with v5 in Phase 2.
+
+**Gate:** Phase 1 is done. I am stopping here as you ordered. Reply **GO** and I start Phase 2 (the air table).
 
 ## The first paragraph (tool status, written before the update above)
 
@@ -29,7 +47,7 @@ The broken one is the 25 Hz flutter meter. I injected a known 30 % flutter into 
 | 1 | Bandwidth audit | **PASS** (TESTED) | Tool found known cutoffs within 15 Hz on 16 made-up tests. 171 real files measured. 140 reach 19 kHz or more. **31 are disqualified** (below 19 kHz). |
 | 2 | Metric sanity | **PASS** (TESTED) | I cut the 5–10 kHz band by 10 dB. The 16–20 over 5–10 ratio rose 10.01 dB. The real 16–20 kHz level moved 0.02 dB. So the ratio can rise only because the bottom fell. |
 | 3 | Line-level sanity | **PASS** (TESTED) | Both ways of measuring a 25 Hz line agree within 1 dB when the line is clearly above the noise. Details below. |
-| 4 | Synthetic injection | **FAIL** (TESTED) | Air 9/10. Post-hit smear 9/10. Moving notch 9/10. **Flutter 4/10, then 3/10 and 4/10 (bug), then 2/10.** |
+| 4 | Synthetic injection | **PASS after fixes** (TESTED) | Air 9/10. Post-hit smear 9/10. Moving notch 9/10. **Flutter failed four times, then v5 passed 27/27 on never-used clips. See the Update.** The table below is the first-run record. |
 | 5 | Sensitivity floor | **PASS** (TESTED) | Table below. |
 | 6 | Independent tool check | **PASS** (TESTED), with two gaps | Python and ffmpeg agree on 14 of 14 files. Worst gap 0.109 dB. `sox` could not be installed here (UNKNOWN). Sonic Visualiser by hand cannot be run here (UNKNOWN). |
 

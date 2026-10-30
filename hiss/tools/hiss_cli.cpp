@@ -226,7 +226,7 @@ int cmdMeters(const std::string& path) {
     const auto cb = Mt::combLines(x.data(), n, fs);
     std::printf("comb_valid %d\ncomb_median_line_db %.3f\ncomb_on_gt_off_pct %.2f\ncomb_bandwidth_hz %.4f\n", cb.valid, cb.medianLineDb, cb.onGreaterThanOffPct, cb.bandwidthHz);
     const auto fl = Mt::flutterDepth(x.data(), n, fs);
-    std::printf("flutter_valid %d\nflutter_depth %.5f\nflutter_shown %d\n", fl.valid, fl.depth, fl.valid && fl.depth > Mt::kFlutterPresentThreshold);
+    std::printf("flutter_valid %d\nflutter_depth %.5f\nflutter_gain %.4f\n", fl.valid, fl.depth, fl.gain);
     return 0;
 }
 

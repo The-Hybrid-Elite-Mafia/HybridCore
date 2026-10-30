@@ -741,7 +741,7 @@ void testMeters() {
         HCHECK(none.onGreaterThanOffPct < 65.0 && none.onGreaterThanOffPct > 30.0, "with no comb, about half do (%.1f %%)", none.onGreaterThanOffPct);
         HCHECK(!Mt::combLines(x.data(), n, 44100.5).valid, "a sample rate that is not a multiple of 25 Hz is refused");
     }
-    {   // flutter (detect-only)
+    {   // flutter (quantified, self-calibrating)
         const auto b = bandNoise(20, fs, 5000, 15000, 7, 0.05);
         const std::size_t n = 960000;
         std::vector<float> plain(b.begin(), b.begin() + static_cast<std::ptrdiff_t>(n)), am = plain;
@@ -750,8 +750,17 @@ void testMeters() {
         HMEASURED("flutter reading, nothing injected", f0.depth, "");
         HMEASURED("flutter reading, 0.30 injected", f1.depth, "");
         HCHECK(f0.valid && f1.valid, "both clips are long enough and have a band to measure");
-        HCHECK(f1.depth > Mt::kFlutterPresentThreshold && f0.depth < Mt::kFlutterPresentThreshold, "0.30 flutter is shown, none is not shown");
-        HCHECK(f1.depth > 0.20 && f1.depth < 0.40, "reading for a true 0.30 is between 0.20 and 0.40 (detect-only: NOT held to +/-20 %%) (%.3f)", f1.depth);
+        // The registered rule (SPLIT.json check 4) is +/-20 %%. I first wrote +/-10 %% as my own stricter guess; steady noise reads 0.341 (14 %% high), so that guess failed and is not used.
+        HCHECK(f1.depth > 0.24 && f1.depth < 0.36, "a true 0.30 reads 0.24 to 0.36 (the registered +/-20 %%) (%.3f)", f1.depth);
+        HCHECK(f0.depth < 0.03, "no flutter reads under 0.03 (%.4f)", f0.depth);
+        // the exact slip that failed the first real test: 19.5 s at 44.1 kHz puts 25 Hz half way between two FFT bins
+        const double fs2 = 44100.0; const std::size_t n2 = static_cast<std::size_t>(19.5 * fs2);
+        const auto b2 = bandNoise(20, fs2, 5000, 15000, 8, 0.05);
+        std::vector<float> am2(b2.begin(), b2.begin() + static_cast<std::ptrdiff_t>(n2));
+        for (std::size_t i = 0; i < n2; ++i) am2[i] = static_cast<float>(am2[i] * (1.0 + 0.30 * std::sin(2.0 * 3.14159265358979323846 * 25.0 * static_cast<double>(i) / fs2 + 2.0)));
+        const auto f2 = Mt::flutterDepth(am2.data(), n2, fs2);
+        HMEASURED("flutter reading, 0.30 injected, 19.5 s at 44.1 kHz (half-bin case)", f2.depth, "");
+        HCHECK(f2.valid && f2.depth > 0.24 && f2.depth < 0.36, "the half-bin case also reads 0.24 to 0.36 (%.3f)", f2.depth);
         HCHECK(!Mt::flutterDepth(plain.data(), 480000, fs).valid, "a 10 s clip is refused");
         std::vector<float> silent(n, 0.0f);
         HCHECK(!Mt::flutterDepth(silent.data(), n, fs).valid, "a clip with nothing in 5-15 kHz is refused");

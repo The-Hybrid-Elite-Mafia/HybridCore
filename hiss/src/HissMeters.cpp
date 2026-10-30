@@ -59,6 +59,48 @@ void filtfilt4(std::vector<double>& x, bool high, double f, double fs) {
     std::reverse(x.begin(), x.end());
 }
 
+// Butterworth band-pass of order 4 per side (eight poles), the same design as scipy.signal.butter(4, [lo, hi], "band"):
+// analog low-pass poles -> band-pass transform with pre-warped edges -> bilinear transform. Four 2nd-order sections.
+// Each section is scaled to gain 1 at the band centre (the overall scale does not matter for the flutter depth).
+struct BandPass4 {
+    Biquad sec[4];
+    void design(double lo, double hi, double fs) {
+        const double W1 = 2.0 * fs * std::tan(kPi * lo / fs), W2 = 2.0 * fs * std::tan(kPi * hi / fs);
+        const double bw = W2 - W1, w0 = std::sqrt(W1 * W2);
+        std::vector<Cx> poles;
+        for (int k = 0; k < 4; ++k) {
+            const double ang = kPi * (2.0 * k + 4 + 1) / 8.0;
+            const Cx p(std::cos(ang), std::sin(ang));
+            const Cx a = p * (bw / 2.0), d = std::sqrt(a * a - Cx(w0 * w0, 0.0));
+            poles.push_back(a + d); poles.push_back(a - d);
+        }
+        std::vector<Cx> zp;   // digital poles
+        for (const Cx& s : poles) zp.push_back((Cx(2.0 * fs, 0.0) + s) / (Cx(2.0 * fs, 0.0) - s));
+        std::vector<char> used(zp.size(), 0);
+        int n = 0;
+        const double wc = 2.0 * kPi * std::sqrt(lo * hi) / fs;      // centre frequency, radians per sample
+        for (std::size_t i = 0; i < zp.size() && n < 4; ++i) {
+            if (used[i] || zp[i].imag() < 0.0) continue;
+            std::size_t j = i;                                        // its conjugate
+            double best = 1e30;
+            for (std::size_t q = 0; q < zp.size(); ++q) if (q != i && !used[q]) { const double dd = std::abs(zp[q] - std::conj(zp[i])); if (dd < best) { best = dd; j = q; } }
+            used[i] = used[j] = 1;
+            Biquad& b = sec[n++];
+            b.a1 = -2.0 * zp[i].real(); b.a2 = std::norm(zp[i]);
+            b.b0 = 1.0; b.b1 = 0.0; b.b2 = -1.0;
+            const Cx e1 = std::polar(1.0, -wc), e2 = std::polar(1.0, -2.0 * wc);
+            const double gain = std::abs((b.b0 + b.b1 * e1 + b.b2 * e2) / (1.0 + b.a1 * e1 + b.a2 * e2));
+            b.b0 /= gain; b.b2 /= gain;
+        }
+    }
+    void filtfilt(std::vector<double>& x) const {
+        for (const Biquad& b : sec) b.run(x);
+        std::reverse(x.begin(), x.end());
+        for (const Biquad& b : sec) b.run(x);
+        std::reverse(x.begin(), x.end());
+    }
+};
+
 } // namespace
 
 // ================================ STFT / ratio ================================
@@ -237,15 +279,21 @@ CombResult combLines(const float* x, std::size_t n, double fs, double loHz, doub
 }
 
 // ================================ flutter ================================
-FlutterResult flutterDepth(const float* x, std::size_t n, double fs, double modHz) {
-    FlutterResult r;
-    if (static_cast<double>(n) < cfg::kFlutterMinSeconds * fs) return r;
+namespace {
+// 5-15 kHz band of x, zero phase
+std::vector<double> flutterBand(const float* x, std::size_t n, double fs) {
     std::vector<double> b(x, x + n);
-    filtfilt4(b, true, cfg::kFlutterBandLoHz, fs);
-    filtfilt4(b, false, std::min(cfg::kFlutterBandHiHz, fs / 2.0 * 0.9), fs);
+    BandPass4 bp;
+    bp.design(cfg::kFlutterBandLoHz, std::min(cfg::kFlutterBandHiHz, fs / 2.0 * 0.9), fs);
+    bp.filtfilt(b);
+    return b;
+}
+// Complex line of the loudness curve at exactly modHz, divided by the mean envelope. Reads the line at its true
+// frequency with a direct sum (no FFT bin), so it does not matter where the clip length puts the line between bins.
+bool flutterLine(const std::vector<double>& b, double fs, double modHz, Cx& out) {
+    const std::size_t n = b.size();
     double ms = 0; for (double v : b) ms += v * v;
-    if (std::sqrt(ms / static_cast<double>(n)) < std::pow(10.0, cfg::kFlutterMinBandDb / 20.0)) return r;
-    // Hilbert envelope through a zero-padded power-of-2 FFT
+    if (std::sqrt(ms / static_cast<double>(n)) < std::pow(10.0, cfg::kFlutterMinBandDb / 20.0)) return false;
     const int N = nextPow2(n);
     FftD fft; fft.prepare(N);
     std::vector<Cx> z(static_cast<std::size_t>(N), Cx{});
@@ -259,21 +307,42 @@ FlutterResult flutterDepth(const float* x, std::size_t n, double fs, double modH
     filtfilt4(e, false, cfg::kFlutterEnvLowpassHz, fs);
     double mean = 0; for (double v : e) mean += v;
     mean /= static_cast<double>(n);
-    if (!(mean > 0)) return r;
-    const auto w = hann(static_cast<int>(n));
-    double sw = 0; for (double v : w) sw += v;
-    const long k0 = std::lround(modHz * static_cast<double>(n) / fs);
-    double best = 0;
-    for (long k = k0 - 1; k <= k0 + 1; ++k) {
-        double re = 0, im = 0;
-        const double step = -2.0 * kPi * static_cast<double>(k) / static_cast<double>(n);
-        for (std::size_t i = 0; i < n; ++i) {
-            const double v = (e[i] - mean) * w[i], ang = step * static_cast<double>(i);
-            re += v * std::cos(ang); im += v * std::sin(ang);
-        }
-        best = std::max(best, 2.0 * std::hypot(re, im) / sw);
+    if (!(mean > 0)) return false;
+    double sw = 0, re = 0, im = 0;
+    const double step = -2.0 * kPi * modHz / fs;
+    for (std::size_t i = 0; i < n; ++i) {
+        const double w = 0.5 - 0.5 * std::cos(2.0 * kPi * static_cast<double>(i) / static_cast<double>(n - 1));   // symmetric, same as numpy.hanning
+        const double v = (e[i] - mean) * w, ang = step * static_cast<double>(i);
+        sw += w; re += v * std::cos(ang); im += v * std::sin(ang);
     }
-    r.valid = true; r.depth = best / mean;
+    out = Cx(2.0 * re / sw / mean, 2.0 * im / sw / mean);
+    return true;
+}
+std::vector<float> withFlutter(const float* x, const std::vector<double>& band, double fs, double depth, double phase, double modHz) {
+    std::vector<float> y(band.size());
+    for (std::size_t i = 0; i < y.size(); ++i)
+        y[i] = static_cast<float>(x[i] + depth * std::sin(2.0 * kPi * modHz * static_cast<double>(i) / fs + phase) * band[i]);
+    return y;
+}
+} // namespace
+
+FlutterResult flutterDepth(const float* x, std::size_t n, double fs, double modHz) {
+    FlutterResult r;
+    if (static_cast<double>(n) < cfg::kFlutterMinSeconds * fs) return r;
+    const std::vector<double> b0 = flutterBand(x, n, fs);
+    Cx a0;
+    if (!flutterLine(b0, fs, modHz, a0)) return r;
+    // Standard addition: add a known flutter twice (phase 0 and 90 degrees) and see how much the reading moves.
+    // That movement per unit of depth, g, is this clip's own gain; depth = |reading| / g.
+    const double ref = cfg::kFlutterCalibDepth;
+    Cx a1, a2;
+    const auto y1 = withFlutter(x, b0, fs, ref, 0.0, modHz), y2 = withFlutter(x, b0, fs, ref, kPi / 2.0, modHz);
+    if (!flutterLine(flutterBand(y1.data(), n, fs), fs, modHz, a1) || !flutterLine(flutterBand(y2.data(), n, fs), fs, modHz, a2)) return r;
+    const double g1 = std::abs(a1 - a0) / ref, g2 = std::abs(a2 - a0) / ref;
+    if (std::fabs(g1 - g2) > cfg::kFlutterGainMismatch * std::max(g1, g2) || std::max(g1, g2) <= 0.0) return r;   // not linear on this clip: no number
+    r.gain = 0.5 * (g1 + g2);
+    r.depth = std::abs(a0) / r.gain;
+    r.valid = true;
     return r;
 }
 
