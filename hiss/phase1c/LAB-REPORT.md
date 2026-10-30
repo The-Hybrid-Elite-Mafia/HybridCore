@@ -1,7 +1,7 @@
 # HEM Hiss tools: the five tools (Lab report, 2026-10-30)
 
 Branch: `hiss-tamer-2` (made from `hiss-tamer-1`). Nothing is on main.
-Everything below was run on a Linux build machine with GCC (the Windows MSVC run is the CI job on this branch; its result is NOT in this file).
+Run on two machines: a Linux build machine with GCC 13, and GitHub's Windows runner with MSVC (Visual Studio 2022, Release). **Windows result: run 41027592840, commit af4d1ce, all steps green**: build with no failure, old tests, lab tests 55 of 55, tool tests 40 of 40, the command-line smoke run (scanner, combclick, airlab, inject, hash, pack, and the Tamer refusing with no proof file), Python check. The Windows numbers matched the Linux numbers in the lab test log (same readings to the printed digits, except tails read 88 / 90 / 250 / 264 ms against 87 / 92 / 244 / 262 ms on Linux, because the two compilers round the hit times differently; both are inside the +/-15 % range).
 
 ## Top line
 - **Engines: BUILT and TESTED on made-up signals.** 8, 9, 11, 12 (ASSUMED model), 13, 14, 15, 16, 17, 18, 19, 20 are new, pure C++, no JUCE. The older engines 1 to 7, 10 were re-run: 132 of 132 checks pass.
@@ -61,7 +61,7 @@ All numbers in `HissConfig.hpp` section LAB (click size rule 8x, 40 ms tolerance
 - Everything on real Suno files (cause, size, whether any of these meters sees it). The tools can only say what they measured.
 - Whether music with sharp high-frequency drums looks like clicks to the click finder.
 - Wobble depth under a strong beat.
-- CPU use on the i7-14700HX. Windows MSVC result: see the CI run on this branch.
+- CPU use on the i7-14700HX (the CI runner is a different machine).
 - Whether the five-tool faceplate layouts (control counts) are right. They were a proposal. No screen was built.
 - Masking: whether the assumed model matches ears.
 
