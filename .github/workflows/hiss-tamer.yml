@@ -99,18 +99,23 @@ jobs:
 
       - name: Publish pictures and program to the hiss-ui-shots branch
         if: github.event_name == 'push'
+        continue-on-error: true
         shell: pwsh
         run: |
-          git config user.name "hem-build"
-          git config user.email "hem-build@users.noreply.github.com"
+          function G {
+            $o = & git @args 2>&1 | Out-String
+            if ($LASTEXITCODE -ne 0) { Write-Host "::error title=publish git $($args -join ' ')::exit $LASTEXITCODE : $($o -replace "`r?`n",' | ')"; exit 1 }
+          }
+          G config user.name "hem-build"
+          G config user.email "hem-build@users.noreply.github.com"
           $sha = (git rev-parse --short HEAD)
           Copy-Item -Recurse out\ui "$env:RUNNER_TEMP\ui"
-          git checkout --orphan hiss-ui-shots
-          git rm -rf . --quiet
+          G checkout --orphan hiss-ui-shots
+          G rm -rf . --quiet
           Copy-Item "$env:RUNNER_TEMP\ui\*" . -Recurse
-          git add -A
-          git commit -m "Windows build pictures and program from $sha" --quiet
-          git push -f origin hiss-ui-shots
+          G add -A
+          G commit -m "Windows build pictures and program from $sha" --quiet
+          G push -f origin hiss-ui-shots
 
       - name: Demo files through AUTO FIX
         shell: pwsh
