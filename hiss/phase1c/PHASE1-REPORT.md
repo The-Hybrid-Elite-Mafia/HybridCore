@@ -35,7 +35,7 @@ Every number comes from `RESULTS.json` and the `results/check*.json` files next 
 
 **Gate:** Phase 1 is done. I am stopping here as you ordered. Reply **GO** and I start Phase 2 (the air table).
 
-## The first paragraph (tool status, written before the update above)
+## The first paragraph (OLD: written before the update above; the flutter meter was broken then and is fixed now)
 
 **One of my measuring tools is broken. The other five work.**
 The broken one is the 25 Hz flutter meter. I injected a known 30 % flutter into human cymbals. The meter found it within 20 % in only 4 of 10 tries. I changed the meter twice. The first change had a plain bug (3 of 10 and 4 of 10). The bug-fixed one got 2 of 10 on 10 clips it had never seen. Your rule says all six checks must pass, so **Phase 1 FAILS and I stopped.** I did not start Phase 2.
