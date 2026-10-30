@@ -76,24 +76,28 @@ jobs:
       - name: Five tools, command line, on the demo files (smoke run, reports saved)
         shell: pwsh
         run: |
-          $tools = ".\build\hiss\Release\hc_hiss_tools.exe"
+          function Fail($m) { Write-Host "::error title=hiss tools smoke::$($m -replace "`r?`n",' | ')"; exit 1 }
+          $tools = (Resolve-Path ".\build\hiss\Release\hc_hiss_tools.exe").Path
           New-Item -ItemType Directory -Force out\tools | Out-Null
           $wav = Get-ChildItem out\demo -Filter *_before.wav | Select-Object -First 1
-          if (-not $wav) { throw "no demo file" }
+          if (-not $wav) { Fail "no demo file in out\demo" }
           foreach ($t in "scanner","combclick","airlab") {
-            & $tools $t $wav.FullName "out\tools\$t.md" | Out-Null
-            if ($LASTEXITCODE -ne 0) { throw "$t failed ($LASTEXITCODE)" }
+            $o = & $tools $t $wav.FullName "out\tools\$t.md" 2>&1 | Out-String
+            if ($LASTEXITCODE -ne 0) { Fail "$t exit $LASTEXITCODE : $o" }
           }
-          & $tools proof inject comb $wav.FullName out\tools\injected.wav -80 3000 20000 5
-          if ($LASTEXITCODE -ne 0) { throw "proof inject failed" }
-          & $tools proof hash $wav.FullName out\tools\injected.wav | Tee-Object -FilePath out\tools\hashes.txt
-          & $tools proof pack out\tools\pack salt1 $wav.FullName out\tools\injected.wav
-          if ($LASTEXITCODE -ne 0) { throw "proof pack failed" }
+          $o = & $tools proof inject comb $wav.FullName out\tools\injected.wav -80 3000 20000 5 2>&1 | Out-String
+          if ($LASTEXITCODE -ne 0) { Fail "proof inject exit $LASTEXITCODE : $o" }
+          $o = & $tools proof hash $wav.FullName out\tools\injected.wav 2>&1 | Out-String
+          if ($LASTEXITCODE -ne 0) { Fail "proof hash exit $LASTEXITCODE : $o" }
+          $o | Set-Content out\tools\hashes.txt
+          $o = & $tools proof pack out\tools\pack salt1 $wav.FullName out\tools\injected.wav 2>&1 | Out-String
+          if ($LASTEXITCODE -ne 0) { Fail "proof pack exit $LASTEXITCODE : $o" }
           # The Tamer must REFUSE with no proof file, and must not write anything.
           "" | Set-Content out\tools\empty_proof.txt
-          & $tools tamer $wav.FullName out\tools\tamer_refused out\tools\empty_proof.txt
-          if ($LASTEXITCODE -ne 3) { throw "the Tamer did not refuse without proof (exit $LASTEXITCODE)" }
-          if (Test-Path out\tools\tamer_refused) { throw "the Tamer wrote files while refusing" }
+          $o = & $tools tamer $wav.FullName out\tools\tamer_refused out\tools\empty_proof.txt 2>&1 | Out-String
+          if ($LASTEXITCODE -ne 3) { Fail "the Tamer did not refuse without proof (exit $LASTEXITCODE) : $o" }
+          if (Test-Path out\tools\tamer_refused) { Fail "the Tamer wrote files while refusing" }
+          Write-Host "::notice title=hiss tools smoke::scanner, combclick, airlab, inject, hash, pack and the Tamer refusal all ran on $($wav.Name)"
           Get-ChildItem out\tools | ForEach-Object { Write-Host $_.Name }
 
       - name: Python check (separately written measurements)
