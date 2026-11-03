@@ -48,6 +48,7 @@ void testFxClip();
 void testFxCeiling();
 void testFxHeat();
 void testFxDynamics();
+void testFxCompressor();
 void testFxTone();
 void testFxNew();
 void testFxRack();

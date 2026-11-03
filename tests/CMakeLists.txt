@@ -10,6 +10,7 @@ add_executable(hc_tests
     analysis_tests.cpp
     fx_tests.cpp
     fx_dyn_tests.cpp
+    fx_comp_tests.cpp
     fx_tone_tests.cpp
     fx_new_tests.cpp
     fx_rack_tests.cpp

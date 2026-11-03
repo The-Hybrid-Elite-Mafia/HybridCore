@@ -230,6 +230,7 @@ int main(int argc, char** argv) {
     testFxCeiling();
     testFxHeat();
     testFxDynamics();
+    testFxCompressor();
     testFxTone();
     testFxNew();
     testFxRack();
