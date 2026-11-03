@@ -5,6 +5,7 @@
 #include "hybrid/fx/Dsp.hpp"
 
 #include <chrono>
+#include <cstring>
 #include <cstdio>
 #include <numbers>
 
@@ -66,9 +67,17 @@ void testFxCompressor() {
     std::printf("[fx] HEM COMPRESSOR: every control measured\n");
     const float A = static_cast<float>(linOf(-6.0));   // 1 kHz at -6 dBFS peak
 
-    {   // 0. Defaults: ANALOG starts ON (published default), IN starts ON.
+    {   // 0. Defaults (Steven's rule: zero / neutral unless the original's published default says otherwise).
         auto e = make();
-        CHECK(e->get(param(*e, "analog")) == 1.0f && e->get(param(*e, "in")) == 1.0f);
+        auto v = [&](const char* id) { return e->get(param(*e, id)); };
+        auto txt = [&](const char* id) { const int i = param(*e, id); return fx::formatValue(e->params()[static_cast<std::size_t>(i)], e->get(i)); };
+        std::printf("  defaults: thr %g, make-up %g, trim %g, sc %g, mix %g, analog %g, in %g, fade %s, rate-s %g, ratio %s, attack %s, release %s\n",
+                    v("threshold"), v("makeup"), v("trim"), v("scfilter"), v("mix"), v("analog"), v("in"), txt("fade").c_str(), v("fadetime"),
+                    txt("ratio").c_str(), txt("attack").c_str(), txt("release").c_str());
+        CHECK(v("threshold") == 0.0f && v("makeup") == 0.0f && v("trim") == 0.0f && v("scfilter") == 0.0f);
+        CHECK(v("mix") == 100.0f && v("analog") == 1.0f && v("in") == 1.0f && v("fadetime") == 10.0f);
+        CHECK(v("fade") == 0.0f && txt("fade") == "OFF");
+        CHECK(txt("ratio") == "4:1" && txt("attack") == "3 ms" && txt("release") == "0.6 s");
     }
     {   // 1. Static compression: 2:1, 4:1, 10:1 at -20 dBFS threshold, tone at -6 dBFS peak (14 dB over, minus half the knee effect is zero this far over).
         const int idx[] = {0, 1, 2};
@@ -176,31 +185,118 @@ void testFxCompressor() {
         CHECK(g[1] < g[0] * 0.35);
         CHECK(std::fabs(g[2] - g[0]) < 0.3);
     }
-    {   // 10. Fade: 2 s fade, check gain at 1 s and 2 s, then fade back in.
-        auto e = make(); base(*e); e->set(param(*e, "in"), 0.0f); e->set(param(*e, "fadetime"), 2.0f); e->set(param(*e, "fade"), 1.0f); e->reset();
-        std::vector<float> a(128, 1.0f), b(128, 1.0f);
-        float one = 0, two = 0, back = 0;
-        for (std::size_t s = 0; s < static_cast<std::size_t>(kFs * 5); s += 128) {
+    {   // 10. FADE has three steps: OFF (skip to unity) -> FADE OUT -> FADE IN. Old sessions: saved 1 = FADE OUT.
+        auto e = make();
+        const int fi = param(*e, "fade");
+        const auto& fp = e->params()[static_cast<std::size_t>(fi)];
+        CHECK(fp.taper == fx::Taper::Choice && fp.max == 2.0f);
+        CHECK(fx::formatValue(fp, 0.0f) == "OFF" && fx::formatValue(fp, 1.0f) == "FADE OUT" && fx::formatValue(fp, 2.0f) == "FADE IN");
+        base(*e); e->set(param(*e, "in"), 0.0f); e->set(param(*e, "fadetime"), 2.0f);
+        e->set(fi, 1.0f);   // what an old saved session (toggle ON) loads as
+        e->reset();
+        std::vector<float> a(64), b(64);
+        // Script: 0-2 s FADE OUT, 2-3 s FADE IN, 3-3.5 s FADE OUT, then OFF (skip).
+        float outHalf = 0, outEnd = 0, inHalf = 0, atFlip = 0, beforeFlip = 0, back = 0, mid = 0, afterSkip = 0;
+        for (std::size_t s = 0; s < static_cast<std::size_t>(kFs * 4); s += 64) {
             std::fill(a.begin(), a.end(), 1.0f); std::fill(b.begin(), b.end(), 1.0f);
-            if (s == static_cast<std::size_t>(kFs) * 2) e->set(param(*e, "fade"), 0.0f);
-            e->process(a.data(), b.data(), 128);
-            if (s == 48000) one = a[0];
-            if (s == 48000 * 2 + 128) two = a[0];
-            if (s == 48000 * 3) back = a[0];
+            if (s == 96000) e->set(fi, 2.0f);
+            if (s == 144000) e->set(fi, 1.0f);
+            if (s == 168000) e->set(fi, 0.0f);
+            e->process(a.data(), b.data(), 64);
+            if (s == 48000) outHalf = a[0];
+            if (s == 96000 - 64) { outEnd = a[63]; }
+            if (s == 120000) inHalf = a[0];
+            if (s == 144000 - 64) beforeFlip = a[63];
+            if (s == 144000) atFlip = a[0];
+            if (s == 168000 - 64) mid = a[63];
+            if (s == 168000 + 1024) afterSkip = a[0];
+            if (s == 192000 - 64) back = a[63];
         }
-        std::printf("  fade: %.3f at 1 s, %.3f at 2 s, %.3f one second after fading back in\n", one, two, back);
-        CHECK(std::fabs(one - 0.5f) < 0.02f); CHECK(two < 0.01f); CHECK(std::fabs(back - 0.5f) < 0.03f);
+        std::printf("  FADE OUT (old saved 1): %.3f at 1 s, %.4f at 2 s; FADE IN: %.3f after 0.5 s; OUT again from %.3f -> %.3f, %.3f at 0.5 s; OFF (skip): %.3f 21 ms later, %.3f at end\n",
+                    outHalf, outEnd, inHalf, beforeFlip, atFlip, mid, afterSkip, back);
+        CHECK(std::fabs(outHalf - 0.5f) < 0.02f); CHECK(outEnd < 0.002f);
+        CHECK(std::fabs(inHalf - 0.25f) < 0.02f);
+        CHECK(std::fabs(atFlip - beforeFlip) < 0.002f);   // FADE IN / OUT carry on from the current level (no jump)
+        CHECK(std::fabs(mid - 0.25f) < 0.02f);
+        CHECK(afterSkip > 0.999f && back > 0.999f);
     }
-    {   // 11. ANALOG adds harmonics (no compression here: tone stays under the knee).
-        double h3[2], h2on = 0;
-        for (int k = 0; k < 2; ++k) {
-            auto e = make(); base(*e); e->set(param(*e, "threshold"), 15.0f); e->set(param(*e, "analog"), k ? 1.0f : 0.0f); e->reset();
-            Stereo s = sine(1000.0, 1.0, 0.45f); run(*e, s);
-            h3[k] = harmonic(s.l, 3000, 24000, 48000) / harmonic(s.l, 1000, 24000, 48000);
-            if (k) h2on = harmonic(s.l, 2000, 24000, 48000) / harmonic(s.l, 1000, 24000, 48000);
+    {   // 10b. FADE IN on its own starts from the current level (already unity = stays at unity).
+        auto e = make(); base(*e); e->set(param(*e, "in"), 0.0f); e->set(param(*e, "fade"), 2.0f); e->reset();
+        Stereo s = sine(1000.0, 0.5, 0.5f), in = s; run(*e, s);
+        CHECK(std::memcmp(s.l.data(), in.l.data(), s.size() * sizeof(float)) == 0);
+    }
+    {   // 11. ANALOG = subtle console colour, not a squash. Level change ANALOG on vs off (no compression), harmonics, noise.
+        const float lv[3] = {0.0f, -6.0f, -30.0f};
+        double dLev[3], h2[3], h3[3];
+        for (int k = 0; k < 3; ++k) {
+            double fund[2];
+            for (int on = 0; on < 2; ++on) {
+                // Mix 0% = the compressor's wet path is out, so nothing is compressed even at 0 dBFS.
+                auto e = make(); base(*e); e->set(param(*e, "threshold"), 15.0f); e->set(param(*e, "mix"), 0.0f);
+                e->set(param(*e, "analog"), on ? 1.0f : 0.0f); e->reset();
+                Stereo s = sine(1000.0, 1.0, static_cast<float>(linOf(lv[k]))); run(*e, s);
+                fund[on] = harmonic(s.l, 1000, 24000, 48000);
+                if (on) { h2[k] = dbOf(harmonic(s.l, 2000, 24000, 48000) / fund[on]); h3[k] = dbOf(harmonic(s.l, 3000, 24000, 48000) / fund[on]); }
+            }
+            dLev[k] = dbOf(fund[1] / fund[0]);
         }
-        std::printf("  ANALOG: 3rd harmonic %.0f dB off, %.1f dB on; 2nd harmonic %.1f dB on\n", dbOf(std::max(h3[0], 1e-9)), dbOf(h3[1]), dbOf(h2on));
-        CHECK(h3[1] > 0.005 && h3[0] < 1e-4 && h2on > 0.0005);
+        std::printf("  ANALOG level change (on vs off): %+.3f dB at 0 dBFS, %+.3f dB at -6, %+.3f dB at -30\n", dLev[0], dLev[1], dLev[2]);
+        std::printf("  ANALOG harmonics: 2nd %.1f / 3rd %.1f dB at 0 dBFS, %.1f / %.1f at -6, %.1f / %.1f at -30\n", h2[0], h3[0], h2[1], h3[1], h2[2], h3[2]);
+        for (int k = 0; k < 3; ++k) CHECK(std::fabs(dLev[k]) <= 0.1);
+        const double sum6 = dbOf(std::sqrt(linOf(h2[1]) * linOf(h2[1]) + linOf(h3[1]) * linOf(h3[1])));
+        const double sum0 = dbOf(std::sqrt(linOf(h2[0]) * linOf(h2[0]) + linOf(h3[0]) * linOf(h3[0])));
+        const double sum30 = dbOf(std::sqrt(linOf(h2[2]) * linOf(h2[2]) + linOf(h3[2]) * linOf(h3[2])));
+        std::printf("  ANALOG 2nd+3rd together: %.1f dB at 0 dBFS, %.1f at -6, %.1f at -30\n", sum0, sum6, sum30);
+        CHECK(h2[1] > -66.0 && h2[1] < -50.0 && h3[1] > -66.0 && h3[1] < -50.0);
+        CHECK(sum6 > -62.0 && sum6 < -50.0);
+        CHECK(sum0 > sum6 && sum6 > sum30 && sum0 < -40.0);   // rises gently with level
+        // Same compressor, wet path, ANALOG on: still no level loss when nothing is compressed.
+        double fund[2];
+        for (int on = 0; on < 2; ++on) {
+            auto e = make(); base(*e); e->set(param(*e, "threshold"), 15.0f); e->set(param(*e, "analog"), on ? 1.0f : 0.0f); e->reset();
+            Stereo s = sine(1000.0, 1.0, static_cast<float>(linOf(-6.0))); run(*e, s);
+            fund[on] = harmonic(s.l, 1000, 24000, 48000);
+        }
+        std::printf("  ANALOG at -6 dBFS through the wet path (mix 100%%): %+.3f dB\n", dbOf(fund[1] / fund[0]));
+        CHECK(std::fabs(dbOf(fund[1] / fund[0])) <= 0.1);
+        // ANALOG off: no harmonics at all.
+        {
+            auto e = make(); base(*e); e->set(param(*e, "threshold"), 15.0f); e->set(param(*e, "analog"), 0.0f); e->reset();
+            Stereo s = sine(1000.0, 1.0, 0.5f); run(*e, s);
+            CHECK(harmonic(s.l, 2000, 24000, 48000) / harmonic(s.l, 1000, 24000, 48000) < 1e-5);
+        }
+    }
+    {   // 11b. ANALOG noise floor: faint, steady, the same every run (seeded), and none when ANALOG is off or IN is off.
+        double on = 0; bool silentOff = true, silentIn = true, same = true, lrDiffer = false;
+        Stereo r1(48000), r2(48000);
+        {   // the same instance after reset() makes the same noise
+            auto e = make(); base(*e); e->set(param(*e, "analog"), 1.0f); e->reset();
+            run(*e, r1); e->reset(); run(*e, r2);
+        }
+        on = rmsDb(r1.l, 4800);
+        for (std::size_t i = 0; i < r1.size(); ++i) { if (r1.l[i] != r2.l[i] || r1.r[i] != r2.r[i]) same = false; if (r1.l[i] != r1.r[i]) lrDiffer = true; }
+        {
+            auto e = make(); base(*e); e->set(param(*e, "analog"), 0.0f); e->reset();
+            Stereo s(48000); run(*e, s);
+            for (std::size_t i = 0; i < s.size(); ++i) if (s.l[i] != 0.0f || s.r[i] != 0.0f) silentOff = false;
+        }
+        {
+            auto e = make(); base(*e); e->set(param(*e, "analog"), 1.0f); e->set(param(*e, "in"), 0.0f); e->reset();
+            Stereo s(48000); run(*e, s);
+            for (std::size_t i = 0; i < s.size(); ++i) if (s.l[i] != 0.0f || s.r[i] != 0.0f) silentIn = false;
+        }
+        std::printf("  ANALOG noise floor: %.1f dBFS RMS on silence; ANALOG off silent: %s; IN off silent: %s; repeatable: %s; L/R differ: %s\n",
+                    on, silentOff ? "yes" : "no", silentIn ? "yes" : "no", same ? "yes" : "no", lrDiffer ? "yes" : "no");
+        CHECK(on > -100.0 && on < -92.0);
+        CHECK(silentOff && silentIn && same && lrDiffer);
+    }
+    {   // 11c. IN off = bit-exact pass-through, even with ANALOG on, make-up, mix and SC filter set.
+        auto e = make(); base(*e); e->set(param(*e, "in"), 0.0f); e->set(param(*e, "analog"), 1.0f); e->set(param(*e, "makeup"), 9.0f);
+        e->set(param(*e, "mix"), 60.0f); e->set(param(*e, "scfilter"), 200.0f); e->reset();
+        Stereo s = noise(1.0, 0.9f), in = s; run(*e, s, 177);
+        const bool exact = std::memcmp(s.l.data(), in.l.data(), s.size() * sizeof(float)) == 0 && std::memcmp(s.r.data(), in.r.data(), s.size() * sizeof(float)) == 0;
+        std::printf("  IN off with ANALOG on: bit-exact pass-through %s\n", exact ? "yes" : "NO");
+        CHECK(exact);
     }
     {   // 12. Stereo link: loud left, quiet right, same gain on both.
         auto e = make(); base(*e);
@@ -225,6 +321,36 @@ void testFxCompressor() {
         CHECK(!e->paramActive(param(*e, "release")));
         e->set(param(*e, "release"), 2.0f);
         CHECK(e->paramActive(param(*e, "release")));
+    }
+    {   // 16. SC FILTER switching on starts from clean filter memory (no stale burst = no click / no false squeeze).
+        auto e = make(); base(*e); e->set(param(*e, "release"), 0.0f);
+        e->set(param(*e, "scfilter"), 100.0f);
+        Stereo loud = sine(60.0, 0.2, 1.0f); run(*e, loud, 64);          // filter memory full of a loud low tone
+        e->set(param(*e, "scfilter"), 0.0f);
+        Stereo quiet = sine(1000.0, 1.0, static_cast<float>(linOf(-60.0))); run(*e, quiet, 64);   // filter off, GR back to 0
+        e->set(param(*e, "scfilter"), 100.0f);
+        Stereo q2 = sine(1000.0, 0.1, static_cast<float>(linOf(-60.0)));
+        const auto gr = runTrace(*e, q2, 16);
+        float mx = 0; for (float g : gr) mx = std::max(mx, g);
+        std::printf("  SC FILTER switched on during quiet audio: worst gain reduction %.3f dB\n", mx);
+        CHECK(mx < 0.01f);
+    }
+    {   // 17. Zero heap allocations in process(): ANALOG on, every release incl. AUTO, SC filter on, every FADE state.
+        auto e = make(); base(*e); e->set(param(*e, "analog"), 1.0f); e->set(param(*e, "scfilter"), 120.0f); e->set(param(*e, "fadetime"), 1.0f); e->reset();
+        Stereo s = noise(0.5, 0.8f);
+        std::uint64_t allocs = 0; int runs = 0;
+        {
+            AllocScope scope;
+            for (int rel = 0; rel <= 4; ++rel)
+                for (int fade = 0; fade <= 2; ++fade) {
+                    e->set(param(*e, "release"), static_cast<float>(rel)); e->set(param(*e, "fade"), static_cast<float>(fade));
+                    e->set(param(*e, "scfilter"), (rel & 1) ? 0.0f : 120.0f + 10.0f * static_cast<float>(rel));
+                    run(*e, s, 256); ++runs;
+                }
+            allocs = scope.count();
+        }
+        std::printf("  allocations in process(): %llu across %d runs (5 releases x 3 fade states, ANALOG on, SC filter on/off)\n", static_cast<unsigned long long>(allocs), runs);
+        CHECK(allocs == 0);
     }
     {   // 15. Real-time cost, everything on.
         auto e = make(); setAll(*e, kThrM20, 1, 0, 4, 100.0f, 100.0f, 0.0f, 0.0f, true, true); e->reset();
