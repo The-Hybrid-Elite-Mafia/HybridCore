@@ -1,7 +1,7 @@
 // HEM COMPRESSOR: what each control must actually do to the sound, measured with numbers.
 #include "FxTestUtil.hpp"
 #include "TestHarness.hpp"
-#include "hybrid/fx/CompressorConfig.hpp"
+#include "hem/compressor/HemCompressor.hpp"
 #include "hybrid/fx/Dsp.hpp"
 
 #include <chrono>
@@ -17,7 +17,7 @@ constexpr double kFs = 48000.0;
 constexpr float kThrM20 = -2.0f;   // knob value that puts the threshold at -20 dBFS (knob + (-18))
 
 std::unique_ptr<fx::Effect> make() {
-    auto e = fx::makeCompressor();
+    auto e = hem::compressor::make();
     e->prepare(kFs, 512);
     return e;
 }

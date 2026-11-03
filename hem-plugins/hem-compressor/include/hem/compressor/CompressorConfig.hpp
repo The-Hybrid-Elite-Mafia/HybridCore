@@ -1,6 +1,6 @@
 #pragma once
 // =============================================================================
-//  HEM COMPRESSOR: central config. Every unverified working guess lives in THIS file.
+//  HEM COMPRESSOR: central config (the ONE place for this plugin's guesses). Every unverified working guess lives in THIS file.
 //    // ASSUMED = a guess used so the control works. Not checked against any hardware.
 //    // UNKNOWN = not known at all. A plain default is used and it is listed in kNotes.
 //  Nothing here copies, or claims to match, any other maker's product.
@@ -8,7 +8,7 @@
 #include <array>
 #include <cstddef>
 
-namespace hc::fx::compressor_cfg {
+namespace hem::compressor::cfg {
 
 inline constexpr float kThrKnobToDbFS = -18.0f;  // ASSUMED: threshold dBFS = knob + this. From the published note that the unit's meters are calibrated 18 dBu = 0 dBFS; that this also applies to the THRESHOLD knob is a guess.
 // DOCUMENTED (public manuals): THRESHOLD spans -15 to +15; lowering it gives more compression.
@@ -47,4 +47,4 @@ inline constexpr std::array<Note, 15> kNotes = {{
     {"UNKNOWN", "The exact curves and timings of any reference hardware. None are copied or claimed."},
 }};
 
-} // namespace hc::fx::compressor_cfg
+} // namespace hem::compressor::cfg

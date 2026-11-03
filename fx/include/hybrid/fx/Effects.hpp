@@ -25,7 +25,6 @@ namespace hc::fx {
 [[nodiscard]] std::unique_ptr<Effect> makeBalance();
 [[nodiscard]] std::unique_ptr<Effect> makeEcho();
 [[nodiscard]] std::unique_ptr<Effect> makeSwirlKiller();
-[[nodiscard]] std::unique_ptr<Effect> makeCompressor();
 
 // HEM TUNE's note finder (exposed for tests): nearest allowed MIDI note for key (0 = C) and
 // scale (0 chromatic, 1 major, 2 minor).

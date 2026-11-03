@@ -1,18 +1,18 @@
 // HEM COMPRESSOR: stereo-linked peak compressor with parallel mix, optional saturation, detector
-// high-pass, trim and a fade. Our own design. Every guess it makes is in CompressorConfig.hpp.
+// high-pass, trim and a fade. Our own design. Every guess it makes is in include/hem/compressor/CompressorConfig.hpp.
 // Signal path: detector (optional 12 dB/oct high-pass, loudest side) -> level in dB -> 6 dB soft-knee
-// gain computer -> attack / release smoothing in dB (AUTO release follows how deep the squeeze is)
+// gain computer -> attack / release smoothing in dB (AUTO release follows how long the peak lasted)
 // -> gain -> optional tanh saturation -> make-up -> parallel mix -> IN cross-fade -> trim * fade.
 // Audio thread: no allocation, no locks, no waiting. Parameters are read once per block.
-#include "hybrid/fx/CompressorConfig.hpp"
+#include "hem/compressor/CompressorConfig.hpp"
+#include "hem/compressor/HemCompressor.hpp"
 #include "hybrid/fx/Dsp.hpp"
-#include "hybrid/fx/Effects.hpp"
 
 #include <cmath>
 
-namespace hc::fx {
+namespace hem::compressor {
 namespace {
-namespace cfg = compressor_cfg;
+using namespace hc::fx;
 
 enum P { Threshold, Ratio, Attack, Release, ScFilter, Mix, Makeup, Trim, Analog, In, Fade, FadeTime, kCount };
 
@@ -153,6 +153,6 @@ private:
 
 } // namespace
 
-std::unique_ptr<Effect> makeCompressor() { return std::make_unique<Compressor>(); }
+std::unique_ptr<hc::fx::Effect> make() { return std::make_unique<Compressor>(); }
 
-} // namespace hc::fx
+} // namespace hem::compressor

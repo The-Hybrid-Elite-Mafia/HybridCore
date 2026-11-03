@@ -54,6 +54,7 @@ function(hc_copy_assets target)
 endfunction()
 
 add_subdirectory(core)
+add_subdirectory(hem-plugins)   # the HEM plugin series, one folder per plugin
 add_subdirectory(io)
 add_subdirectory(dsp)
 add_subdirectory(analysis)
