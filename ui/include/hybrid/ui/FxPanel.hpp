@@ -1,6 +1,6 @@
 #pragma once
 // =============================================================================
-//  FxPanel — the faceplate of every HEM plug-in (the 22 effects and HEM WAVE).
+//  FxPanel — the faceplate of every HEM plug-in (the 23 effects and HEM WAVE).
 //
 //  Look: a slab of polished obsidian, rendered on the CPU once per plug-in and lit from the
 //  top-left like the console (kLight). Every control sits in its own CNC-routed pocket: round

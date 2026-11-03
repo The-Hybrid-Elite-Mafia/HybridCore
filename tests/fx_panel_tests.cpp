@@ -18,7 +18,7 @@ bool inside(const ui::Rect& a, float w, float h) { return a.x >= 0 && a.y >= 0 &
 } // namespace
 
 void testFxPanel() {
-    std::printf("[ui] plug-in faceplates: layout of all 22 effects, knobs / buttons / selectors, meters, obsidian plate\n");
+    std::printf("[ui] plug-in faceplates: layout of all 23 effects, knobs / buttons / selectors, meters, obsidian plate\n");
     int clean = 0;
     for (const fx::EffectInfo& info : fx::effects()) {
         auto e = info.create();

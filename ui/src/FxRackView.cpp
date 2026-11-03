@@ -280,7 +280,7 @@ void FxRackView::draw(Renderer& r, float canvasScale, FxRackModel& model) {
         panel_->view->draw(r, *panel_->host, panel_->ctrl->hover(), panel_->ctrl->active(), ox_, oy_, true);
     } else {
         r.text(TextStyle::Heading, "PICK A STRIP, THEN A SLOT", right_.cx(), right_.cy() - 30, kViolet, Align::Center, TextFx::Neon);
-        r.text(TextStyle::Status, "22 HEM effects - each strip takes 3, in order: slot 1, then 2, then 3", right_.cx(), right_.cy() + 40, kDim,
+        r.text(TextStyle::Status, "23 HEM effects - each strip takes 3, in order: slot 1, then 2, then 3", right_.cx(), right_.cy() + 40, kDim,
                Align::Center, TextFx::Shadowed);
     }
 }

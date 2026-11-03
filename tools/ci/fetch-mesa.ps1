@@ -11,7 +11,8 @@ $work = Join-Path ([IO.Path]::GetTempPath()) 'hc-mesa'
 Remove-Item -Recurse -Force $work -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $work | Out-Null
 
-$assets = gh release view --repo pal1000/mesa-dist-win --json tagName,assets | ConvertFrom-Json
+# Pinned: 26.2.4 is the version the CI passed with on 2026-10-30. The newest release (26.2.6) had no opengl32.dll in its x64 folder.
+$assets = gh release view 26.2.4 --repo pal1000/mesa-dist-win --json tagName,assets | ConvertFrom-Json
 $asset  = $assets.assets | Where-Object { $_.name -match '^mesa3d-.*-release-msvc\.7z$' } | Select-Object -First 1
 if (-not $asset) { throw "No release-msvc 7z asset found in pal1000/mesa-dist-win $($assets.tagName)" }
 Write-Host "Mesa: $($assets.tagName) / $($asset.name)"

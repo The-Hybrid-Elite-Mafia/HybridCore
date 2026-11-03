@@ -1,4 +1,4 @@
-// hc_fx_snapshot — renders the obsidian faceplate of every HEM plug-in (the 22 effects and
+// hc_fx_snapshot — renders the obsidian faceplate of every HEM plug-in (the 23 effects and
 // HEM WAVE) off-screen with the real faceplate code (hc::ui::FxPanelWindow, OpenGL), after
 // running each effect on a few seconds of test audio so its meters are live, and saves PNGs
 // plus one contact sheet. Used by CI (software OpenGL); works on the rig too.
