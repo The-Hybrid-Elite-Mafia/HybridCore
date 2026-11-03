@@ -75,7 +75,7 @@ void FxPanelView::drawCompressorKnob(Renderer& r, const PanelKnob& k, const Pane
         const float r0 = R + 5 * z, r1 = R + (major ? 17.0f : 11.0f) * z;
         const float xs[2] = {cx + std::sin(a) * r0, cx + std::sin(a) * r1}, ys[2] = {cy - std::cos(a) * r0, cy - std::cos(a) * r1};
         const bool on = k.steps > 1 ? std::fabs(f - n) < 0.5f / static_cast<float>(marks - 1) : false;
-        r.polyline(xs, ys, 2, (major ? 3.2f : 2.0f) * z, on ? kAmber : kEngrave.withAlpha(major ? 0.85f : 0.55f), Blend::Over, on);
+        r.polyline(xs, ys, 2, (major ? 3.2f : 2.0f) * z, on ? kAmber : kEngrave.withAlpha(major ? 0.85f : 0.55f), Blend::Over, false);
     }
     // the knob: dark spun cap on a knurled silver skirt, in its well
     const float bodyR = R * 0.80f;
@@ -83,18 +83,17 @@ void FxPanelView::drawCompressorKnob(Renderer& r, const PanelKnob& k, const Pane
     // thin amber arc from the start to the value; knobs that go both ways start it at their default (0 dB)
     const float a0 = kKnobMin + (kKnobMax - kKnobMin) * (prm.bipolar ? prm.defNormalized : 0.0f);
     const float ar = R * 0.93f, aw = 2.6f * z;
-    if (std::fabs(ang - a0) > 0.004f) r.arc(cx, cy, ar, aw, std::min(a0, ang), std::max(a0, ang), kAmber.withAlpha(0.85f), true);
+    if (std::fabs(ang - a0) > 0.004f) r.arc(cx, cy, ar, aw, std::min(a0, ang), std::max(a0, ang), kAmber.withAlpha(0.85f), false);
     const float bd = bodyR * 2.0f * 256.0f / 254.0f;
     r.spriteRotated(Sprite::KnobBody, cx, cy, bd, bd, ang);
     const float len = (knob::kIndicatorTo - knob::kIndicatorFrom) * bodyR;
     const float mid = 0.5f * (knob::kIndicatorTo + knob::kIndicatorFrom) * bodyR;
     const float ih = len * 96.0f / 72.0f, iw = ih * 24.0f / 96.0f;
-    r.spriteRotated(Sprite::KnobIndicator, cx + std::sin(ang) * mid, cy - std::cos(ang) * mid, iw, ih, ang, {1.0f, 0.97f, 0.92f, 1.0f}, Blend::Over, true);
+    r.spriteRotated(Sprite::KnobIndicator, cx + std::sin(ang) * mid, cy - std::cos(ang) * mid, iw, ih, ang, {1.0f, 0.97f, 0.92f, 1.0f}, Blend::Over, false);
     r.sprite(Sprite::KnobLight, {cx - bd / 2, cy - bd / 2, bd, bd});
     // a stepped knob always shows its own step (RELEASE at AUTO is still a choice, not an unused knob)
     const bool on = host.active(k.param) || prm.kind == PanelParam::Kind::Choice;
     if (!on) r.fillRound(well.inset(well.w * 0.06f), well.w * 0.44f, rgb8(0x000000, 0.6f), Blend::Over);
-    if (hot) r.glow(well.inset(well.w * 0.14f), well.w * 0.36f, 16.0f * z, kTeal.withAlpha(0.28f), true);
 
     // caption (engraved) and value window (teal)
     const Rect c = at(k.caption, ox, oy);
@@ -105,7 +104,7 @@ void FxPanelView::drawCompressorKnob(Renderer& r, const PanelKnob& k, const Pane
     r.fillRound(v.inset(3 * z), 8 * z, kGlassC, Blend::Over);
     const std::string t = on ? knobText(prm, host, k.param) : std::string("--");
     const TextStyle vs = fit(r, TextStyle::Title, t, v.w - 14 * z);
-    r.text(vs, t, v.cx(), v.cy() + r.capHeight(vs) * 0.5f, on ? (hot ? kEngrave : kTeal) : kEngraveDim, Align::Center, on ? TextFx::NeonCrisp : TextFx::Shadowed);
+    r.text(vs, t, v.cx(), v.cy() + r.capHeight(vs) * 0.5f, on ? (hot ? kEngrave : kTeal) : kEngraveDim, Align::Center, on ? TextFx::Plain : TextFx::Shadowed);
 }
 
 void FxPanelView::drawCompressor(Renderer& r, const PanelHost& host, PanelHit hover, PanelHit active, float ox, float oy, bool plate) const {
@@ -124,19 +123,17 @@ void FxPanelView::drawCompressor(Renderer& r, const PanelHost& host, PanelHit ho
     const float grDb = nm > 2 ? -host.meter(2) : 0.0f;
     cmeters_.update(grDb, inDb, outDb, dt);
 
-    // amber neon in the routed channels
+    // amber channels: one solid colour, no glow
     for (const PanelGroove& g : L.grooves) {
         const float xs[2] = {g.x0 + ox, g.x1 + ox}, ys[2] = {g.y0 + oy, g.y1 + oy};
-        r.glow({std::min(xs[0], xs[1]), ys[0] - 1 * z, std::fabs(xs[1] - xs[0]), 2 * z}, 2 * z, 12.0f * z, kAmber.withAlpha(0.45f), true);
-        r.polyline(xs, ys, 2, 3.5f * z, kAmber, Blend::Over, true);
-        r.polyline(xs, ys, 2, 1.3f * z, {1, 1, 1, 0.7f}, Blend::Add, true);
+        r.polyline(xs, ys, 2, 3.5f * z, kAmber, Blend::Over, false);
     }
 
     // title
     {
         const Rect ta = at(L.titleArea, ox, oy);
         const TextStyle big = ts(TextStyle::Display);
-        spaced(r, big, "HEM", ta.cx(), ta.y + 150 * z, 14.0f * z, kAmber, TextFx::Neon);
+        spaced(r, big, "HEM", ta.cx(), ta.y + 150 * z, 14.0f * z, kAmber, TextFx::Plain);
         const TextStyle sub = ts(TextStyle::Panel);
         spaced(r, sub, "COMPRESSOR", ta.cx(), ta.y + 222 * z, 9.0f * z, kEngrave, TextFx::Shadowed);
     }
@@ -148,7 +145,6 @@ void FxPanelView::drawCompressor(Renderer& r, const PanelHost& host, PanelHit ho
         if (s.meter != 2) continue;
         const Rect g = at(s.bar, ox, oy);
         r.fillRound(g, 18 * z, rgb8(0x0B0A08, 1.0f), Blend::Over);
-        r.glow(g.inset(g.w * 0.16f, g.h * 0.22f), g.h * 0.25f, 60.0f * z, kAmber.withAlpha(0.16f), false);   // warm backlight
         r.pushClip(g);
         const float px = g.cx(), py = g.bottom() + g.h * 0.20f;
         const float arcR = g.h * 0.98f;
@@ -185,8 +181,7 @@ void FxPanelView::drawCompressor(Renderer& r, const PanelHost& host, PanelHit ho
         const float nx[2] = {px + std::sin(a) * (g.h * 0.32f), px + std::sin(a) * (arcR + 26.0f * z)};
         const float ny[2] = {py - std::cos(a) * (g.h * 0.32f), py - std::cos(a) * (arcR + 26.0f * z)};
         r.polyline(nx, ny, 2, 9.0f * z, rgb8(0x000000, 0.35f), Blend::Over);
-        r.polyline(nx, ny, 2, 4.0f * z, kAmber, Blend::Over, true);
-        r.polyline(nx, ny, 2, 1.5f * z, {1, 1, 1, 0.8f}, Blend::Add, true);
+        r.polyline(nx, ny, 2, 4.0f * z, kAmber, Blend::Over, false);
         r.popClip();
         // glass: sheen and a bright rim
         {   // reflection: bright at the top edge, fading out a third of the way down
@@ -196,14 +191,13 @@ void FxPanelView::drawCompressor(Renderer& r, const PanelHost& host, PanelHit ho
             const Rgba qc[4] = {top, top, bottom, bottom};
             r.colorQuad(qx, qy, qc, Blend::Add);
         }
-        r.fillRound({g.x + 4 * z, g.y + 3 * z, g.w - 8 * z, 2 * z}, 1 * z, {1, 1, 1, 0.22f}, Blend::Add);
         // number
         const Rect v = at(s.value, ox, oy);
         r.fillRound(v.inset(3 * z), 8 * z, kGlassC, Blend::Over);
         char b[24];
         std::snprintf(b, sizeof b, "%.1f dB", static_cast<double>(std::round(cmeters_.needleDb * 10.0f) / 10.0f));
         const TextStyle vs = fit(r, TextStyle::Title, b, v.w - 14 * z);
-        r.text(vs, b, v.cx(), v.cy() + r.capHeight(vs) * 0.5f, kAmber, Align::Center, TextFx::NeonCrisp);
+        r.text(vs, b, v.cx(), v.cy() + r.capHeight(vs) * 0.5f, kAmber, Align::Center, TextFx::Plain);
         const Rect c = at(s.caption, ox, oy);
         const TextStyle cs = ts(TextStyle::Caption);
         r.text(cs, "GAIN REDUCTION", c.right() - 6 * z, c.cy() + r.capHeight(cs) * 0.5f, kEngraveDim, Align::Right, TextFx::Shadowed);
@@ -223,9 +217,7 @@ void FxPanelView::drawCompressor(Renderer& r, const PanelHost& host, PanelHit ho
             const Rgba col = top > -3.0f ? kRed : top > -12.0f ? kAmber : kTeal;
             const Rect led{bar.x + pad, bar.bottom() - pad - static_cast<float>(i + 1) * lh - static_cast<float>(i) * gap, bar.w - 2 * pad, lh};
             if (i < lit) {
-                r.glow(led, 3 * z, 8.0f * z, col.withAlpha(0.45f), true);
-                r.fillRound(led, 3 * z, col, Blend::Over, true);
-                r.fillRound({led.x + 2 * z, led.y + 1 * z, led.w - 4 * z, led.h * 0.35f}, 2 * z, {1, 1, 1, 0.22f}, Blend::Add, true);
+                r.fillRound(led, 3 * z, col, Blend::Over, false);
             } else {
                 r.fillRound(led, 3 * z, col.withAlpha(0.10f), Blend::Over);
             }
@@ -247,7 +239,7 @@ void FxPanelView::drawCompressor(Renderer& r, const PanelHost& host, PanelHit ho
         if (lvl <= -60.0f) std::snprintf(b, sizeof b, "--");
         else std::snprintf(b, sizeof b, "%.1f", static_cast<double>(std::round(lvl * 10.0f) / 10.0f));
         const TextStyle vs = fit(r, TextStyle::Title, b, v.w - 12 * z);
-        r.text(vs, b, v.cx(), v.cy() + r.capHeight(vs) * 0.5f, kTeal, Align::Center, TextFx::NeonCrisp);
+        r.text(vs, b, v.cx(), v.cy() + r.capHeight(vs) * 0.5f, kTeal, Align::Center, TextFx::Plain);
         const Rect c = at(s.caption, ox, oy);
         spaced(r, ts(TextStyle::Label), s.meter == 0 ? "IN" : "OUT", c.cx(), c.cy() + r.capHeight(ts(TextStyle::Label)) * 0.5f, 3.0f * z, kEngrave,
                TextFx::Shadowed);
@@ -283,9 +275,7 @@ void FxPanelView::drawCompressor(Renderer& r, const PanelHost& host, PanelHit ho
         const Rect lens = br.inset(12 * z);
         const TextStyle st = fit(r, TextStyle::Title, state, lens.w - 10 * z);
         if (lit) {
-            r.glow(lens, 8 * z, 16.0f * z, lamp.withAlpha(0.45f), true);
-            r.fillRound(lens, 8 * z, lamp.withAlpha(0.95f), Blend::Over, true);
-            r.fillRound({lens.x + 4 * z, lens.y + 3 * z, lens.w - 8 * z, lens.h * 0.38f}, 6 * z, {1, 1, 1, 0.20f}, Blend::Add, true);
+            r.fillRound(lens, 8 * z, lamp, Blend::Over, false);
             r.text(st, state, lens.cx(), lens.cy() + r.capHeight(st) * 0.5f, rgb8(0x14100A), Align::Center, TextFx::Plain);
         } else {
             r.fillRound(lens, 8 * z, lamp.withAlpha(0.10f), Blend::Over);
@@ -305,7 +295,7 @@ void FxPanelView::drawCompressor(Renderer& r, const PanelHost& host, PanelHit ho
     // ---- footer
     const Rect ft = at(L.footer, ox, oy);
     const TextStyle fs = ts(TextStyle::Caption);
-    r.text(fs, "HYBRID ELITE MAFIA", ft.x + 30 * z, ft.cy() + r.capHeight(fs) * 0.5f, kAmber, Align::Left, TextFx::NeonCrisp);
+    r.text(fs, "HYBRID ELITE MAFIA", ft.x + 30 * z, ft.cy() + r.capHeight(fs) * 0.5f, kAmber, Align::Left, TextFx::Plain);
     {
         const float x0 = ft.x + 30 * z + r.textWidth(fs, "HYBRID ELITE MAFIA") + 30 * z;
         const float x1 = (host.hasBypass() && L.hasBypass ? at(L.bypass, ox, oy).x : ft.right()) - 20 * z;
@@ -315,7 +305,7 @@ void FxPanelView::drawCompressor(Renderer& r, const PanelHost& host, PanelHit ho
     }
     if (host.hasBypass() && L.hasBypass) {
         const bool byp = host.bypassed();
-        drawButton(r, at(L.bypass, ox, oy), byp ? "BYPASSED" : "BYPASS", byp, hover.kind == PanelHit::Kind::Bypass, kAmber);
+        drawButton(r, at(L.bypass, ox, oy), byp ? "BYPASSED" : "BYPASS", byp, hover.kind == PanelHit::Kind::Bypass, kAmber, false);
     }
 }
 
