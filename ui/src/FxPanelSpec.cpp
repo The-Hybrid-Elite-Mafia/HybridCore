@@ -9,8 +9,10 @@ PanelSpec panelSpecFor(const fx::EffectInfo& info, const fx::Effect& e) {
     PanelSpec s;
     s.name = info.name;
     s.blurb = info.blurb;
+    if (s.name == "HEM COMPRESSOR") s.style = PanelStyle::Compressor;   // its own hand-laid-out plate
     for (const fx::ParamInfo& p : e.params()) {
         PanelParam pp;
+        pp.id = p.id;
         pp.name = p.name;
         if (p.taper == fx::Taper::Toggle) pp.kind = PanelParam::Kind::Toggle;
         else if (p.taper == fx::Taper::Choice) {
@@ -27,6 +29,8 @@ PanelSpec panelSpecFor(const fx::EffectInfo& info, const fx::Effect& e) {
     if (s.meters.empty() && (cat.find("Dynamics") != std::string::npos || cat.find("Mastering") != std::string::npos ||
                              cat.find("Restoration") != std::string::npos || s.name == "HEM CLIP"))
         s.meters.push_back({"GAIN RED.", "dB", -24.0f, 0.0f, false});
+    // The compressor plate's needle reads the gain reduction as meter 2 (after IN and OUT).
+    if (s.style == PanelStyle::Compressor) s.meters.push_back({"dB COMPRESSION", "dB", -20.0f, 0.0f, false});
     return s;
 }
 

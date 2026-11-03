@@ -160,6 +160,7 @@ void FxPanelView::drawMeter(Renderer& r, const PanelMeterSlot& s, float raw, flo
 }
 
 void FxPanelView::draw(Renderer& r, const PanelHost& host, PanelHit hover, PanelHit active, float ox, float oy, bool plate) const {
+    if (layout_.style == PanelStyle::Compressor) { drawCompressor(r, host, hover, active, ox, oy, plate); return; }
     const PanelLayout& L = layout_;
     const float z = L.zoom;
     ++frame_;

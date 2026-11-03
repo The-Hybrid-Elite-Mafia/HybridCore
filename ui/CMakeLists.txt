@@ -17,6 +17,8 @@ add_library(hc_ui STATIC
     src/FxPanel.cpp
     src/FxPanelSpec.cpp
     src/FxPanelView.cpp
+    src/FxPanelCompressor.cpp
+    src/FxPanelCompressorView.cpp
     src/FxPanelWindow.cpp
     src/FxRackView.cpp)
 add_library(hc::ui ALIAS hc_ui)

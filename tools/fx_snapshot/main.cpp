@@ -150,6 +150,23 @@ int main(int argc, char** argv) {
         const ui::PanelSpec spec = ui::panelSpecFor(info, *e);
         ui::EffectPanelHost host(*e);
         save(info.name, spec, host);
+        if (std::string(info.name) == "HEM COMPRESSOR") {
+            // A second shot of its own plate in a "working" state: knobs moved off their defaults,
+            // the needle near 6 dB of reduction (threshold picked for this test song), FADE showing OUT.
+            auto w = info.create();
+            const auto ps = w->params();
+            auto set = [&](const char* id, float v) {
+                for (std::size_t i = 0; i < ps.size(); ++i) if (std::string(ps[i].id) == id) w->set(static_cast<int>(i), v);
+            };
+            set("threshold", -4.0f); set("ratio", 1.0f); set("attack", 2.0f); set("release", 4.0f); set("scfilter", 90.0f);
+            set("mix", 80.0f); set("makeup", 4.0f); set("trim", -1.5f); set("fadetime", 6.0f); set("fade", 1.0f);
+            feed(*w);
+            std::printf("     HEM COMPRESSOR working state: engine GR %.2f dB, IN %.2f dBFS, OUT %.2f dBFS\n",
+                        static_cast<double>(-w->reductionDb()), static_cast<double>(w->meter(0)), static_cast<double>(w->meter(1)));
+            const ui::PanelSpec ws = ui::panelSpecFor(info, *w);
+            ui::EffectPanelHost wh(*w);
+            save("HEM COMPRESSOR working", ws, wh);
+        }
     }
     {
         synth::WaveSynth s;

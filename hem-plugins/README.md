@@ -5,7 +5,7 @@ All are C++23, no JUCE, built on The Hybrid Core. Names and sound are our own.
 
 | Folder | Plugin | State |
 |---|---|---|
-| `hem-compressor/` | HEM COMPRESSOR | Engine built, 33 measured checks in CI, in the FX rack and the VST3 suite. Faceplate: the console's automatic one. A custom HEM faceplate is not built yet. |
+| `hem-compressor/` | HEM COMPRESSOR | Engine built, 54 measured checks, in the FX rack and the VST3 suite. Its own HEM faceplate (ui/src/FxPanelCompressor*.cpp): brushed titanium, crown badge and ghost, needle GR meter, IN / OUT LED ladders, used in the FX rack, the VST3 editor and the CI snapshots. Not yet seen on Steven's own screen. |
 
 ## Layout of one plugin
 ```

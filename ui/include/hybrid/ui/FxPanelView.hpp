@@ -11,6 +11,7 @@
 #include "hybrid/ui/FxPanel.hpp"
 #include "hybrid/ui/Renderer.hpp"
 
+#include <chrono>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -31,6 +32,9 @@ private:
     void drawButton(Renderer& r, Rect b, const std::string& text, bool lit, bool hot, Rgba colour) const;
     void drawMeter(Renderer& r, const PanelMeterSlot& m, float value, float ox, float oy) const;
     void drawCrown(Renderer& r, Rect area) const;
+    // HEM COMPRESSOR's own plate (FxPanelCompressor.cpp).
+    void drawCompressor(Renderer& r, const PanelHost& host, PanelHit hover, PanelHit active, float ox, float oy, bool plate) const;
+    void drawCompressorKnob(Renderer& r, const PanelKnob& k, const PanelHost& host, bool hot, float ox, float oy) const;
     // The text style for `base` at this plate's zoom, and the largest one that fits `width`.
     [[nodiscard]] TextStyle ts(TextStyle base) const;
     [[nodiscard]] TextStyle fit(const Renderer& r, TextStyle base, std::string_view text, float width) const;
@@ -41,6 +45,8 @@ private:
     FxPalette          pal_;
     mutable std::vector<float> bar_, shown_;
     mutable std::uint32_t      frame_ = 0;
+    mutable compressor_face::MeterState cmeters_;
+    mutable std::chrono::steady_clock::time_point last_{};
 };
 
 } // namespace hc::ui

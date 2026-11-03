@@ -91,12 +91,12 @@ Rect zr(Rect r, float z) { return {r.x * z, r.y * z, r.w * z, r.h * z}; }
 } // namespace
 
 PanelLayout layoutFxPanel(const PanelSpec& spec, float zoom, int maxCols) {
-    PanelLayout L = layoutAtOne(spec, maxCols);
+    PanelLayout L = spec.style == PanelStyle::Compressor ? layoutCompressorPanel(spec) : layoutAtOne(spec, maxCols);
     const float z = std::clamp(zoom, 0.25f, 4.0f);
     if (std::fabs(z - 1.0f) < 1e-6f) return L;
     L.zoom = z;
     L.width *= z; L.height *= z;
-    for (Rect* r : {&L.header, &L.titleArea, &L.footer, &L.bypass, &L.logo, &L.meterBay}) *r = zr(*r, z);
+    for (Rect* r : {&L.header, &L.titleArea, &L.footer, &L.bypass, &L.logo, &L.meterBay, &L.badgeLeft, &L.badgeRight}) *r = zr(*r, z);
     for (auto& p : L.pockets) { p.r = zr(p.r, z); p.radius *= z; }
     for (auto& g : L.grooves) { g.x0 *= z; g.y0 *= z; g.x1 *= z; g.y1 *= z; }
     for (auto& s : L.sections) { s.bay = zr(s.bay, z); s.captionArea = zr(s.captionArea, z); }
@@ -270,6 +270,8 @@ struct Surface {
 
 } // namespace
 
+void compositeBrandArt(const PanelLayout& L, Image& img, float ppu);   // FxPanelCompressor.cpp
+
 Image renderFxPlate(const PanelLayout& L, const FxPalette& pal, float ppu) {
     const auto W = static_cast<std::uint32_t>(std::lround(L.width * ppu)), H = static_cast<std::uint32_t>(std::lround(L.height * ppu));
     Image img;
@@ -355,6 +357,7 @@ Image renderFxPlate(const PanelLayout& L, const FxPalette& pal, float ppu) {
     // Linear-light colours.
     auto lin = [](Rgba c) { return V3{srgbToLinear(c.r), srgbToLinear(c.g), srgbToLinear(c.b)}; };
     const V3 violet = lin(pal.violet), lime = lin(pal.lime);
+    const bool brushed = L.style == PanelStyle::Compressor;   // dark brushed titanium instead of obsidian
 
     for (std::uint32_t py = 0; py < H; ++py) {
         for (std::uint32_t px = 0; px < W; ++px) {
@@ -382,7 +385,15 @@ Image renderFxPlate(const PanelLayout& L, const FxPalette& pal, float ppu) {
             V3 albedo{0.010f, 0.010f, 0.012f};
             float specPow = 160.0f, specAmt = 0.9f, envAmt = 1.0f, ao = 1.0f;
             bool  metal = false;
-            if (s.kind == 0 || s.kind == 5) {
+            if (brushed && (s.kind == 0 || s.kind == 5)) {
+                // dark charcoal brushed titanium: long horizontal grain, a few deeper scratches
+                const float streak = fbm(tx * 0.0012f, ty * 0.55f, 3);
+                const float fine = vnoise(tx * 0.03f, ty * 2.7f);
+                const float scratch = std::pow(vnoise(tx * 0.0035f, ty * 0.21f), 14.0f);
+                const float a = 0.020f + 0.012f * streak + 0.005f * fine + 0.010f * scratch;
+                albedo = {a, a * 1.015f, a * 1.06f};
+                specPow = 26.0f; specAmt = 0.55f; envAmt = 0.9f;
+            } else if (s.kind == 0 || s.kind == 5) {
                 // polished obsidian: flow banding and a faint violet / green sheen inside the glass
                 const float warp = fbm(tx * 0.004f, ty * 0.004f, 3) * 6.0f;
                 const float band = 0.5f + 0.5f * std::sin(tx * 0.006f + ty * 0.017f + warp);
@@ -430,7 +441,13 @@ Image renderFxPlate(const PanelLayout& L, const FxPalette& pal, float ppu) {
             const float streak = std::exp(-(u - 0.40f) * (u - 0.40f) / 0.0060f) * 0.75f + std::exp(-(u - 0.63f) * (u - 0.63f) / 0.0012f) * 0.30f
                                + std::exp(-(u - 0.12f) * (u - 0.12f) / 0.0100f) * 0.20f;
             const float fres = metal ? 0.6f : 0.045f + 0.6f * std::pow(1.0f - std::max(0.0f, n.z), 5.0f);
-            const float env = (box * 0.9f + (s.kind == 0 || s.kind == 5 ? streak : 0.0f) + 0.012f) * fres * envAmt;
+            float env = (box * 0.9f + (!brushed && (s.kind == 0 || s.kind == 5) ? streak : 0.0f) + 0.012f) * fres * envAmt;
+            if (brushed && (s.kind == 0 || s.kind == 5)) {
+                // brushed metal: a soft horizontal sheen band that follows the grain
+                const float yy = y / L.height;
+                const float band = std::exp(-(yy - 0.20f) * (yy - 0.20f) / 0.012f) + 0.55f * std::exp(-(yy - 0.74f) * (yy - 0.74f) / 0.02f);
+                env += band * (0.020f + 0.030f * fbm(tx * 0.0009f, ty * 0.45f, 2));
+            }
 
             V3 c{albedo.x * (0.06f + 0.94f * diff * shadow) * ao, albedo.y * (0.06f + 0.94f * diff * shadow) * ao,
                  albedo.z * (0.06f + 0.94f * diff * shadow) * ao};
@@ -442,6 +459,7 @@ Image renderFxPlate(const PanelLayout& L, const FxPalette& pal, float ppu) {
             o[0] = linearToSrgb8(c.x); o[1] = linearToSrgb8(c.y); o[2] = linearToSrgb8(c.z); o[3] = 255;
         }
     }
+    if (L.badgeLeft.w > 0 || L.badgeRight.w > 0) compositeBrandArt(L, img, ppu);
     return img;
 }
 
@@ -514,12 +532,13 @@ PanelHit hitTestPanel(const PanelLayout& L, float x, float y) noexcept {
     return {};
 }
 
-void FxPanelController::stepChoice(int param, int delta) {
+void FxPanelController::stepChoice(int param, int delta, bool wrap) {
     const PanelParam& p = spec_.params[static_cast<std::size_t>(param)];
     const int n = static_cast<int>(p.choices.size());
     if (n < 2) return;
     const int cur = static_cast<int>(std::lround(host_.normalized(param) * static_cast<float>(n - 1)));
-    const int next = ((cur + delta) % n + n) % n;
+    const int next = wrap ? ((cur + delta) % n + n) % n : std::clamp(cur + delta, 0, n - 1);
+    if (!wrap && next == cur) return;
     host_.beginEdit(param);
     host_.setNormalized(param, static_cast<float>(next) / static_cast<float>(n - 1));
     host_.endEdit(param);
@@ -546,6 +565,7 @@ void FxPanelController::mouseDown(float x, float y, bool doubleClick, bool) {
     case PanelHit::Kind::Button: {
         const PanelButton& b = layout_.buttons[static_cast<std::size_t>(h.index)];
         const PanelParam& p = spec_.params[static_cast<std::size_t>(b.param)];
+        if (b.choice < 0 && p.kind == PanelParam::Kind::Choice) { stepChoice(b.param, +1); break; }   // one button cycles every step
         host_.beginEdit(b.param);
         if (b.choice < 0) host_.setNormalized(b.param, host_.normalized(b.param) >= 0.5f ? 0.0f : 1.0f);
         else host_.setNormalized(b.param, p.choices.size() > 1 ? static_cast<float>(b.choice) / static_cast<float>(p.choices.size() - 1) : 0.0f);
@@ -580,6 +600,10 @@ void FxPanelController::wheel(float x, float y, float notches, bool fine) {
     const PanelHit h = hitTestPanel(layout_, x, y);
     if (h.kind == PanelHit::Kind::Knob) {
         const int param = layout_.knobs[static_cast<std::size_t>(h.index)].param;
+        if (spec_.params[static_cast<std::size_t>(param)].kind == PanelParam::Kind::Choice) {   // stepped knob: one notch = one step
+            if (notches != 0.0f) stepChoice(param, notches > 0 ? 1 : -1, false);
+            return;
+        }
         host_.beginEdit(param);
         host_.setNormalized(param, std::clamp(host_.normalized(param) + notches * (fine ? 0.005f : 0.03f), 0.0f, 1.0f));
         host_.endEdit(param);

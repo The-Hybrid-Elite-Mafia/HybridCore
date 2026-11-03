@@ -46,6 +46,10 @@ function(hc_add_faceplate_resources target)
                 "${pkg}/Contents/Resources/fonts/"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different "${PROJECT_SOURCE_DIR}/assets/faceplates/Main-Faceplate.png"
                 "${pkg}/Contents/Resources/faceplates/"
+        # Steven's brand art (crown badge, hooded ghost) for the HEM COMPRESSOR faceplate
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${pkg}/Contents/Resources/brand"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${PROJECT_SOURCE_DIR}/assets/brand/crown_badge.png"
+                "${PROJECT_SOURCE_DIR}/assets/brand/ghost.png" "${pkg}/Contents/Resources/brand/"
         VERBATIM)
 endfunction()
 

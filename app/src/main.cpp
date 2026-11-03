@@ -76,7 +76,7 @@ struct Options {
     std::filesystem::path screenshot;
     bool                  offline   = false;
     std::filesystem::path session;   // a .hcs given on the command line (double-click in Explorer)
-    bool                  fxDemo    = false;   // CI: open the FX RACK with two effects on strip 1
+    bool                  fxDemo    = false;   // CI: open the FX RACK with three effects on strip 1
 };
 
 Options parseOptions() {
@@ -704,10 +704,11 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         for (std::size_t t = 0; t < list.size(); ++t) {
             if (std::string(list[t].name) == "HEM PUNCH") (void)a.audio.fxRack().setEffect(0, 0, static_cast<int>(t));
             if (std::string(list[t].name) == "HEM TUNE") (void)a.audio.fxRack().setEffect(0, 1, static_cast<int>(t));
+            if (std::string(list[t].name) == "HEM COMPRESSOR") (void)a.audio.fxRack().setEffect(0, 2, static_cast<int>(t));
         }
         console.setScope(false);
         a.rackOpen = true;
-        a.rackView.select(0, 0);
+        a.rackView.select(0, 2);   // shows HEM COMPRESSOR's own faceplate in the rack
     }
     auto uiState = [&console] { return console.faderBank() + 4u * static_cast<std::uint32_t>(console.page()) + (console.scope() ? 64u : 0u); };
     if (!opts.session.empty()) a.openSession(opts.session, console);

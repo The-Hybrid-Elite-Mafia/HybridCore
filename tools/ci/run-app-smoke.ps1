@@ -6,7 +6,8 @@
   With -StemsDir, a session file (.hcs) naming two stems from that folder is written and passed
   on the command line, as Explorer does on a double-click: the run must open it (settings show the
   session and both stem slots, and the screenshot shows them loaded).
-  With -FxDemo, the FX RACK opens with HEM PUNCH and HEM TUNE on strip 1; settings must keep both.
+  With -FxDemo, the FX RACK opens with HEM PUNCH, HEM TUNE and HEM COMPRESSOR on strip 1 (the compressor's
+  own faceplate shown); settings must keep all three.
   With -SavedAsio, settings from an ASIO build (device.kind=asio) are put in place and the app is
   started WITHOUT --device offline: it must start cleanly and fall back to WASAPI (settings then say wasapi).
 #>
@@ -54,8 +55,9 @@ if ($FxDemo) {
     $text = if (Test-Path $settings) { Get-Content $settings -Raw } else { '' }
     $punch = $text -match '(?m)^stem01\.fx1=HEM PUNCH\|'
     $tune  = $text -match '(?m)^stem01\.fx2=HEM TUNE\|'
-    Write-Host "FX RACK saved in settings: HEM PUNCH $punch, HEM TUNE $tune"
-    if (-not $punch -or -not $tune) { $ok = $false }
+    $comp  = $text -match '(?m)^stem01\.fx3=HEM COMPRESSOR\|'
+    Write-Host "FX RACK saved in settings: HEM PUNCH $punch, HEM TUNE $tune, HEM COMPRESSOR $comp"
+    if (-not $punch -or -not $tune -or -not $comp) { $ok = $false }
 }
 if ($SavedAsio) {
     $text = if (Test-Path $settings) { Get-Content $settings -Raw } else { '' }

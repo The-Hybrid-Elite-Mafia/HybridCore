@@ -3,7 +3,9 @@
 - **New: HEM COMPRESSOR** (C++23, no JUCE). Stepped attack (0.1 to 30 ms), release (0.1 to 1.2 s or AUTO) and ratio (2, 4, 10),
   threshold, make-up, parallel mix, 12 dB/oct detector filter, ANALOG switch, trim and fade. AUTO release follows how long a peak
   lasts. It sits in any FX RACK slot on any stem and ships in the VST3 suite. Every guess it makes is listed in
-  `hem-plugins/hem-compressor/include/hem/compressor/CompressorConfig.hpp` as ASSUMED or UNKNOWN. Measured by 33 checks in CI, 0 allocations on the audio thread.
+  `hem-plugins/hem-compressor/include/hem/compressor/CompressorConfig.hpp` as ASSUMED or UNKNOWN. 0 allocations on the audio thread (tested).
+  ANALOG is now a quiet console colour (under 0.1 dB level change, faint harmonics and noise), FADE has three steps
+  (OFF / FADE OUT / FADE IN), and the compressor wears its own HEM faceplate with a needle meter and IN / OUT LED ladders.
 
 ## The Hybrid Core — 0.14.2: sound on every output (HDMI soundbars, TVs, Bluetooth)
 

@@ -79,7 +79,7 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           tools\ci\run-and-report.ps1 -Title "ui: snapshot, ANALYZER (3D)" -Exe .\build\rig-public\tools\ui_snapshot\Release\hc_ui_snapshot.exe -ArgList '--out','shots','--sizes','3840x2160,1389x868','--seconds','6','--forge','0','--scope','--name','HybridCore-scope'
 
-      - name: Plug-in faceplates (all 23 HEM effects + HEM WAVE, live meters)
+      - name: Plug-in faceplates (all 23 HEM effects + HEM WAVE, live meters; HEM COMPRESSOR twice)
         env:
           GALLIUM_DRIVER: llvmpipe
         run: |
@@ -103,6 +103,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tools\ci\run-and-report.ps1 -Title "ui: publish screenshots" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\publish-screenshots.ps1','-Folder','shots'
+
+      - name: Publish screenshots of a work branch to ci-screenshots-<branch> (main's set untouched)
+        if: github.ref != 'refs/heads/main' && startsWith(github.ref, 'refs/heads/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tools\ci\run-and-report.ps1 -Title "ui: publish branch screenshots" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\publish-screenshots.ps1','-Folder','shots','-Branch','ci-screenshots-${{ github.ref_name }}'
 
       - name: Build installer
         run: |

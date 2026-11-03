@@ -1,4 +1,5 @@
 #include "hybrid/ui/Console.hpp"
+#include "hybrid/ui/FxPanel.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -14,6 +15,7 @@ double msSince(std::chrono::steady_clock::time_point t0) {
 
 bool Console::init(const std::filesystem::path& assetDir, const std::filesystem::path& dataDir, int msaaSamples, std::string* error) {
     if (!renderer_.init(msaaSamples, error)) return false;
+    setPanelArtDir(assetDir);   // FX rack faceplates with brand art (HEM COMPRESSOR)
     const auto plateFile = resolveFaceplate(assetDir, dataDir);
     art_ = loadFaceplateArt(plateFile, error);
     if (!art_) return false;

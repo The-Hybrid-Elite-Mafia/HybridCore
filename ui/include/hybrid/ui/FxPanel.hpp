@@ -22,6 +22,7 @@
 
 #include <array>
 #include <cstdint>
+#include <filesystem>
 #include <span>
 #include <string>
 #include <vector>
@@ -31,6 +32,7 @@ namespace hc::ui {
 // One control as the panel sees it (filled from hc::fx::ParamInfo or hc::synth::ParamInfo).
 struct PanelParam {
     enum class Kind : std::uint8_t { Knob, Toggle, Choice };
+    std::string              id;              // stable id ("attack"); empty when the source has none
     std::string              name;            // "Attack"
     Kind                     kind = Kind::Knob;
     std::vector<std::string> choices;          // Choice: every option's name
@@ -48,7 +50,14 @@ struct PanelGroup {
     std::string name;
     int         first = 0, count = 0;   // parameter index range
 };
+// Which faceplate a plug-in wears: the automatic obsidian one, or a hand-laid-out plate of its own.
+enum class PanelStyle : std::uint8_t {
+    Auto,         // laid out automatically from the parameter list (every HEM effect by default)
+    Compressor    // HEM COMPRESSOR: portrait brushed-titanium plate, needle meter, LED ladders (FxPanelCompressor.cpp)
+};
+
 struct PanelSpec {
+    PanelStyle              style = PanelStyle::Auto;
     std::string             name;    // "HEM PUNCH"
     std::string             blurb;   // one line
     std::vector<PanelParam> params;
@@ -78,6 +87,7 @@ struct PanelKnob {
     int  param = -1;
     Rect well;             // the round pocket (knob drawn inside)
     Rect caption, value;   // caption line, value window
+    int  steps = 0;        // > 1: a stepped knob with this many positions (scale marks at each one)
 };
 struct PanelButton {
     int  param  = -1;
@@ -104,6 +114,7 @@ struct PanelSection {
 };
 
 struct PanelLayout {
+    PanelStyle style = PanelStyle::Auto;
     float width = 0, height = 0;
     float zoom = 1.0f;     // every size × zoom (text picks a matching larger style)
     Rect  header, titleArea, footer, bypass, logo;
@@ -119,6 +130,8 @@ struct PanelLayout {
     std::vector<PanelCaption>   captions;
     std::vector<std::array<float, 2>> screws;   // chrome screw centres
     Rect meterBay;
+    // Hand-laid-out plates only (style != Auto): where Steven's brand art sits (crown badge, hooded ghost).
+    Rect badgeLeft, badgeRight;
 };
 
 inline constexpr float kPanelCellW = 230.0f, kPanelCellH = 270.0f;
@@ -130,7 +143,15 @@ inline constexpr int   kPanelMaxCols = 6;
 
 // ---- the obsidian slab ------------------------------------------------------------------
 // Straight-alpha sRGB, opaque, `pixelsPerUnit` × the layout size. Deterministic.
+// Plates with brand art (PanelLayout::badgeLeft / badgeRight) bake it in from setPanelArtDir()'s folder;
+// without it (or if the files are missing) those spots stay plain recesses.
 [[nodiscard]] Image renderFxPlate(const PanelLayout& layout, const FxPalette& palette, float pixelsPerUnit = 1.0f);
+
+// The folder holding brand/crown_badge.png and brand/ghost.png (the app's or the plug-in bundle's assets).
+// Message thread; remembered for the process. The pictures are decoded once, on first use.
+void setPanelArtDir(const std::filesystem::path& assetDir);
+// The decoded brand pictures (straight sRGB RGBA), or nullptr when not found. 0 = crown badge, 1 = ghost.
+[[nodiscard]] const Image* panelBrandArt(int which);
 
 // ---- interaction ----------------------------------------------------------------------
 class PanelHost {
@@ -176,7 +197,7 @@ public:
     static constexpr float kDragUnitsForFullRange = 560.0f;
 
 private:
-    void stepChoice(int param, int delta);
+    void stepChoice(int param, int delta, bool wrap = true);
     const PanelLayout& layout_;
     const PanelSpec&   spec_;
     PanelHost&         host_;
@@ -184,6 +205,40 @@ private:
     float    lastY_ = 0, dragValue_ = 0;
 };
 
+} // namespace hc::ui
+
+namespace hc::ui {
+// ---- HEM COMPRESSOR faceplate (PanelStyle::Compressor) ------------------------------------------
+// Meters (spec.meters): 0 = IN peak dBFS, 1 = OUT peak dBFS, 2 = gain reduction in dB (<= 0, the
+// effect's reductionDb()). The needle shows 0..20 dB of reduction; the ladders -54..0 dBFS.
+namespace compressor_face {
+inline constexpr float kNeedleMaxDb   = 20.0f;
+inline constexpr float kNeedleSweep   = 0.92f;    // radians each side of straight up (0 dB at the left end)
+inline constexpr int   kLeds          = 24;
+inline constexpr float kLadderMinDb   = -54.0f, kLadderMaxDb = 0.0f;
+// Faceplate ballistics (UI only, ASSUMED: the original's meter timing is not published).
+inline constexpr float kNeedleRiseS   = 0.060f;   // needle moves toward more reduction with this time constant
+inline constexpr float kNeedleFallS   = 0.300f;   // and back toward 0 with this one
+inline constexpr float kLedFallDbPerS = 26.0f;    // LEDs jump up at once, drop back at this rate
+
+// Needle angle (radians from straight up, negative = left) for a reduction in dB (>= 0).
+[[nodiscard]] float needleAngle(float reductionDb) noexcept;
+// How many of the kLeds LEDs are lit for a peak level in dBFS.
+[[nodiscard]] int ledsLit(float dbfs) noexcept;
+// The level (dBFS) at which LED i (0 = bottom) lights.
+[[nodiscard]] float ledThreshold(int i) noexcept;
+
+// What the needle and ladders show right now. The first update jumps straight to the reading
+// (so a single snapshot frame is true); after that the ballistics above apply.
+struct MeterState {
+    float needleDb = 0.0f;              // reduction shown, dB >= 0
+    float inDb = -120.0f, outDb = -120.0f;
+    bool  primed = false;
+    void update(float reductionDb, float inDbfs, float outDbfs, float dtSeconds) noexcept;
+};
+} // namespace compressor_face
+
+[[nodiscard]] PanelLayout layoutCompressorPanel(const PanelSpec& spec);
 } // namespace hc::ui
 
 // ---- HEM effects -> panel ------------------------------------------------------------------

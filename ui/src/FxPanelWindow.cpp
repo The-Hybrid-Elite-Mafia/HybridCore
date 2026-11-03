@@ -66,6 +66,7 @@ float FxPanelWindow::defaultScale(const PanelSpec& spec) noexcept {
 bool FxPanelWindow::setUp(const PanelSpec& spec, PanelHost& host, const std::filesystem::path& assetDir, int w, int h, std::string* error) {
     spec_ = &spec;
     host_ = &host;
+    setPanelArtDir(assetDir);   // brand art for plates that show it (HEM COMPRESSOR)
     layout_ = std::make_unique<PanelLayout>(layoutFxPanel(spec));
     view_ = std::make_unique<FxPanelView>(*layout_, spec);
     controller_ = std::make_unique<FxPanelController>(*layout_, spec, host);
