@@ -1,3 +1,11 @@
+## The Hybrid Core — 0.14.4 (test build: HEM ECHO DECK)
+
+- **New: HEM ECHO DECK** (C++23, no JUCE): tape-style echo. ECHO TIME in ms or as a note (NOTE / DOT / TRIP) at the
+  song tempo or your own TAP tempo, FEEDBACK, MIX, INPUT and OUTPUT (echo only), LOW CUT and HIGH CUT inside the loop,
+  GROOVE (shuffle / swing), FEEL (drag / rush), SATURATION, 8 STYLES of our own (CLEAN, ANALOG, TAPE, WORN TAPE,
+  DARK DRUM, RADIO, PHONE, SMEAR) and SINGLE or PING-PONG. Every guess is listed in
+  `hem-plugins/hem-echo-deck/include/hem/echodeck/EchoDeckConfig.hpp` as ASSUMED or UNKNOWN. 0 allocations on the audio thread (tested).
+
 ## The Hybrid Core — 0.14.3 (test build from the HEM COMPRESSOR branch)
 
 - **New: HEM COMPRESSOR** (C++23, no JUCE). Stepped attack (0.1 to 30 ms), release (0.1 to 1.2 s or AUTO) and ratio (2, 4, 10),

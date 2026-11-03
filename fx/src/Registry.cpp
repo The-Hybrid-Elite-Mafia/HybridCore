@@ -1,4 +1,5 @@
 #include "hem/compressor/HemCompressor.hpp"
+#include "hem/echodeck/HemEchoDeck.hpp"
 #include "hybrid/fx/Effects.hpp"
 
 namespace hc::fx {
@@ -30,6 +31,7 @@ std::span<const EffectInfo> effects() noexcept {
         {"HEM ECHO", "Fx|Delay", "Stereo / ping-pong delay with tempo sync, ducking and tape wobble", {0x50BA60C8, 0x31CB4ACB, 0xB7AEA12B, 0xB330F84C}, {0x8FB25D7B, 0x2E8C4C6B, 0xA9647CCF, 0x6787AE01}, &makeEcho},
         {"HEM SWIRL KILLER", "Fx|Restoration", "Removes AI / codec swirl in the stereo sides, keeps the centre untouched", {0xF9DF44AE, 0x8D6E4EDC, 0x9B3DA8A5, 0x563A1ACD}, {0xFB001571, 0x17B74FBF, 0xBDBA25CE, 0x2DD6535D}, &makeSwirlKiller},
         {"HEM COMPRESSOR", "Fx|Dynamics", "Compressor with stepped attack, release and ratio, auto release, side-chain filter, parallel mix and an analog switch", {0x642D00DA, 0x66A4EBD2, 0xC305D5A8, 0x015EA015}, {0x2095BD73, 0x88B738C2, 0x5A0A78B7, 0xB748CF04}, &hem::compressor::make},
+        {"HEM ECHO DECK", "Fx|Delay", "Tape-style echo with styles, tap tempo, groove, feel, saturation, low / high cut and ping-pong", {0x626B62F7, 0xCD6B4B8B, 0x8B4E6EAA, 0xC13694D9}, {0x256AC860, 0x14C0462C, 0xB80E9019, 0x6E8614A9}, &hem::echodeck::make},
     };
     return kList;
 }

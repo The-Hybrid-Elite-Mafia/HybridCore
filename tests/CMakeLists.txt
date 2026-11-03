@@ -11,6 +11,7 @@ add_executable(hc_tests
     fx_tests.cpp
     fx_dyn_tests.cpp
     ${PROJECT_SOURCE_DIR}/hem-plugins/hem-compressor/tests/compressor_tests.cpp
+    ${PROJECT_SOURCE_DIR}/hem-plugins/hem-echo-deck/tests/echo_deck_tests.cpp
     fx_tone_tests.cpp
     fx_new_tests.cpp
     fx_rack_tests.cpp

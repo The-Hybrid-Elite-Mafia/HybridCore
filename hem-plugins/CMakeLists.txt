@@ -6,3 +6,4 @@
 #  so The Hybrid Core's FX rack and the VST3 suite can host every one of them.
 # =============================================================================
 add_subdirectory(hem-compressor)
+add_subdirectory(hem-echo-deck)
