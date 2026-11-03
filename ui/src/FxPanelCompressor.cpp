@@ -199,19 +199,20 @@ PanelLayout layoutCompressorPanel(const PanelSpec& spec) {
     // ---- knobs
     struct K { const char* id; float cx, cy; bool small; };
     const K ks[] = {
-        {"threshold", 340, 912, false}, {"attack", 340, 1182, false}, {"ratio", 340, 1452, false},
-        {"scfilter", 600, 912, true},   {"mix", 600, 1182, true},     {"trim", 600, 1452, true},
-        {"makeup", 860, 912, false},    {"release", 860, 1182, false}, {"fadetime", 860, 1452, false},
+        {"threshold", 340, 906, false}, {"attack", 340, 1192, false}, {"ratio", 340, 1478, false},
+        {"scfilter", 600, 906, true},   {"mix", 600, 1192, true},     {"trim", 600, 1478, true},
+        {"makeup", 860, 906, false},    {"release", 860, 1192, false}, {"fadetime", 860, 1478, false},
     };
     for (const K& k : ks) {
         const int p = paramById(spec, k.id);
         if (p < 0) continue;
         PanelKnob kn;
         kn.param = p;
-        const float r = k.small ? 64.0f : 94.0f;
+        // caption above the scale marks, value window under them; rows are 286 apart so neither touches the next row
+        const float r = k.small ? 64.0f : 88.0f;
         kn.well = {k.cx - r, k.cy - r, 2 * r, 2 * r};
-        kn.caption = k.small ? Rect{k.cx - 110, k.cy - 124, 220, 44} : Rect{k.cx - 130, k.cy - 152, 260, 44};
-        kn.value = k.small ? Rect{k.cx - 82, k.cy + 80, 164, 44} : Rect{k.cx - 90, k.cy + 104, 180, 46};
+        kn.caption = k.small ? Rect{k.cx - 110, k.cy - 130, 220, 44} : Rect{k.cx - 130, k.cy - 146, 260, 40};
+        kn.value = k.small ? Rect{k.cx - 82, k.cy + 82, 164, 44} : Rect{k.cx - 90, k.cy + 92, 180, 44};
         const PanelParam& pp = spec.params[static_cast<std::size_t>(p)];
         if (pp.kind == PanelParam::Kind::Choice) kn.steps = static_cast<int>(pp.choices.size());
         L.pockets.push_back({kn.well, r, kWell, true, true});
@@ -226,9 +227,9 @@ PanelLayout layoutCompressorPanel(const PanelSpec& spec) {
     for (const B& b : bs) {
         const int p = paramById(spec, b.id);
         if (p < 0) continue;
-        PanelButton pb{p, -1, {b.cx - 92, 1650, 184, 92}, b.caption};
+        PanelButton pb{p, -1, {b.cx - 92, 1668, 184, 88}, b.caption};
         L.pockets.push_back({pb.rect.inset(-7), 14, kBtn, false, false});
-        L.captions.push_back({p, {b.cx - 110, 1610, 220, 36}});
+        L.captions.push_back({p, {b.cx - 110, 1624, 220, 36}});
         L.buttons.push_back(pb);
     }
     // anything the plate does not place by name still gets a knob (no control may go missing)
@@ -250,10 +251,10 @@ PanelLayout layoutCompressorPanel(const PanelSpec& spec) {
     }
 
     // ---- footer, bypass, screws
-    L.footer = {40, 1776, kW - 80, 70};
-    L.bypass = {950, 1780, 196, 62};
+    L.footer = {40, 1782, kW - 80, 64};
+    L.bypass = {950, 1786, 196, 56};
     if (spec.hasBypass) L.pockets.push_back({L.bypass.inset(-6), 14, kBtn, false, false});
-    L.grooves.push_back({80, 1764, kW - 80, 1764, false});
+    L.grooves.push_back({80, 1773, kW - 80, 1773, false});
     const float si = 30.0f;
     L.screws = {{si, si}, {L.width - si, si}, {si, L.height - si}, {L.width - si, L.height - si}};
     return L;

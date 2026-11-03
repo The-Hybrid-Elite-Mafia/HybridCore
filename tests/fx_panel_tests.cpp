@@ -206,6 +206,15 @@ void testFxPanelCompressor() {
             if (c == 1) { const ui::PanelKnob* l = knobOf(grid[0][r]); gridOk = gridOk && l && k->well.w < l->well.w; }   // centre knobs are small
         }
     CHECK(gridOk);
+    {   // no caption sits on another control's value window, well or button (captions are drawn inside their rects)
+        bool clear = true;
+        for (const auto& cap : L.captions) {
+            for (const auto& k : L.knobs) clear = clear && !overlaps(cap.r, k.value) && !overlaps(cap.r, k.well);
+            for (const auto& b : L.buttons) clear = clear && !overlaps(cap.r, b.rect);
+            for (const auto& m : L.meters) clear = clear && !overlaps(cap.r, m.bar) && !overlaps(cap.r, m.value);
+        }
+        CHECK(clear);
+    }
     CHECK(knobOf("ratio") && knobOf("ratio")->steps == 3 && knobOf("attack")->steps == 6 && knobOf("release")->steps == 5 && knobOf("threshold")->steps == 0);
     // IN ladder left of everything, OUT right of everything, needle glass between them
     CHECK(L.meters[0].bar.right() < L.knobs[0].well.x && L.meters[1].bar.x > knobOf("makeup")->well.right());

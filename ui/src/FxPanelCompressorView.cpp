@@ -72,7 +72,7 @@ void FxPanelView::drawCompressorKnob(Renderer& r, const PanelKnob& k, const Pane
         const float f = static_cast<float>(i) / static_cast<float>(marks - 1);
         const float a = kKnobMin + (kKnobMax - kKnobMin) * f;
         const bool major = k.steps > 1 || i % 5 == 0;
-        const float r0 = R + 5 * z, r1 = R + (major ? 19.0f : 12.0f) * z;
+        const float r0 = R + 5 * z, r1 = R + (major ? 17.0f : 11.0f) * z;
         const float xs[2] = {cx + std::sin(a) * r0, cx + std::sin(a) * r1}, ys[2] = {cy - std::cos(a) * r0, cy - std::cos(a) * r1};
         const bool on = k.steps > 1 ? std::fabs(f - n) < 0.5f / static_cast<float>(marks - 1) : false;
         r.polyline(xs, ys, 2, (major ? 3.2f : 2.0f) * z, on ? kAmber : kEngrave.withAlpha(major ? 0.85f : 0.55f), Blend::Over, on);
@@ -80,8 +80,8 @@ void FxPanelView::drawCompressorKnob(Renderer& r, const PanelKnob& k, const Pane
     // the knob: dark spun cap on a knurled silver skirt, in its well
     const float bodyR = R * 0.80f;
     r.sprite(Sprite::KnobShadow, {cx - bodyR * 1.16f + 0.07f * bodyR, cy - bodyR * 1.16f + 0.12f * bodyR, bodyR * 2.32f, bodyR * 2.32f});
-    // thin amber arc from the start to the value (centre start on bipolar knobs)
-    const float a0 = kKnobMin + (kKnobMax - kKnobMin) * (prm.bipolar ? 0.5f : 0.0f);
+    // thin amber arc from the start to the value; knobs that go both ways start it at their default (0 dB)
+    const float a0 = kKnobMin + (kKnobMax - kKnobMin) * (prm.bipolar ? prm.defNormalized : 0.0f);
     const float ar = R * 0.93f, aw = 2.6f * z;
     if (std::fabs(ang - a0) > 0.004f) r.arc(cx, cy, ar, aw, std::min(a0, ang), std::max(a0, ang), kAmber.withAlpha(0.85f), true);
     const float bd = bodyR * 2.0f * 256.0f / 254.0f;
@@ -189,7 +189,13 @@ void FxPanelView::drawCompressor(Renderer& r, const PanelHost& host, PanelHit ho
         r.polyline(nx, ny, 2, 1.5f * z, {1, 1, 1, 0.8f}, Blend::Add, true);
         r.popClip();
         // glass: sheen and a bright rim
-        r.fillRound({g.x + 14 * z, g.y + 10 * z, g.w - 28 * z, g.h * 0.30f}, 14 * z, {1, 1, 1, 0.045f}, Blend::Add);
+        {   // reflection: bright at the top edge, fading out a third of the way down
+            const float x0 = g.x + 10 * z, x1 = g.right() - 10 * z, y0 = g.y + 6 * z, y1 = g.y + g.h * 0.34f;
+            const float qx[4] = {x0, x1, x1, x0}, qy[4] = {y0, y0, y1, y1};
+            const Rgba top{1, 1, 1, 0.07f}, bottom{1, 1, 1, 0.0f};
+            const Rgba qc[4] = {top, top, bottom, bottom};
+            r.colorQuad(qx, qy, qc, Blend::Add);
+        }
         r.fillRound({g.x + 4 * z, g.y + 3 * z, g.w - 8 * z, 2 * z}, 1 * z, {1, 1, 1, 0.22f}, Blend::Add);
         // number
         const Rect v = at(s.value, ox, oy);
