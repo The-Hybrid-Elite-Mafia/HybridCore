@@ -59,10 +59,8 @@ void FxPanelView::drawCrown(Renderer& r, Rect a) const {
     const float xs[] = {x0, x0, x0 + w * 0.25f, x0 + w * 0.5f, x0 + w * 0.75f, x1, x1, x0};
     const float ys[] = {base, top, mid, top - a.h * 0.06f, mid, top, base, base};
     const float z = layout_.zoom;
-    r.polyline(xs, ys, 8, 7.0f * z, pal_.lime.withAlpha(0.35f), Blend::Add, true);
-    r.polyline(xs, ys, 8, 3.5f * z, pal_.lime, Blend::Over, true);
-    for (int i : {1, 3, 5}) r.sprite(Sprite::GlowDot, {xs[i] - 9 * z, ys[i] - 9 * z, 18 * z, 18 * z}, pal_.lime, Blend::Add, true);
-    r.fillRound({x0, base + 8 * z, w, 6 * z}, 3 * z, pal_.violet, Blend::Over, true);
+    r.polyline(xs, ys, 8, 3.5f * z, pal_.lime, Blend::Over, false);
+    r.fillRound({x0, base + 8 * z, w, 6 * z}, 3 * z, pal_.violet, Blend::Over, false);
 }
 
 void FxPanelView::drawKnob(Renderer& r, const PanelKnob& k, const PanelHost& host, bool hot, float ox, float oy) const {
@@ -77,9 +75,8 @@ void FxPanelView::drawKnob(Renderer& r, const PanelKnob& k, const PanelHost& hos
     r.sprite(Sprite::KnobTrack, {cx - R, cy - R, 2 * R, 2 * R});
     r.arc(cx, cy, ar, aw, kKnobMin, kKnobMax, pal_.lime.withAlpha(0.16f), false);
     if (std::fabs(ang - a0) > 0.004f) {
-        r.arc(cx, cy, ar, aw, std::min(a0, ang), std::max(a0, ang), pal_.lime, true);
+        r.arc(cx, cy, ar, aw, std::min(a0, ang), std::max(a0, ang), pal_.lime, false);
         const float tx = cx + std::sin(ang) * ar, ty = cy - std::cos(ang) * ar;
-        r.sprite(Sprite::GlowDot, {tx - aw * 2.4f, ty - aw * 2.4f, aw * 4.8f, aw * 4.8f}, pal_.lime.withAlpha(0.95f), Blend::Add, true);
     }
     const float bodyR = knob::kBody * R;
     r.sprite(Sprite::KnobShadow, {cx - bodyR * 1.14f + 0.06f * bodyR, cy - bodyR * 1.14f + 0.10f * bodyR, bodyR * 2.28f, bodyR * 2.28f});
@@ -89,31 +86,28 @@ void FxPanelView::drawKnob(Renderer& r, const PanelKnob& k, const PanelHost& hos
     const float mid = 0.5f * (knob::kIndicatorTo + knob::kIndicatorFrom) * bodyR;
     const float ih = len * 96.0f / 72.0f, iw = ih * 24.0f / 96.0f;
     r.spriteRotated(Sprite::KnobIndicator, cx + std::sin(ang) * mid, cy - std::cos(ang) * mid, iw, ih, ang,
-                    {0.55f + 0.45f * pal_.lime.r, 0.55f + 0.45f * pal_.lime.g, 0.55f + 0.45f * pal_.lime.b, 1.0f}, Blend::Over, true);
+                    {0.55f + 0.45f * pal_.lime.r, 0.55f + 0.45f * pal_.lime.g, 0.55f + 0.45f * pal_.lime.b, 1.0f}, Blend::Over, false);
     r.sprite(Sprite::KnobLight, {cx - bd / 2, cy - bd / 2, bd, bd});
     const bool on = host.active(k.param);
     if (!on) r.fillRound(well.inset(well.w * 0.04f), well.w * 0.46f, rgb8(0x000000, 0.62f), Blend::Over);   // not in use right now
-    if (hot) r.glow(well.inset(well.w * 0.12f), well.w * 0.4f, 18.0f, pal_.violet.withAlpha(0.35f), true);
 
     // value window
     const Rect v = at(k.value, ox, oy);
     r.fillRound(v.inset(3 * layout_.zoom), 7 * layout_.zoom, kGlass, Blend::Over);
     const std::string t = on ? host.text(k.param) : std::string("--");
     const TextStyle vs = fit(r, TextStyle::Title, t, v.w - 12 * layout_.zoom);
-    r.text(vs, t, v.cx(), v.cy() + r.capHeight(vs) * 0.5f, !on ? kTextDim : hot ? kText : pal_.lime, Align::Center, on ? TextFx::NeonCrisp : TextFx::Shadowed);
+    r.text(vs, t, v.cx(), v.cy() + r.capHeight(vs) * 0.5f, !on ? kTextDim : hot ? kText : pal_.lime, Align::Center, on ? TextFx::Plain : TextFx::Shadowed);
 }
 
-void FxPanelView::drawButton(Renderer& r, Rect b, const std::string& text, bool lit, bool hot, Rgba colour, bool glow) const {
+void FxPanelView::drawButton(Renderer& r, Rect b, const std::string& text, bool lit, bool hot, Rgba colour, bool /*glow*/) const {
     const float z = layout_.zoom;
     const TextStyle bs = fit(r, TextStyle::Caption, text, b.w - 14 * z);
     if (lit) {
-        if (glow) r.glow(b.inset(4 * z), 10 * z, 12.0f * z, colour.withAlpha(0.40f), true);
         r.fillRound(b.inset(2 * z), 10 * z, colour.withAlpha(0.92f), Blend::Over, false);
-        r.fillRound({b.x + 8 * z, b.y + 5 * z, b.w - 16 * z, b.h * 0.35f}, 8 * z, {1, 1, 1, 0.16f}, Blend::Add);
         r.text(bs, text, b.cx(), b.cy() + r.capHeight(bs) * 0.5f, rgb8(0x0A0812), Align::Center, TextFx::Plain, b.w - 14 * z);
     } else {
         r.fillRound(b.inset(2 * z), 10 * z, kGlass, Blend::Over);
-        r.fillRound({b.x + 2 * z, b.y + 2 * z, b.w - 4 * z, 2 * z}, 1 * z, colour.withAlpha(hot ? 0.8f : 0.35f), Blend::Over, glow);
+        r.fillRound({b.x + 2 * z, b.y + 2 * z, b.w - 4 * z, 2 * z}, 1 * z, colour.withAlpha(hot ? 0.8f : 0.35f), Blend::Over, false);
         r.text(bs, text, b.cx(), b.cy() + r.capHeight(bs) * 0.5f, hot ? kText : kTextDim, Align::Center, TextFx::Shadowed, b.w - 14 * z);
     }
 }
@@ -138,22 +132,20 @@ void FxPanelView::drawMeter(Renderer& r, const PanelMeterSlot& s, float raw, flo
             const float h = inner.h * 0.5f * std::fabs(f);
             const Rect fill = f > 0 ? Rect{inner.x, midY - h, inner.w, h} : Rect{inner.x, midY, inner.w, h};
             const Rgba c = f > 0 ? pal_.lime : pal_.violet;
-            r.glow(fill, 6 * z, 10.0f * z, c.withAlpha(0.45f), true);
-            r.fillRound(fill, 5 * z, c, Blend::Over, true);
+            r.fillRound(fill, 5 * z, c, Blend::Over, false);
         }
     } else if (f > 0.002f) {
         const bool fromTop = m.unit == "dB" && m.max <= 0.0f;   // reduction hangs from the top
         const float h = inner.h * f;
         const Rect fill = fromTop ? Rect{inner.x, inner.y, inner.w, h} : Rect{inner.x, inner.bottom() - h, inner.w, h};
         const Rgba c = fromTop ? pal_.violet : pal_.lime;
-        r.glow(fill, 6 * z, 10.0f * z, c.withAlpha(0.45f), true);
-        r.fillRound(fill, 5 * z, c, Blend::Over, true);
+        r.fillRound(fill, 5 * z, c, Blend::Over, false);
     }
     const Rect vbox = at(s.value, ox, oy);
     r.fillRound(vbox.inset(2 * z), 7 * z, kGlass, Blend::Over);
     const std::string num = formatPanelMeter(m, number);
     const TextStyle ns = fit(r, TextStyle::Title, num, vbox.w - 10 * z);
-    r.text(ns, num, vbox.cx(), vbox.cy() + r.capHeight(ns) * 0.5f, pal_.lime, Align::Center, TextFx::NeonCrisp);
+    r.text(ns, num, vbox.cx(), vbox.cy() + r.capHeight(ns) * 0.5f, pal_.lime, Align::Center, TextFx::Plain);
     const Rect cap = at(s.caption, ox, oy);
     const TextStyle cs = fit(r, TextStyle::Caption, m.name, cap.w);
     r.text(cs, m.name, cap.cx(), cap.cy() + r.capHeight(cs) * 0.5f, kText, Align::Center, TextFx::Shadowed);
@@ -170,16 +162,13 @@ void FxPanelView::draw(Renderer& r, const PanelHost& host, PanelHit hover, Panel
     for (const PanelGroove& g : L.grooves) {
         const Rgba c = g.lime ? pal_.lime : pal_.violet;
         const float xs[2] = {g.x0 + ox, g.x1 + ox}, ys[2] = {g.y0 + oy, g.y1 + oy};
-        r.glow({std::min(xs[0], xs[1]), std::min(ys[0], ys[1]) - 1 * z, std::fabs(xs[1] - xs[0]), std::fabs(ys[1] - ys[0]) + 2 * z}, 2 * z, 14.0f * z,
-               c.withAlpha(0.55f), true);
-        r.polyline(xs, ys, 2, 4.0f * z, c, Blend::Over, true);
-        r.polyline(xs, ys, 2, 1.6f * z, {1, 1, 1, 0.75f}, Blend::Add, true);
+        r.polyline(xs, ys, 2, 4.0f * z, c, Blend::Over, false);
     }
     // header: crown, name, blurb
     drawCrown(r, at(L.logo, ox, oy).inset(12 * z));
     const Rect ta = at(L.titleArea, ox, oy);
     const TextStyle nameStyle = fit(r, TextStyle::Display, L.name, ta.w);
-    r.text(nameStyle, L.name, ta.x, ta.y + 92 * z, pal_.lime, Align::Left, TextFx::Neon);
+    r.text(nameStyle, L.name, ta.x, ta.y + 92 * z, pal_.lime, Align::Left, TextFx::Plain);
     {   // the description: one line if it fits, else two smaller lines, shortened only as a last resort
         const float room = L.header.right() + ox - 30 * z - (ta.x + 4 * z);
         const TextStyle one = ts(TextStyle::Sub);
@@ -202,7 +191,7 @@ void FxPanelView::draw(Renderer& r, const PanelHost& host, PanelHit hover, Panel
     for (const PanelSection& s : L.sections)
         if (!s.caption.empty()) {
             const Rect c = at(s.captionArea, ox, oy);
-            r.text(ts(TextStyle::Label), s.caption, c.x + 8 * z, c.y + 30 * z, pal_.violet, Align::Left, TextFx::Neon);
+            r.text(ts(TextStyle::Label), s.caption, c.x + 8 * z, c.y + 30 * z, pal_.violet, Align::Left, TextFx::Plain);
         }
     // control captions
     for (const PanelCaption& c : L.captions) {
@@ -257,7 +246,7 @@ void FxPanelView::draw(Renderer& r, const PanelHost& host, PanelHit hover, Panel
         r.fillRound(box.inset(3 * z), 9 * z, kGlass, Blend::Over);
         const std::string t = host.text(s.param);
         const TextStyle st = fit(r, TextStyle::Title, t, box.w - 12 * z);
-        r.text(st, t, box.cx(), box.cy() + r.capHeight(st) * 0.5f, on ? pal_.lime : kTextDim, Align::Center, on ? TextFx::NeonCrisp : TextFx::Shadowed);
+        r.text(st, t, box.cx(), box.cy() + r.capHeight(st) * 0.5f, on ? pal_.lime : kTextDim, Align::Center, on ? TextFx::Plain : TextFx::Shadowed);
         for (int side = 0; side < 2; ++side) {
             const Rect b = at(side == 0 ? s.prev : s.next, ox, oy);
             const bool hot = hover.index == static_cast<int>(i) &&
@@ -266,7 +255,7 @@ void FxPanelView::draw(Renderer& r, const PanelHost& host, PanelHit hover, Panel
             const float dir = side == 0 ? -1.0f : 1.0f, cx = b.cx(), cy = b.cy(), sz = 11.0f * z;
             const float xs[4] = {cx - dir * sz * 0.7f, cx + dir * sz * 0.9f, cx - dir * sz * 0.7f, cx - dir * sz * 0.7f};
             const float ys[4] = {cy - sz, cy, cy + sz, cy - sz};
-            r.polyline(xs, ys, 4, 3.0f * z, hot ? pal_.lime : pal_.violet, Blend::Over, true);
+            r.polyline(xs, ys, 4, 3.0f * z, hot ? pal_.lime : pal_.violet, Blend::Over, false);
         }
     }
     // meters
@@ -275,7 +264,7 @@ void FxPanelView::draw(Renderer& r, const PanelHost& host, PanelHit hover, Panel
     const Rect ft = at(L.footer, ox, oy);
     const TextStyle fs = ts(TextStyle::Label);
     const std::string brand = "HYBRID ELITE MAFIA  -  STUDIO PLUG-INS";
-    r.text(fs, brand, ft.x + 24 * z, ft.cy() + r.capHeight(fs) * 0.5f, pal_.violet, Align::Left, TextFx::Neon);
+    r.text(fs, brand, ft.x + 24 * z, ft.cy() + r.capHeight(fs) * 0.5f, pal_.violet, Align::Left, TextFx::Plain);
     {
         const float x0 = ft.x + 24 * z + r.textWidth(fs, brand) + 40 * z;
         const float x1 = (host.hasBypass() && L.hasBypass ? at(L.bypass, ox, oy).x : ft.right()) - 30 * z;

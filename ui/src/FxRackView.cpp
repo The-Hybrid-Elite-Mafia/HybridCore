@@ -15,13 +15,11 @@ const Rgba kGlass = rgb8(0x050507, 0.92f);
 
 void button(Renderer& r, Rect b, const std::string& text, bool lit, bool hot, Rgba colour, TextStyle ts = TextStyle::Label) {
     if (lit) {
-        r.glow(b.inset(4), 12, 10.0f, colour.withAlpha(0.35f), true);
         r.fillRound(b, 12, colour.withAlpha(0.92f), Blend::Over, false);
-        r.fillRound({b.x + 8, b.y + 5, b.w - 16, b.h * 0.33f}, 9, {1, 1, 1, 0.15f}, Blend::Add);
         r.text(ts, text, b.cx(), b.cy() + r.capHeight(ts) * 0.5f, rgb8(0x0A0812), Align::Center, TextFx::Plain);
     } else {
         r.fillRound(b, 12, kGlass, Blend::Over);
-        r.fillRound({b.x + 3, b.y + 3, b.w - 6, 3}, 1.5f, colour.withAlpha(hot ? 0.9f : 0.35f), Blend::Over, true);
+        r.fillRound({b.x + 3, b.y + 3, b.w - 6, 3}, 1.5f, colour.withAlpha(hot ? 0.9f : 0.35f), Blend::Over, false);
         r.text(ts, text, b.cx(), b.cy() + r.capHeight(ts) * 0.5f, hot ? kText : kDim, Align::Center, TextFx::Shadowed);
     }
 }
@@ -215,11 +213,11 @@ void FxRackView::draw(Renderer& r, float canvasScale, FxRackModel& model) {
     syncPanel(model, &r, canvasScale);
     // the rack's own glass, over the stem strips
     r.fillRound(area_, 28, rgb8(0x060509, 1.0f), Blend::Over);
-    r.fillRound({area_.x + 30, area_.y + 6, area_.w - 60, 4}, 2, kViolet, Blend::Over, true);
-    r.fillRound({area_.x + 30, area_.bottom() - 10, area_.w - 60, 4}, 2, kViolet, Blend::Over, true);
+    r.fillRound({area_.x + 30, area_.y + 6, area_.w - 60, 4}, 2, kViolet, Blend::Over, false);
+    r.fillRound({area_.x + 30, area_.bottom() - 10, area_.w - 60, 4}, 2, kViolet, Blend::Over, false);
 
     // ---- left: strips and inserts
-    r.text(TextStyle::Heading, "FX RACK", left_.x, left_.y + 56, kLime, Align::Left, TextFx::Neon);
+    r.text(TextStyle::Heading, "FX RACK", left_.x, left_.y + 56, kLime, Align::Left, TextFx::Plain);
     for (std::uint32_t s = 0; s < hc::kStemCount; ++s) {
         int used = 0;
         for (int k = 0; k < kSlots; ++k) used += model.type(s, k) >= 0;
@@ -234,23 +232,23 @@ void FxRackView::draw(Renderer& r, float canvasScale, FxRackModel& model) {
         std::snprintf(bpm, sizeof bpm, "%.1f BPM", static_cast<double>(model.tempo()));
         const Rect tb = tempoBox();
         r.fillRound(tb, 14, kGlass, Blend::Over);
-        r.fillRound({tb.x + 3, tb.y + 3, tb.w - 6, 3}, 1.5f, (model.tempoSet() ? kLime : kViolet).withAlpha(0.7f), Blend::Over, true);
+        r.fillRound({tb.x + 3, tb.y + 3, tb.w - 6, 3}, 1.5f, (model.tempoSet() ? kLime : kViolet).withAlpha(0.7f), Blend::Over, false);
         r.text(TextStyle::Caption, model.tempoSet() ? "SONG TEMPO" : "TEMPO  (BEAT FORGE)", tb.cx(), tb.y + 30, kDim, Align::Center, TextFx::Shadowed);
-        r.text(TextStyle::Title, bpm, tb.cx(), tb.y + 66, kLime, Align::Center, TextFx::NeonCrisp);
+        r.text(TextStyle::Title, bpm, tb.cx(), tb.y + 66, kLime, Align::Center, TextFx::Plain);
         button(r, tempoDown(), "-", false, false, kViolet, TextStyle::Title);
         button(r, tempoUp(), "+", false, false, kViolet, TextStyle::Title);
     }
     const std::string title = fitText(r, TextStyle::Label, "INSERTS  -  " + upper(model.stemName(stem_)), left_.w);
-    r.text(TextStyle::Label, title, left_.x, slotRow(0).y - 22, kViolet, Align::Left, TextFx::Neon);
+    r.text(TextStyle::Label, title, left_.x, slotRow(0).y - 22, kViolet, Align::Left, TextFx::Plain);
     const auto list = fx::effects();
     for (int k = 0; k < kSlots; ++k) {
         const Rect row = slotRow(k);
         const int t = model.type(stem_, k);
         const bool sel = k == slot_;
         r.fillRound(row, 16, sel ? rgb8(0x14101F, 0.95f) : kGlass, Blend::Over);
-        if (sel) r.fillRound({row.x, row.y + 8, 6, row.h - 16}, 3, kLime, Blend::Over, true);
+        if (sel) r.fillRound({row.x, row.y + 8, 6, row.h - 16}, 3, kLime, Blend::Over, false);
         r.text(TextStyle::Panel, std::to_string(k + 1), row.x + 36, row.cy() + r.capHeight(TextStyle::Panel) * 0.5f, sel ? kLime : kDim, Align::Center,
-               TextFx::Neon);
+               TextFx::Plain);
         const Rect nm = slotName(k);
         if (t >= 0) {
             r.text(TextStyle::Title, list[static_cast<std::size_t>(t)].name, nm.x + 10, nm.cy() + r.capHeight(TextStyle::Title) * 0.5f,
@@ -266,20 +264,20 @@ void FxRackView::draw(Renderer& r, float canvasScale, FxRackModel& model) {
 
     // ---- right: picker or faceplate
     if (picker_) {
-        r.text(TextStyle::Heading, "CHOOSE AN EFFECT FOR SLOT " + std::to_string(slot_ + 1), right_.x, right_.y + 56, kLime, Align::Left, TextFx::Neon);
+        r.text(TextStyle::Heading, "CHOOSE AN EFFECT FOR SLOT " + std::to_string(slot_ + 1), right_.x, right_.y + 56, kLime, Align::Left, TextFx::Plain);
         for (std::size_t i = 0; i < list.size(); ++i) {
             const Rect b = pickerButton(i);
             const bool hot = hoverPick_ == static_cast<int>(i);
             r.fillRound(b, 14, hot ? rgb8(0x1A1328, 0.97f) : kGlass, Blend::Over);
-            r.fillRound({b.x + 3, b.y + 3, b.w - 6, 3}, 1.5f, (hot ? kLime : kViolet).withAlpha(hot ? 0.95f : 0.5f), Blend::Over, true);
-            r.text(TextStyle::Title, fitText(r, TextStyle::Title, list[i].name, b.w - 44), b.x + 22, b.y + 54, hot ? kLime : kText, Align::Left, TextFx::Neon);
+            r.fillRound({b.x + 3, b.y + 3, b.w - 6, 3}, 1.5f, (hot ? kLime : kViolet).withAlpha(hot ? 0.95f : 0.5f), Blend::Over, false);
+            r.text(TextStyle::Title, fitText(r, TextStyle::Title, list[i].name, b.w - 44), b.x + 22, b.y + 54, hot ? kLime : kText, Align::Left, TextFx::Plain);
             r.text(TextStyle::Caption, fitText(r, TextStyle::Caption, list[i].blurb, b.w - 44), b.x + 22, b.y + 96, kDim, Align::Left, TextFx::Shadowed);
         }
         button(r, {right_.right() - 300, right_.bottom() - 110, 300, 90}, "CANCEL", false, false, kViolet);
     } else if (panel_) {
         panel_->view->draw(r, *panel_->host, panel_->ctrl->hover(), panel_->ctrl->active(), ox_, oy_, true);
     } else {
-        r.text(TextStyle::Heading, "PICK A STRIP, THEN A SLOT", right_.cx(), right_.cy() - 30, kViolet, Align::Center, TextFx::Neon);
+        r.text(TextStyle::Heading, "PICK A STRIP, THEN A SLOT", right_.cx(), right_.cy() - 30, kViolet, Align::Center, TextFx::Plain);
         r.text(TextStyle::Status, "23 HEM effects - each strip takes 3, in order: slot 1, then 2, then 3", right_.cx(), right_.cy() + 40, kDim,
                Align::Center, TextFx::Shadowed);
     }

@@ -29,7 +29,7 @@ public:
 
 private:
     void drawKnob(Renderer& r, const PanelKnob& k, const PanelHost& host, bool hot, float ox, float oy) const;
-    void drawButton(Renderer& r, Rect b, const std::string& text, bool lit, bool hot, Rgba colour, bool glow = true) const;   // glow = false: one solid colour, no halo
+    void drawButton(Renderer& r, Rect b, const std::string& text, bool lit, bool hot, Rgba colour, bool glow = false) const;   // every faceplate is solid colour now; glow is ignored
     void drawMeter(Renderer& r, const PanelMeterSlot& m, float value, float ox, float oy) const;
     void drawCrown(Renderer& r, Rect area) const;
     // HEM COMPRESSOR's own plate (FxPanelCompressor.cpp).
