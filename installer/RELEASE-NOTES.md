@@ -1,4 +1,4 @@
-## Next (not released yet)
+## The Hybrid Core — 0.14.3 (test build from the HEM COMPRESSOR branch)
 
 - **New: HEM COMPRESSOR** (C++23, no JUCE). Stepped attack (0.1 to 30 ms), release (0.1 to 1.2 s or AUTO) and ratio (2, 4, 10),
   threshold, make-up, parallel mix, 12 dB/oct detector filter, ANALOG switch, trim and fade. AUTO release follows how long a peak
