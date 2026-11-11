@@ -41,7 +41,8 @@ std::string formatValue(const ParamInfo& p, float v) {
     }
     if (u == "Hz") {
         if (v >= 1000.0f) std::snprintf(b, sizeof b, "%.2f kHz", v / 1000.0f);
-        else std::snprintf(b, sizeof b, "%.0f Hz", v);
+        // slow rates keep their decimals: an LFO at 0.25 Hz read "0 Hz" and looked switched off
+        else std::snprintf(b, sizeof b, v < 10.0f ? "%.2f Hz" : v < 100.0f ? "%.1f Hz" : "%.0f Hz", v);
     } else if (u == "dB") {
         std::snprintf(b, sizeof b, "%+.1f dB", v);
         if (std::fabs(v) < 0.05f) std::snprintf(b, sizeof b, "0.0 dB");
