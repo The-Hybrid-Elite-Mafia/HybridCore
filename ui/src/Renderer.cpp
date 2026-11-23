@@ -610,6 +610,15 @@ void Renderer::sprite(Sprite s, Rect dst, Rgba tint, Blend blend, bool emissive)
     rectQuad({px(dst.x), py(dst.y), dst.w * canvas_.scale, dst.h * canvas_.scale}, u0, v0, u1, v1, c, kModeTexture, kTexParts, p, q, emissive);
 }
 
+void Renderer::spritePart(Sprite s, float fx0, float fy0, float fx1, float fy1, Rect dst, Rgba tint, Blend blend, bool emissive) {
+    float c[4];
+    premul(tint, blend, c);
+    float u0, v0, u1, v1;
+    spriteUv(s, fx0, fy0, fx1, fy1, u0, v0, u1, v1);
+    const float p[2] = {0, 0}, q[4] = {0, 0, 0, 0};
+    rectQuad({px(dst.x), py(dst.y), dst.w * canvas_.scale, dst.h * canvas_.scale}, u0, v0, u1, v1, c, kModeTexture, kTexParts, p, q, emissive);
+}
+
 void Renderer::spriteRotated(Sprite s, float cx, float cy, float w, float h, float ang, Rgba tint, Blend blend, bool emissive) {
     float c[4];
     premul(tint, blend, c);

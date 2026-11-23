@@ -95,6 +95,9 @@ struct HemPartImages {
 // The LED column pictures: where the segments sit, as fractions of the picture height (top, bottom).
 namespace hempart {
 inline constexpr float kLedTop = 0.186f, kLedBottom = 0.840f;
+// one LED (gap middle to gap middle) cut from the column, and the caps above and below the LEDs; fractions of the 236 px height
+inline constexpr float kLedCapTop = 38.5f / 236.0f, kLedUnitTop = 174.0f / 236.0f, kLedUnitBottom = 187.55f / 236.0f,
+                       kLedCapBottom = 201.5f / 236.0f;
 inline constexpr float kCapsuleEnd = 34.0f;   // 9-slice inset of the capsule ends, in sprite pixels
 } // namespace hempart
 // Loads <dir>/knob-cyan.png ... led-column-off.png. Missing files stay empty.

@@ -84,6 +84,9 @@ public:
     void panel(Rect dst);                    // the whole plug-in faceplate texture
     void atlas(Rect uv, Rect dst, Rgba tint = {1, 1, 1, 1});   // uv: 0..1 region of the picture atlas
     void sprite(Sprite s, Rect dst, Rgba tint = {}, Blend blend = Blend::Over, bool emissive = false);
+    // one part of a sprite (fractions of its width and height) drawn into dst
+    void spritePart(Sprite s, float fx0, float fy0, float fx1, float fy1, Rect dst, Rgba tint = {}, Blend blend = Blend::Over,
+                    bool emissive = false);
     void spriteRotated(Sprite s, float cx, float cy, float w, float h, float angleRad, Rgba tint = {},
                        Blend blend = Blend::Over, bool emissive = false);
     // 9-slice: corners keep their pixel size × cornerScale (design units per sprite pixel).

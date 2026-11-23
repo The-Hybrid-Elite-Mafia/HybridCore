@@ -193,25 +193,46 @@ void FxPanelView::drawHemMeter(Renderer& r, const PanelMeterSlot& s, float raw, 
     const PanelMeter& m = spec_.meters[static_cast<std::size_t>(s.meter)];
     const float value = smoothed(s.meter, raw), number = shown_[static_cast<std::size_t>(s.meter)];
     const Rect bar = at(s.bar, ox, oy);
-    // Steven's LED column, fitted into the bar (keeps its proportions), unlit; then the lit copy, clipped to the level
-    const float aspect = 96.0f / 236.0f;
-    const float w = std::min(bar.w * 1.6f, bar.h * aspect), h = w / aspect;
+    // Steven's LED column, built to the full height of the bar: its top cap, one LED repeated, its bottom cap.
+    // The LEDs fade from yellow at the bottom to orange-red at the top, like the column on the parts sheet.
+    const float natW = 96.0f, natH = 236.0f;
+    const float w = std::min(bar.w * 2.0f, bar.h * natW / natH);
+    const float k = w / natW;
+    const float topH = natH * hempart::kLedCapTop * k, botH = natH * (1.0f - hempart::kLedCapBottom) * k;
+    const float unitNat = natH * (hempart::kLedUnitBottom - hempart::kLedUnitTop) * k;
+    const float room = std::max(bar.h - topH - botH, unitNat * 4.0f);
+    const int units = std::max(4, static_cast<int>(std::lround(room / unitNat)));
+    const float unitH = room / static_cast<float>(units);
+    const float h = topH + room + botH;
     const Rect col{bar.cx() - w * 0.5f, bar.cy() - h * 0.5f, w, h};
-    r.sprite(Sprite::HemLedOff, col);
-    const float segTop = col.y + col.h * hempart::kLedTop, segBot = col.y + col.h * hempart::kLedBottom, segH = segBot - segTop;
+    const float segTop = col.y + topH, segBot = segTop + room;
+    const auto drawColumn = [&](Sprite sp, bool on) {
+        r.spritePart(sp, 0, 0, 1, hempart::kLedCapTop, {col.x, col.y, w, topH}, {}, Blend::Over, on);
+        for (int i = 0; i < units; ++i) {
+            const float t = static_cast<float>(i) / static_cast<float>(units - 1);   // 0 at the top LED, 1 at the bottom
+            const Rgba tint = on ? Rgba{1.0f, 0.55f + 0.45f * t, 0.45f + 0.55f * t, 1.0f} : Rgba{};
+            r.spritePart(sp, 0, hempart::kLedUnitTop, 1, hempart::kLedUnitBottom, {col.x, segTop + unitH * static_cast<float>(i), w, unitH},
+                         tint, Blend::Over, on);
+        }
+        r.spritePart(sp, 0, hempart::kLedCapBottom, 1, 1, {col.x, segBot, w, botH}, {}, Blend::Over, on);
+    };
+    drawColumn(Sprite::HemLedOff, false);
     const float f = panelMeterFraction(m, value);
+    const auto snap = [&](float frac) {   // whole LEDs only
+        return std::round(std::clamp(frac, 0.0f, 1.0f) * static_cast<float>(units)) * unitH;
+    };
     Rect lit{};
     if (m.centred) {
-        const float mid = (segTop + segBot) * 0.5f, hh = segH * 0.5f * std::fabs(f);
+        const float mid = (segTop + segBot) * 0.5f, hh = snap(std::fabs(f)) * 0.5f;
         lit = f > 0 ? Rect{col.x, mid - hh, col.w, hh} : Rect{col.x, mid, col.w, hh};
     } else {
         const bool fromTop = m.unit == "dB" && m.max <= 0.0f;   // reduction hangs from the top
-        const float hh = segH * std::clamp(f, 0.0f, 1.0f);
+        const float hh = snap(f);
         lit = fromTop ? Rect{col.x, segTop, col.w, hh} : Rect{col.x, segBot - hh, col.w, hh};
     }
     if (lit.h > 0.5f) {
         r.pushClip(lit);
-        r.sprite(Sprite::HemLedOn, col, {}, Blend::Over, true);
+        drawColumn(Sprite::HemLedOn, true);
         r.popClip();
     }
     const float z = layout_.zoom;
