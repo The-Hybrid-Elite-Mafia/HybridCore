@@ -25,8 +25,13 @@ public:
     // plate = false when the obsidian plate is already in the renderer's static layer.
     void draw(Renderer& r, const PanelHost& host, PanelHit hover, PanelHit active, float originX = 0, float originY = 0,
               bool plate = true) const;
+    // Draw the knobs, buttons, power button and meters with Steven's parts sheet (the HEM board look).
+    // Only when the parts atlas holds them (Sprite::HemKnobCyan ...); otherwise the built-in parts.
+    void setHemParts(bool on) noexcept { hemParts_ = on; }
 
 private:
+    void drawHemButton(Renderer& r, Rect b, const std::string& text, bool lit, bool hot, bool amber) const;
+    void drawHemMeter(Renderer& r, const PanelMeterSlot& m, float value, float ox, float oy) const;
     void drawKnob(Renderer& r, const PanelKnob& k, const PanelHost& host, bool hot, float ox, float oy) const;
     void drawButton(Renderer& r, Rect b, const std::string& text, bool lit, bool hot, Rgba colour) const;
     void drawMeter(Renderer& r, const PanelMeterSlot& m, float value, float ox, float oy) const;
@@ -41,6 +46,7 @@ private:
     const PanelLayout& layout_;
     const PanelSpec&   spec_;
     FxPalette          pal_;
+    bool               hemParts_ = false;
     mutable std::vector<float> bar_, shown_;
     mutable std::uint32_t      frame_ = 0;
 };

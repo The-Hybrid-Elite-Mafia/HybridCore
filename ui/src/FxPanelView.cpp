@@ -117,6 +117,19 @@ void FxPanelView::drawKnob(Renderer& r, const PanelKnob& k, const PanelHost& hos
     const float R = well.w * 0.5f * 0.92f;
     const float n = std::clamp(host.normalized(k.param), 0.0f, 1.0f);
     const float ang = kKnobMin + (kKnobMax - kKnobMin) * n;
+    if (hemParts_) {
+        // Steven's chrome knob turns as a whole: its pointer shows the value against the tick scale on the plate
+        const float d = well.w * 1.02f;
+        r.spriteRotated(Sprite::HemKnobCyan, cx, cy, d, d, ang);
+        const bool on = host.active(k.param);
+        if (!on) r.fillRound(well.inset(well.w * 0.02f), well.w * 0.49f, rgb8(0x000000, 0.62f), Blend::Over);   // not in use right now
+        const Rect v = at(k.value, ox, oy);
+        const std::string t = on ? host.text(k.param) : std::string("--");
+        const TextStyle vs = fit(r, TextStyle::Title, t, v.w - 12 * layout_.zoom);
+        r.text(vs, t, v.cx(), v.cy() + r.capHeight(vs) * 0.5f, !on ? kTextDim : hot ? kText : pal_.lime, Align::Center,
+               on ? TextFx::NeonCrisp : TextFx::Shadowed);
+        return;
+    }
     const float a0 = kKnobMin + (kKnobMax - kKnobMin) * (prm.bipolar ? 0.5f : 0.0f);
     const float ar = knob::kArcRadius * R, aw = knob::kArcWidth * R * 1.15f;
     r.sprite(Sprite::KnobTrack, {cx - R, cy - R, 2 * R, 2 * R});
@@ -162,7 +175,57 @@ void FxPanelView::drawButton(Renderer& r, Rect b, const std::string& text, bool 
     }
 }
 
+void FxPanelView::drawHemButton(Renderer& r, Rect b, const std::string& text, bool lit, bool hot, bool amber) const {
+    // Steven's capsule bar: lit = glowing, unlit = the same part turned down; the chrome ends never stretch
+    const Sprite cap = amber ? Sprite::HemCapsuleAmber : Sprite::HemCapsuleCyan;
+    const float h = std::min(b.h, b.w * 0.45f);
+    const Rect c{b.x, b.cy() - h * 0.5f, b.w, h};
+    const float corner = h / 74.0f;   // the capsule picture is 74 px tall
+    r.nineSlice(cap, c, corner, lit ? Rgba{1, 1, 1, 1} : hot ? Rgba{0.42f, 0.42f, 0.44f, 1} : Rgba{0.26f, 0.26f, 0.28f, 1});
+    if (text.empty()) return;
+    const float z = layout_.zoom;
+    const TextStyle bs = fit(r, TextStyle::Caption, text, c.w - 2 * hempart::kCapsuleEnd * corner - 4 * z);
+    r.text(bs, text, c.cx(), c.cy() + r.capHeight(bs) * 0.5f, lit ? rgb8(0x061018) : hot ? kText : rgb8(0xC8D2DC), Align::Center,
+           lit ? TextFx::Plain : TextFx::Shadowed);
+}
+
+void FxPanelView::drawHemMeter(Renderer& r, const PanelMeterSlot& s, float raw, float ox, float oy) const {
+    const PanelMeter& m = spec_.meters[static_cast<std::size_t>(s.meter)];
+    const float value = smoothed(s.meter, raw), number = shown_[static_cast<std::size_t>(s.meter)];
+    const Rect bar = at(s.bar, ox, oy);
+    // Steven's LED column, fitted into the bar (keeps its proportions), unlit; then the lit copy, clipped to the level
+    const float aspect = 96.0f / 236.0f;
+    const float w = std::min(bar.w * 1.6f, bar.h * aspect), h = w / aspect;
+    const Rect col{bar.cx() - w * 0.5f, bar.cy() - h * 0.5f, w, h};
+    r.sprite(Sprite::HemLedOff, col);
+    const float segTop = col.y + col.h * hempart::kLedTop, segBot = col.y + col.h * hempart::kLedBottom, segH = segBot - segTop;
+    const float f = panelMeterFraction(m, value);
+    Rect lit{};
+    if (m.centred) {
+        const float mid = (segTop + segBot) * 0.5f, hh = segH * 0.5f * std::fabs(f);
+        lit = f > 0 ? Rect{col.x, mid - hh, col.w, hh} : Rect{col.x, mid, col.w, hh};
+    } else {
+        const bool fromTop = m.unit == "dB" && m.max <= 0.0f;   // reduction hangs from the top
+        const float hh = segH * std::clamp(f, 0.0f, 1.0f);
+        lit = fromTop ? Rect{col.x, segTop, col.w, hh} : Rect{col.x, segBot - hh, col.w, hh};
+    }
+    if (lit.h > 0.5f) {
+        r.pushClip(lit);
+        r.sprite(Sprite::HemLedOn, col, {}, Blend::Over, true);
+        r.popClip();
+    }
+    const float z = layout_.zoom;
+    const Rect vbox = at(s.value, ox, oy);
+    const std::string num = formatPanelMeter(m, number);
+    const TextStyle ns = fit(r, TextStyle::Title, num, vbox.w - 10 * z);
+    r.text(ns, num, vbox.cx(), vbox.cy() + r.capHeight(ns) * 0.5f, pal_.lime, Align::Center, TextFx::NeonCrisp);
+    const Rect cap = at(s.caption, ox, oy);
+    const TextStyle cs = fit(r, TextStyle::Caption, m.name, cap.w);
+    r.text(cs, m.name, cap.cx(), cap.cy() + r.capHeight(cs) * 0.5f, kText, Align::Center, TextFx::Shadowed);
+}
+
 void FxPanelView::drawMeter(Renderer& r, const PanelMeterSlot& s, float raw, float ox, float oy) const {
+    if (hemParts_) { drawHemMeter(r, s, raw, ox, oy); return; }
     const PanelMeter& m = spec_.meters[static_cast<std::size_t>(s.meter)];
     const float z = layout_.zoom;
     const float value = smoothed(s.meter, raw), number = shown_[static_cast<std::size_t>(s.meter)];
@@ -289,10 +352,12 @@ void FxPanelView::draw(Renderer& r, const PanelHost& host, PanelHit hover, Panel
         const float n = host.normalized(b.param);
         const bool hot = hover.kind == PanelHit::Kind::Button && hover.index == static_cast<int>(i);
         if (b.choice < 0) {
-            drawButton(r, at(b.rect, ox, oy), n >= 0.5f ? "ON" : "OFF", n >= 0.5f, hot, pal_.lime);
+            if (hemParts_) drawHemButton(r, at(b.rect, ox, oy), n >= 0.5f ? "ON" : "OFF", n >= 0.5f, hot, true);
+            else drawButton(r, at(b.rect, ox, oy), n >= 0.5f ? "ON" : "OFF", n >= 0.5f, hot, pal_.lime);
         } else {
             const int sel = static_cast<int>(std::lround(n * static_cast<float>(std::max<std::size_t>(1, p.choices.size()) - 1)));
-            drawButton(r, at(b.rect, ox, oy), b.caption, sel == b.choice && host.active(b.param), hot, pal_.violet);
+            if (hemParts_) drawHemButton(r, at(b.rect, ox, oy), b.caption, sel == b.choice && host.active(b.param), hot, false);
+            else drawButton(r, at(b.rect, ox, oy), b.caption, sel == b.choice && host.active(b.param), hot, pal_.violet);
         }
     }
     // selectors
@@ -300,7 +365,7 @@ void FxPanelView::draw(Renderer& r, const PanelHost& host, PanelHit hover, Panel
         const PanelSelector& s = L.selectors[i];
         const bool on = host.active(s.param);
         const Rect box = at(s.box, ox, oy);
-        r.fillRound(box.inset(3 * z), 9 * z, kGlass, Blend::Over);
+        if (!hemParts_) r.fillRound(box.inset(3 * z), 9 * z, kGlass, Blend::Over);   // the HEM board look has the slot in the plate
         const std::string t = host.text(s.param);
         const TextStyle st = fit(r, TextStyle::Title, t, box.w - 12 * z);
         r.text(st, t, box.cx(), box.cy() + r.capHeight(st) * 0.5f, on ? pal_.lime : kTextDim, Align::Center, on ? TextFx::NeonCrisp : TextFx::Shadowed);
@@ -308,7 +373,12 @@ void FxPanelView::draw(Renderer& r, const PanelHost& host, PanelHit hover, Panel
             const Rect b = at(side == 0 ? s.prev : s.next, ox, oy);
             const bool hot = hover.index == static_cast<int>(i) &&
                              hover.kind == (side == 0 ? PanelHit::Kind::SelectorPrev : PanelHit::Kind::SelectorNext);
-            drawButton(r, b, "", false, hot, pal_.violet);
+            if (hemParts_) {
+                const float sq = std::min(b.w, b.h);
+                r.sprite(Sprite::HemSquareOff, {b.cx() - sq * 0.5f, b.cy() - sq * 0.5f, sq, sq}, hot ? Rgba{1.3f, 1.3f, 1.3f, 1} : Rgba{1, 1, 1, 1});
+            } else {
+                drawButton(r, b, "", false, hot, pal_.violet);
+            }
             const float dir = side == 0 ? -1.0f : 1.0f, cx = b.cx(), cy = b.cy(), sz = 11.0f * z;
             const float xs[4] = {cx - dir * sz * 0.7f, cx + dir * sz * 0.9f, cx - dir * sz * 0.7f, cx - dir * sz * 0.7f};
             const float ys[4] = {cy - sz, cy, cy + sz, cy - sz};
@@ -334,7 +404,16 @@ void FxPanelView::draw(Renderer& r, const PanelHost& host, PanelHit hover, Panel
     }
     if (host.hasBypass() && L.hasBypass) {
         const bool byp = host.bypassed();
-        drawButton(r, at(L.bypass, ox, oy), byp ? "BYPASSED" : "BYPASS", byp, hover.kind == PanelHit::Kind::Bypass, pal_.violet);
+        if (hemParts_) {   // Steven's power button: lit = the plug-in is running, dark = bypassed
+            const Rect b = at(L.bypass, ox, oy);
+            r.sprite(byp ? Sprite::HemPowerOff : Sprite::HemPowerOn, b,
+                     hover.kind == PanelHit::Kind::Bypass ? Rgba{1.15f, 1.15f, 1.15f, 1} : Rgba{1, 1, 1, 1});
+            const TextStyle ls = TextStyle::Caption;
+            r.text(ls, byp ? "BYPASSED" : "ON", b.x - 18, b.cy() + r.capHeight(ls) * 0.5f, byp ? kTextDim : pal_.violet, Align::Right,
+                   TextFx::Shadowed);
+        } else {
+            drawButton(r, at(L.bypass, ox, oy), byp ? "BYPASSED" : "BYPASS", byp, hover.kind == PanelHit::Kind::Bypass, pal_.violet);
+        }
     }
 }
 

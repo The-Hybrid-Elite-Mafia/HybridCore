@@ -554,13 +554,60 @@ struct Item {
 
 } // namespace
 
-PartsAtlas buildPartsAtlas(const Image& fp) {
+HemPartImages loadHemParts(const std::filesystem::path& dir) {
+    HemPartImages h;
+    auto ld = [&](Image& out, const char* name) {
+        if (auto img = loadImageFile(dir / name, nullptr)) out = std::move(*img);
+    };
+    ld(h.knobCyan, "knob-cyan.png");
+    ld(h.knobAmber, "knob-amber.png");
+    ld(h.powerOn, "power-on.png");
+    ld(h.powerOff, "power-off.png");
+    ld(h.squareOn, "square-on.png");
+    ld(h.squareOff, "square-off.png");
+    ld(h.capsuleCyan, "capsule-cyan.png");
+    ld(h.capsuleAmber, "capsule-amber.png");
+    ld(h.ledOn, "led-column-on.png");
+    ld(h.ledOff, "led-column-off.png");
+    return h;
+}
+
+namespace {
+// A straight-alpha sRGB picture as an atlas raster (premultiplied linear).
+Raster fromImage(const Image& im) {
+    Raster c(static_cast<int>(im.width), static_cast<int>(im.height));
+    for (int y = 0; y < c.h; ++y)
+        for (int x = 0; x < c.w; ++x) {
+            const std::uint8_t* s = &im.rgba[(static_cast<std::size_t>(y) * im.width + static_cast<std::size_t>(x)) * 4];
+            const float a = static_cast<float>(s[3]) / 255.0f;
+            c.at(x, y) = {srgb8ToLinear(s[0]) * a, srgb8ToLinear(s[1]) * a, srgb8ToLinear(s[2]) * a, a};
+        }
+    return c;
+}
+} // namespace
+
+PartsAtlas buildPartsAtlas(const Image& fp, const HemPartImages* hem) {
     std::vector<Item> items;
     auto add = [&](Sprite id, Raster c, float slice = 0.0f) {
         Item it{id, std::move(c), {}};
         for (float& s : it.info.slice) s = slice;
         items.push_back(std::move(it));
     };
+    if (hem) {
+        auto addImg = [&](Sprite id, const Image& im, float slice = 0.0f) {
+            if (!im.empty() && im.width <= 1000) add(id, fromImage(im), slice);
+        };
+        addImg(Sprite::HemKnobCyan, hem->knobCyan);
+        addImg(Sprite::HemKnobAmber, hem->knobAmber);
+        addImg(Sprite::HemPowerOn, hem->powerOn);
+        addImg(Sprite::HemPowerOff, hem->powerOff);
+        addImg(Sprite::HemSquareOn, hem->squareOn);
+        addImg(Sprite::HemSquareOff, hem->squareOff);
+        addImg(Sprite::HemCapsuleCyan, hem->capsuleCyan, hempart::kCapsuleEnd);
+        addImg(Sprite::HemCapsuleAmber, hem->capsuleAmber, hempart::kCapsuleEnd);
+        addImg(Sprite::HemLedOn, hem->ledOn);
+        addImg(Sprite::HemLedOff, hem->ledOff);
+    }
     const CapShape fader{124.0f, 62.0f, 22.0f, 16.0f, 0.0f, true};
     const CapShape button{58.0f, 42.0f, 17.0f, 13.0f, 0.06f, false};
 

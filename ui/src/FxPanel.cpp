@@ -282,7 +282,6 @@ PanelLayout layoutFxPanelFramed(const PanelSpec& spec) {
     L.footer = {};
     L.logo = kEmblem;
     L.bypass = L.hasBypass ? kBypass : Rect{};
-    if (L.hasBypass) addRectPocket(L, kBypass.inset(-6), 16, kButtonDepth);
     L.screws.clear();
     L.framed = true;
     return L;
@@ -519,8 +518,9 @@ Image renderFxPlate(const PanelLayout& L, const FxPalette& pal, float ppu) {
 }
 
 Image renderFxPlateFramed(const PanelLayout& L, const FxPalette& pal, float ppu, const Image& frameArt) {
+    (void)pal;
     const auto W = static_cast<std::uint32_t>(std::lround(L.width * ppu)), H = static_cast<std::uint32_t>(std::lround(L.height * ppu));
-    // 1) the frame art at the output size
+    // 1) Steven's backplate at the output size: frame, emblem, circuit board under clear glass
     Image img = frameArt.empty() || W == 0 || H == 0 ? Image{} : resizeSrgb(frameArt, W, H);
     if (img.empty() || img.width != W || img.height != H) {   // no art on disk: plain dark chassis
         img = Image{};
@@ -529,71 +529,118 @@ Image renderFxPlateFramed(const PanelLayout& L, const FxPalette& pal, float ppu,
         for (std::size_t i = 0; i < img.rgba.size(); i += 4) { img.rgba[i] = img.rgba[i + 1] = 14; img.rgba[i + 2] = 17; }
     }
     if (W == 0 || H == 0) return img;
+    const float s = L.zoom;
 
-    // 2) the big panels (sections, meter bay): smoked glass cut into the bed, the board faintly showing
-    auto same = [](const Rect& a, const Rect& b) {
-        return std::fabs(a.x - b.x) < 0.01f && std::fabs(a.y - b.y) < 0.01f && std::fabs(a.w - b.w) < 0.01f && std::fabs(a.h - b.h) < 0.01f;
-    };
-    auto isBay = [&](const PanelPocket& p) {
-        if (p.circle) return false;
-        for (const PanelSection& sec : L.sections) if (same(p.r, sec.bay)) return true;
-        return L.meterBay.w > 0 && same(p.r, L.meterBay);
-    };
-    auto lit = [](float nx, float ny) { return std::max(0.0f, -(nx * 0.6f + ny * 0.8f)); };   // light from the top-left
-    for (const PanelPocket& p : L.pockets) {
-        if (!isBay(p)) continue;
-        const float margin = 26.0f;   // soft contact shadow round each panel
-        const int x0 = std::max(0, static_cast<int>((p.r.x - margin) * ppu)), x1 = std::min(static_cast<int>(W), static_cast<int>((p.r.right() + margin) * ppu) + 1);
-        const int y0 = std::max(0, static_cast<int>((p.r.y - margin) * ppu)), y1 = std::min(static_cast<int>(H), static_cast<int>((p.r.bottom() + margin) * ppu) + 1);
-        for (int py = y0; py < y1; ++py) {
+    // Per-pixel painter over a box (frame pixels), linear light.
+    auto paint = [&](Rect box, auto&& f) {
+        const int x0 = std::max(0, static_cast<int>(box.x * ppu)), x1 = std::min(static_cast<int>(W), static_cast<int>(box.right() * ppu) + 1);
+        const int y0 = std::max(0, static_cast<int>(box.y * ppu)), y1 = std::min(static_cast<int>(H), static_cast<int>(box.bottom() * ppu) + 1);
+        for (int py = y0; py < y1; ++py)
             for (int px = x0; px < x1; ++px) {
-                const float ux = (static_cast<float>(px) + 0.5f) / ppu, uy = (static_cast<float>(py) + 0.5f) / ppu;
-                const float d = sdRound(ux, uy, p.r, p.radius);
                 std::uint8_t* o = &img.rgba[(static_cast<std::size_t>(py) * W + static_cast<std::size_t>(px)) * 4];
-                float R = srgb8ToLinear(o[0]), G = srgb8ToLinear(o[1]), B = srgb8ToLinear(o[2]);
-                if (d >= 0.0f) {
-                    const float k = 0.42f + 0.58f * std::clamp(d / margin, 0.0f, 1.0f);
-                    R *= k; G *= k; B *= k;
-                } else {
-                    const float e = 0.75f;
-                    float nx = sdRound(ux + e, uy, p.r, p.radius) - sdRound(ux - e, uy, p.r, p.radius);
-                    float ny = sdRound(ux, uy + e, p.r, p.radius) - sdRound(ux, uy - e, p.r, p.radius);
-                    const float l = std::sqrt(nx * nx + ny * ny) + 1e-6f;
-                    nx /= l; ny /= l;
-                    const float t = std::clamp((uy - p.r.y) / p.r.h, 0.0f, 1.0f);
-                    const float rim = std::clamp(1.0f + d / 4.0f, 0.0f, 1.0f);   // 4 px bevel at the cut edge
-                    const float li = lit(-nx, -ny);
-                    const float k = 0.30f;
-                    R = R * k + 0.0045f; G = G * k + 0.0055f; B = B * k + 0.0075f;
-                    const float sheen = 0.010f * (1.0f - t) * (1.0f - t);
-                    R += sheen; G += sheen; B += sheen * 1.15f;
-                    R += rim * (0.10f * li + 0.012f); G += rim * (0.11f * li + 0.014f); B += rim * (0.12f * li + 0.018f);
-                }
-                o[0] = linearToSrgb8(std::min(1.0f, R)); o[1] = linearToSrgb8(std::min(1.0f, G)); o[2] = linearToSrgb8(std::min(1.0f, B)); o[3] = 255;
+                float c[3] = {srgb8ToLinear(o[0]), srgb8ToLinear(o[1]), srgb8ToLinear(o[2])};
+                f((static_cast<float>(px) + 0.5f) / ppu, (static_cast<float>(py) + 0.5f) / ppu, c);
+                for (int k = 0; k < 3; ++k) o[k] = linearToSrgb8(std::clamp(c[k], 0.0f, 1.0f));
+                o[3] = 255;
             }
+    };
+    // Chamfered rectangle (cut corners), signed distance: negative inside.
+    auto sdChamfer = [](float x, float y, Rect r, float cut) {
+        const float cx = r.cx(), cy = r.cy(), hx = r.w * 0.5f, hy = r.h * 0.5f;
+        const float qx = std::fabs(x - cx), qy = std::fabs(y - cy);
+        const float box = std::max(qx - hx, qy - hy);
+        const float diag = (qx + qy - (hx + hy - cut)) * 0.70710678f;
+        return std::max(box, diag);
+    };
+    const float lc[2][3] = {{0.0f, 0.80f, 1.0f}, {1.0f, 0.36f, 0.02f}};   // neon cyan, neon amber (linear)
+
+    // 2) each section on its own glass plate: clear (the board shows through), cut corners, a neon edge
+    //    (cyan along the top and left, amber along the bottom and right), a screw in each corner
+    std::vector<std::pair<Rect, bool>> plates;   // rect, meter bay
+    for (const PanelSection& sec : L.sections) plates.push_back({sec.bay, false});
+    if (L.meterBay.w > 0) plates.push_back({L.meterBay, true});
+    for (const auto& [r, meterBay] : plates) {
+        const float cut = std::min({34.0f * s, r.w * 0.2f, r.h * 0.2f}), glowR = 22.0f;
+        paint(r.inset(-glowR - 4), [&](float x, float y, float* c) {
+            const float d = sdChamfer(x, y, r, cut);
+            // which neon: cyan on the upper-left half of the outline, amber on the lower-right
+            const float t = ((x - r.x) / r.w + (y - r.y) / r.h) * 0.5f;
+            const float* nc = t < 0.5f ? lc[0] : lc[1];
+            if (d < 0.0f) {
+                const float k = 1.04f;   // clear glass, a hair brighter, a little cool
+                const float sheen = 0.012f * std::clamp(1.0f - (y - r.y) / (r.h * 0.6f), 0.0f, 1.0f);
+                c[0] = c[0] * k + 0.004f + sheen; c[1] = c[1] * k + 0.006f + sheen; c[2] = c[2] * k + 0.009f + sheen * 1.1f;
+                const float rim = std::clamp(1.0f + d / 5.0f, 0.0f, 1.0f);   // chrome lip at the cut edge
+                c[0] += 0.10f * rim; c[1] += 0.11f * rim; c[2] += 0.12f * rim;
+            }
+            // the neon tube sits 7 px inside the edge, glowing both ways
+            const float tube = std::fabs(d + 7.0f);
+            const float core = std::clamp(1.0f - tube / 2.2f, 0.0f, 1.0f), glow = std::exp(-tube / 7.0f) * 0.35f;
+            const float e = core * 0.9f + glow;
+            for (int k = 0; k < 3; ++k) c[k] += nc[k] * e + core * 0.35f;
+            if (d >= 0.0f) {   // soft contact shadow on the board just outside
+                const float sh = 0.75f + 0.25f * std::clamp(d / glowR, 0.0f, 1.0f);
+                for (int k = 0; k < 3; ++k) c[k] *= sh;
+            }
+        });
+        // corner screws
+        const float sr = std::clamp(9.0f * s, 8.0f, 16.0f), in = cut * 0.55f + sr + 6.0f;
+        for (auto [sx, sy] : {std::pair{r.x + in, r.y + in}, std::pair{r.right() - in, r.y + in}, std::pair{r.x + in, r.bottom() - in},
+                                    std::pair{r.right() - in, r.bottom() - in}}) {
+            paint({sx - sr - 4, sy - sr - 4, 2 * sr + 8, 2 * sr + 8}, [&](float x, float y, float* c) {
+                const float dx = x - sx, dy = y - sy, d = std::sqrt(dx * dx + dy * dy);
+                if (d > sr + 2.0f) return;
+                if (d > sr) { for (int k = 0; k < 3; ++k) c[k] *= 0.55f; return; }   // shadow ring
+                const float n = (-dx * 0.6f - dy * 0.8f) / sr;                      // lit from the top-left
+                float v = 0.10f + 0.16f * std::max(0.0f, n) + 0.05f;
+                const float slot = std::fabs((dx - dy) * 0.7071f);                  // the screw slot
+                if (slot < sr * 0.16f && d < sr * 0.8f) v *= 0.25f;
+                c[0] = v; c[1] = v * 1.02f; c[2] = v * 1.06f;
+            });
         }
     }
 
-    // 3) every knob well, value window, button and meter pocket: the machined obsidian insert,
-    //    exactly as the stand-alone plate renders it (same chamfers, milled floors, shadows)
-    const Image obs = renderFxPlate(L, pal, ppu);
-    for (const PanelPocket& p : L.pockets) {
-        if (isBay(p)) continue;
-        const Rect bb = p.r.inset(-2);
-        const int x0 = std::max(0, static_cast<int>(bb.x * ppu)), x1 = std::min(static_cast<int>(W), static_cast<int>(bb.right() * ppu) + 1);
-        const int y0 = std::max(0, static_cast<int>(bb.y * ppu)), y1 = std::min(static_cast<int>(H), static_cast<int>(bb.bottom() * ppu) + 1);
-        for (int py = y0; py < y1; ++py) {
-            for (int px = x0; px < x1; ++px) {
-                const float ux = (static_cast<float>(px) + 0.5f) / ppu, uy = (static_cast<float>(py) + 0.5f) / ppu;
-                const float a = std::clamp(pocketInside(p, ux, uy) * ppu + 0.5f, 0.0f, 1.0f);   // 1-pixel soft edge
-                if (a <= 0.0f) continue;
-                const std::size_t i = (static_cast<std::size_t>(py) * W + static_cast<std::size_t>(px)) * 4;
-                for (int ch = 0; ch < 3; ++ch) {
-                    const float v = srgb8ToLinear(img.rgba[i + static_cast<std::size_t>(ch)]) * (1.0f - a) + srgb8ToLinear(obs.rgba[i + static_cast<std::size_t>(ch)]) * a;
-                    img.rgba[i + static_cast<std::size_t>(ch)] = linearToSrgb8(std::min(1.0f, v));
-                }
-            }
-        }
+    // 3) knobs: a soft shadow where the knob sits, and a tick scale round it (the knob itself is a live part)
+    for (const PanelKnob& k : L.knobs) {
+        const Rect w = k.well;
+        const float cx = w.cx(), cy = w.cy(), R = w.w * 0.5f;
+        paint(w.inset(-R * 0.30f), [&](float x, float y, float* c) {
+            const float dx = x - cx - R * 0.04f, dy = y - cy - R * 0.07f, d = std::sqrt(dx * dx + dy * dy) / R;
+            const float sh = 1.0f - 0.55f * std::clamp(1.15f - d, 0.0f, 1.0f) / 1.15f * (d < 1.15f ? 1.0f : 0.0f);
+            for (int q = 0; q < 3; ++q) c[q] *= sh;
+            // ticks: 11 from -135 to +135 degrees, at 1.06R..1.20R (long ones at the ends and middle)
+            const float rx = x - cx, ry = y - cy, rr = std::sqrt(rx * rx + ry * ry) / R;
+            const float ang = std::atan2(rx, -ry);   // 0 = up, clockwise
+            constexpr float kMin = -0.75f * 3.14159265f, kMax = 0.75f * 3.14159265f;
+            if (ang < kMin - 0.05f || ang > kMax + 0.05f) return;
+            const float step = (kMax - kMin) / 10.0f;
+            const float idx = (ang - kMin) / step, nearest = std::round(idx);
+            const bool major = nearest == 0.0f || nearest == 10.0f || nearest == 5.0f;
+            const float outer = major ? 1.22f : 1.17f;
+            if (rr < 1.06f || rr > outer) return;
+            const float distPx = std::fabs(idx - nearest) * step * rr * R;
+            const float a = std::clamp(1.0f - (distPx - 1.2f * s) / 1.2f, 0.0f, 1.0f) * (major ? 0.85f : 0.6f);
+            for (int q = 0; q < 3; ++q) c[q] = c[q] * (1.0f - a) + 0.62f * a;
+        });
+    }
+
+    // 4) value windows and selector boxes: dark slots cut into the glass, a chrome rim, the text stays easy to read
+    std::vector<Rect> slots;
+    for (const PanelKnob& k : L.knobs) slots.push_back(k.value);
+    for (const PanelSelector& sel : L.selectors) slots.push_back(sel.box);
+    for (const PanelMeterSlot& m : L.meters) slots.push_back(m.value);
+    for (const Rect& r : slots) {
+        const float rad = std::min(10.0f * s, r.h * 0.3f);
+        paint(r.inset(-4), [&](float x, float y, float* c) {
+            const float d = sdRound(x, y, r, rad);
+            if (d >= 0.0f) { if (d < 3.0f) for (int k = 0; k < 3; ++k) c[k] *= 0.6f; return; }
+            const float t = std::clamp((y - r.y) / r.h, 0.0f, 1.0f);
+            const float v = 0.010f + 0.010f * t;
+            c[0] = c[0] * 0.12f + v; c[1] = c[1] * 0.12f + v * 1.15f; c[2] = c[2] * 0.12f + v * 1.4f;
+            const float rim = std::clamp(1.0f + d / 3.0f, 0.0f, 1.0f);
+            const float lit = (y > r.cy()) ? 0.16f : 0.05f;   // the lower lip catches the light
+            for (int k = 0; k < 3; ++k) c[k] += rim * lit;
+        });
     }
     return img;
 }
