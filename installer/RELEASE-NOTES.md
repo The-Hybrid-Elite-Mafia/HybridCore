@@ -1,3 +1,13 @@
+## The Hybrid Core — 0.15.0: the HEM frame look on every HEM plug-in
+
+- **New look for all 22 HEM effects and HEM WAVE.** Each plug-in window is now the HEM frame (the same
+  chrome frame, emblem and glass bed as the Dark Matter Series). The controls sit on smoked-glass panels
+  in the bed; the name, what it does, the brand and BYPASS sit in the top strip. Cyan and amber lights.
+- **Nothing else changed.** Same knobs, same buttons, same meters, same sound. Only the looks changed.
+- The app's own FX rack keeps its look.
+
+---
+
 ## The Hybrid Core — 0.14.2: sound on every output (HDMI soundbars, TVs, Bluetooth)
 
 - **Fixed: no sound on outputs that can't run 48 kHz exclusive.** Many HDMI soundbars, TVs and Bluetooth
