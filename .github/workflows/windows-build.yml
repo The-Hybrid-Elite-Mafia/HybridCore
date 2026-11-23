@@ -104,12 +104,11 @@ jobs:
           name: shots-${{ github.ref_name }}
           path: shots/*.png
 
-      - name: Publish screenshots to the ci-screenshots branch
-        if: github.ref == 'refs/heads/main'
+      - name: Publish screenshots to the ci-screenshots branch (other branches - ci-screenshots-dev)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tools\ci\run-and-report.ps1 -Title "ui: publish screenshots" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\publish-screenshots.ps1','-Folder','shots'
+          tools\ci\run-and-report.ps1 -Title "ui: publish screenshots" -Exe pwsh -ArgList '-NoProfile','-File','tools\ci\publish-screenshots.ps1','-Folder','shots','-Branch','${{ github.ref == 'refs/heads/main' && 'ci-screenshots' || 'ci-screenshots-dev' }}'
 
       - name: Build installer
         run: |
