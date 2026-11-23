@@ -310,6 +310,13 @@ void testHemParts() {
                          ui::Sprite::HemSquareOff, ui::Sprite::HemCapsuleCyan, ui::Sprite::HemCapsuleAmber, ui::Sprite::HemLedOn, ui::Sprite::HemLedOff})
         ok += a[s].width > 0 && a[s].u1 > a[s].u0 && a[s].v1 > a[s].v0;
     CHECK(ok == 10);
+    CHECK(hem.hasFaders());
+    int faders = 0;
+    for (ui::Sprite s : {ui::Sprite::HemFaderCyan, ui::Sprite::HemFaderAmber, ui::Sprite::HemFaderCapCyan, ui::Sprite::HemFaderCapAmber,
+                         ui::Sprite::HemSliderCyan, ui::Sprite::HemSliderAmber, ui::Sprite::HemSliderCapCyan, ui::Sprite::HemSliderCapAmber})
+        faders += a[s].width > 0 && a[s].u1 > a[s].u0;
+    CHECK(faders == 8);
+    CHECK(a[ui::Sprite::HemFaderCyan].slice[1] == ui::hempart::kFaderEnd && a[ui::Sprite::HemSliderCyan].slice[0] == ui::hempart::kSliderEnd);
     int overlap = 0;   // no two parts share atlas pixels
     for (std::size_t i = 0; i < ui::kSpriteCount; ++i)
         for (std::size_t j = i + 1; j < ui::kSpriteCount; ++j) {

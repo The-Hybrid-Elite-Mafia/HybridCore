@@ -67,6 +67,14 @@ enum class Sprite : std::uint8_t {
     HemCapsuleAmber,
     HemLedOn,        // LED meter column, every segment lit (clipped to the level)
     HemLedOff,       // the same column, segments dark
+    HemFaderCyan,    // vertical fader track (handle cut out; 9-slice: the chamfered ends stay)
+    HemFaderAmber,
+    HemFaderCapCyan, // the fader's metal handle with its neon line
+    HemFaderCapAmber,
+    HemSliderCyan,   // horizontal slider track (handle cut out; 9-slice: the screwed ends stay)
+    HemSliderAmber,
+    HemSliderCapCyan,
+    HemSliderCapAmber,
     Count
 };
 inline constexpr std::size_t kSpriteCount = static_cast<std::size_t>(Sprite::Count);
@@ -86,6 +94,13 @@ struct PartsAtlas {
 // The HEM parts sheet pictures (straight-alpha sRGB). Any empty image leaves its sprite empty.
 struct HemPartImages {
     Image knobCyan, knobAmber, powerOn, powerOff, squareOn, squareOff, capsuleCyan, capsuleAmber, ledOn, ledOff;
+    // faders and sliders (optional: a set without them still counts as complete; the faders then keep their old look)
+    Image faderCyan, faderAmber, faderCapCyan, faderCapAmber, sliderCyan, sliderAmber, sliderCapCyan, sliderCapAmber;
+    [[nodiscard]] bool hasFaders() const noexcept {
+        for (const Image* i : {&faderCyan, &faderAmber, &faderCapCyan, &faderCapAmber, &sliderCyan, &sliderAmber, &sliderCapCyan, &sliderCapAmber})
+            if (i->empty()) return false;
+        return true;
+    }
     [[nodiscard]] bool complete() const noexcept {
         for (const Image* i : {&knobCyan, &knobAmber, &powerOn, &powerOff, &squareOn, &squareOff, &capsuleCyan, &capsuleAmber, &ledOn, &ledOff})
             if (i->empty()) return false;
@@ -99,8 +114,12 @@ inline constexpr float kLedTop = 0.186f, kLedBottom = 0.840f;
 inline constexpr float kLedCapTop = 38.5f / 236.0f, kLedUnitTop = 174.0f / 236.0f, kLedUnitBottom = 187.55f / 236.0f,
                        kLedCapBottom = 201.5f / 236.0f;
 inline constexpr float kCapsuleEnd = 34.0f;   // 9-slice inset of the capsule ends, in sprite pixels
+// fader track (110 x 491): 9-slice inset, and where the handle's centre travels (fractions of the height, top .. bottom)
+inline constexpr float kFaderEnd = 46.0f, kFaderTop = 0.115f, kFaderBottom = 0.885f;
+// slider track (687 x 135): 9-slice inset, and where the handle's centre travels (fractions of the width, left .. right)
+inline constexpr float kSliderEnd = 60.0f, kSliderLeft = 0.115f, kSliderRight = 0.885f;
 } // namespace hempart
-// Loads <dir>/knob-cyan.png ... led-column-off.png. Missing files stay empty.
+// Loads <dir>/knob-cyan.png ... led-column-off.png, fader-*.png, slider-*.png. Missing files stay empty.
 [[nodiscard]] HemPartImages loadHemParts(const std::filesystem::path& dir);
 
 // `faceplate` is the 3840×2160 master (FaceplateArt::master). `hem`: Steven's parts sheet, added when given.

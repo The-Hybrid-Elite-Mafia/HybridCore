@@ -569,6 +569,14 @@ HemPartImages loadHemParts(const std::filesystem::path& dir) {
     ld(h.capsuleAmber, "capsule-amber.png");
     ld(h.ledOn, "led-column-on.png");
     ld(h.ledOff, "led-column-off.png");
+    ld(h.faderCyan, "fader-track-cyan.png");
+    ld(h.faderAmber, "fader-track-amber.png");
+    ld(h.faderCapCyan, "fader-cap-cyan.png");
+    ld(h.faderCapAmber, "fader-cap-amber.png");
+    ld(h.sliderCyan, "slider-track-cyan.png");
+    ld(h.sliderAmber, "slider-track-amber.png");
+    ld(h.sliderCapCyan, "slider-cap-cyan.png");
+    ld(h.sliderCapAmber, "slider-cap-amber.png");
     return h;
 }
 
@@ -607,6 +615,14 @@ PartsAtlas buildPartsAtlas(const Image& fp, const HemPartImages* hem) {
         addImg(Sprite::HemCapsuleAmber, hem->capsuleAmber, hempart::kCapsuleEnd);
         addImg(Sprite::HemLedOn, hem->ledOn);
         addImg(Sprite::HemLedOff, hem->ledOff);
+        addImg(Sprite::HemFaderCyan, hem->faderCyan, hempart::kFaderEnd);
+        addImg(Sprite::HemFaderAmber, hem->faderAmber, hempart::kFaderEnd);
+        addImg(Sprite::HemFaderCapCyan, hem->faderCapCyan);
+        addImg(Sprite::HemFaderCapAmber, hem->faderCapAmber);
+        addImg(Sprite::HemSliderCyan, hem->sliderCyan, hempart::kSliderEnd);
+        addImg(Sprite::HemSliderAmber, hem->sliderAmber, hempart::kSliderEnd);
+        addImg(Sprite::HemSliderCapCyan, hem->sliderCapCyan);
+        addImg(Sprite::HemSliderCapAmber, hem->sliderCapAmber);
     }
     const CapShape fader{124.0f, 62.0f, 22.0f, 16.0f, 0.0f, true};
     const CapShape button{58.0f, 42.0f, 17.0f, 13.0f, 0.06f, false};
