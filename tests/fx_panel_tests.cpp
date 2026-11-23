@@ -310,6 +310,15 @@ void testHemParts() {
                          ui::Sprite::HemSquareOff, ui::Sprite::HemCapsuleCyan, ui::Sprite::HemCapsuleAmber, ui::Sprite::HemLedOn, ui::Sprite::HemLedOff})
         ok += a[s].width > 0 && a[s].u1 > a[s].u0 && a[s].v1 > a[s].v0;
     CHECK(ok == 10);
+    int overlap = 0;   // no two parts share atlas pixels
+    for (std::size_t i = 0; i < ui::kSpriteCount; ++i)
+        for (std::size_t j = i + 1; j < ui::kSpriteCount; ++j) {
+            const ui::SpriteInfo& s = a.sprites[i];
+            const ui::SpriteInfo& o = a.sprites[j];
+            if (s.width > 0 && o.width > 0 && s.u0 < o.u1 && o.u0 < s.u1 && s.v0 < o.v1 && o.v0 < s.v1) ++overlap;
+        }
+    CHECK(overlap == 0);
+    CHECK(a.texture.width <= 4096 && a.texture.height <= 4096);
     CHECK(a[ui::Sprite::HemCapsuleCyan].slice[0] == ui::hempart::kCapsuleEnd);
     CHECK(a[ui::Sprite::HemKnobCyan].width == a[ui::Sprite::HemKnobCyan].height);   // square: turns about its centre
     const ui::PartsAtlas plain = ui::buildPartsAtlas(fp);                            // without the sheet: those sprites stay empty
