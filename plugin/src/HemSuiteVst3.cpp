@@ -8,7 +8,10 @@
 //  text as hc::fx), a Bypass parameter (latency-matched, no click: 10 ms crossfade) and,
 //  for the dynamics ones, a read-only Gain Reduction meter for the host's generic editor.
 //  Editor: every effect has its own obsidian faceplate (hc::ui::FxPanelWindow, OpenGL, inside
-//  the host's window). Live meters reach it through read-only output parameters.
+//  the host's window). Live meters reach it two ways: read straight from this process's running
+//  processor (found through a registry once the processor announces itself; works in hosts that run
+//  both halves in one process, such as Audacity, which does not pass output parameters back), else
+//  through read-only output parameters.
 //  Steinberg VST3 SDK: MIT licence (verified from the SDK's LICENSE.txt, v3.8.1).
 // =============================================================================
 #include "hybrid/fx/Dsp.hpp"
@@ -17,6 +20,7 @@
 #include "hybrid/ui/FxPanelWindow.hpp"
 
 #include "pluginterfaces/base/ibstream.h"
+#include "pluginterfaces/vst/ivstmessage.h"
 #include "pluginterfaces/vst/ivstparameterchanges.h"
 #include "pluginterfaces/vst/ivstprocesscontext.h"
 #include "pluginterfaces/vst/vsttypes.h"
@@ -28,6 +32,10 @@
 #include <windows.h>
 
 #include <algorithm>
+#include <atomic>
+#include <chrono>
+#include <map>
+#include <mutex>
 #include <cstdlib>
 #include <filesystem>
 #include <cstring>
@@ -62,6 +70,23 @@ std::filesystem::path bundleResources() {
 constexpr char         kStateMagic[] = "HEMFX1\n";
 
 FUID toFuid(const std::array<std::uint32_t, 4>& u) { return FUID(u[0], u[1], u[2], u[3]); }
+constexpr const char* kLiveMessage = "hemfx.live";
+constexpr std::int64_t kLiveStaleMs = 300;   // no process() call for this long: the processor is stopped
+std::int64_t nowMs() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
+// ---- processors this process is running, so a controller can find its live effect -----------
+class Processor;
+struct LiveRegistry {
+    std::mutex mutex;
+    std::map<std::int64_t, Processor*> map;
+    std::int64_t next = 1;
+};
+LiveRegistry& live() {
+    static LiveRegistry r;
+    return r;
+}
 std::u16string toU16(const std::string& s) { return std::u16string(s.begin(), s.end()); }   // ASCII names
 bool hasMeter(const fx::EffectInfo& info) {
     const std::string c = info.subCategory, n = info.name;
@@ -116,6 +141,7 @@ bool readState(IBStream* s, fx::Effect& e, bool& bypass) {
 class Processor final : public Vst::AudioEffect {
 public:
     explicit Processor(const fx::EffectInfo* info) : info_(info), fx_(info->create()) { setControllerClass(toFuid(info->controllerUid)); }
+    ~Processor() override { unregister(); }
 
     static FUnknown* createInstance(void* ctx) {
         return static_cast<Vst::IAudioProcessor*>(new Processor(static_cast<const fx::EffectInfo*>(ctx)));
@@ -126,7 +152,41 @@ public:
         if (r != kResultOk) return r;
         addAudioInput(STR16("Stereo In"), Vst::SpeakerArr::kStereo);
         addAudioOutput(STR16("Stereo Out"), Vst::SpeakerArr::kStereo);
+        std::lock_guard lock(live().mutex);
+        if (token_ == 0) token_ = live().next++;
+        live().map[token_] = this;
         return kResultOk;
+    }
+    tresult PLUGIN_API terminate() SMTG_OVERRIDE {
+        unregister();
+        return AudioEffect::terminate();
+    }
+
+    // Tell the controller which live effect is ours (UI thread; never from process()).
+    tresult PLUGIN_API connect(Vst::IConnectionPoint* other) SMTG_OVERRIDE {
+        const tresult r = AudioEffect::connect(other);
+        if (r == kResultOk && token_ != 0) {
+            if (Vst::IMessage* msg = allocateMessage()) {
+                msg->setMessageID(kLiveMessage);
+                msg->getAttributes()->setInt("token", token_);
+                sendMessage(msg);
+                msg->release();
+            }
+        }
+        return r;
+    }
+
+    // The live readouts, for the controller in this process (any thread; lock-free reads). False when
+    // the processor is not running (stopped, or no process() call for kLiveStaleMs).
+    bool liveMeter(int m, float& out) const noexcept {
+        if (nowMs() - lastProcessMs_.load(std::memory_order_relaxed) > kLiveStaleMs) return false;
+        out = fx_->meter(m);
+        return true;
+    }
+    bool liveReduction(float& out) const noexcept {
+        if (nowMs() - lastProcessMs_.load(std::memory_order_relaxed) > kLiveStaleMs) return false;
+        out = fx_->reductionDb();
+        return true;
     }
 
     tresult PLUGIN_API setBusArrangements(Vst::SpeakerArrangement* inputs, int32 numIns, Vst::SpeakerArrangement* outputs,
@@ -214,6 +274,7 @@ public:
             done += n;
         }
         out.silenceFlags = 0;
+        lastProcessMs_.store(nowMs(), std::memory_order_relaxed);
         // Gain-reduction meter (0 dB .. -30 dB → 1 .. 0) for the host's generic editor.
         if (hasMeter(*info_) && data.outputParameterChanges) {
             int32 idx = 0;
@@ -244,8 +305,15 @@ public:
     tresult PLUGIN_API getState(IBStream* state) SMTG_OVERRIDE { return writeText(state, stateText(*fx_, bypass_)) ? kResultOk : kResultFalse; }
 
 private:
+    void unregister() noexcept {
+        std::lock_guard lock(live().mutex);
+        if (token_ != 0) live().map.erase(token_);
+    }
+
     const fx::EffectInfo*       info_;
     std::unique_ptr<fx::Effect> fx_;
+    std::int64_t                token_ = 0;
+    std::atomic<std::int64_t>   lastProcessMs_{0};
     fx::DelayLine               bypassDelay_[2];
     std::vector<float>          dry_[2];
     double                      sampleRate_ = 48000.0;
@@ -299,6 +367,7 @@ class Controller;
 class ControllerHost final : public ui::PanelHost {
 public:
     ControllerHost(Vst::EditController& c, fx::Effect& e, bool gainMeter) : c_(c), e_(e), gainMeter_(gainMeter) {}
+    void setLiveToken(std::int64_t t) noexcept { liveToken_.store(t, std::memory_order_relaxed); }
     float normalized(int i) const override { return static_cast<float>(c_.getParamNormalized(static_cast<Vst::ParamID>(i))); }
     void beginEdit(int i) override { c_.beginEdit(static_cast<Vst::ParamID>(i)); }
     void setNormalized(int i, float v) override {
@@ -314,6 +383,14 @@ public:
     }
     float meter(int m) const override {
         const auto ms = e_.meters();
+        if (const std::int64_t t = liveToken_.load(std::memory_order_relaxed); t != 0 && !bypassed()) {   // the running processor itself
+            std::lock_guard lock(live().mutex);
+            const auto it = live().map.find(t);
+            float v = 0;
+            if (it != live().map.end()) {
+                if (m < static_cast<int>(ms.size()) ? it->second->liveMeter(m, v) : (gainMeter_ && it->second->liveReduction(v))) return v;
+            }
+        }
         if (m < static_cast<int>(ms.size())) return normToMeter(ms[static_cast<std::size_t>(m)], c_.getParamNormalized(kMeterBase + static_cast<Vst::ParamID>(m)));
         return gainMeter_ ? static_cast<float>((c_.getParamNormalized(kMeterId) - 1.0) * 30.0) : 0.0f;
     }
@@ -333,9 +410,10 @@ public:
     }
 
 private:
-    Vst::EditController& c_;
-    fx::Effect&          e_;
-    bool                 gainMeter_;
+    Vst::EditController&      c_;
+    fx::Effect&               e_;
+    bool                      gainMeter_;
+    std::atomic<std::int64_t> liveToken_{0};
 };
 
 // The editor: an OpenGL child window inside the host's window.
@@ -396,6 +474,15 @@ public:
             setParamNormalized(static_cast<Vst::ParamID>(i), fx::toNormalized(ps[i], fx_->get(static_cast<int>(i))));
         setParamNormalized(kBypassId, bypass ? 1.0 : 0.0);
         return kResultOk;
+    }
+
+    tresult PLUGIN_API notify(Vst::IMessage* message) SMTG_OVERRIDE {
+        if (message && message->getMessageID() && std::strcmp(message->getMessageID(), kLiveMessage) == 0) {
+            int64 t = 0;
+            if (message->getAttributes() && message->getAttributes()->getInt("token", t) == kResultOk) host_.setLiveToken(t);
+            return kResultOk;
+        }
+        return EditController::notify(message);
     }
 
     IPlugView* PLUGIN_API createView(FIDString name) SMTG_OVERRIDE {

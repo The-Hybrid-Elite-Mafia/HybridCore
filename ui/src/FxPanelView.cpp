@@ -138,7 +138,6 @@ void FxPanelView::drawKnob(Renderer& r, const PanelKnob& k, const PanelHost& hos
     r.sprite(Sprite::KnobLight, {cx - bd / 2, cy - bd / 2, bd, bd});
     const bool on = host.active(k.param);
     if (!on) r.fillRound(well.inset(well.w * 0.04f), well.w * 0.46f, rgb8(0x000000, 0.62f), Blend::Over);   // not in use right now
-    if (hot) r.glow(well.inset(well.w * 0.12f), well.w * 0.4f, 18.0f, pal_.violet.withAlpha(0.35f), true);
 
     // value window
     const Rect v = at(k.value, ox, oy);

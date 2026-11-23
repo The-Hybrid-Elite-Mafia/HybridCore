@@ -1,3 +1,12 @@
+## The Hybrid Core — 0.15.1: meters that move in Audacity, no knob glow
+
+- **Fixed: plug-in meters stayed still in Audacity** (HEM ECHO's time readout, the gain-reduction meters).
+  Audacity doesn't send the meter values back to the plug-in window, so the window now reads them straight
+  from the running plug-in. Other hosts work as before.
+- **Removed the blue glow** behind a knob while you hover or turn it.
+
+---
+
 ## The Hybrid Core — 0.15.0: the HEM frame look on every HEM plug-in
 
 - **New look for all 22 HEM effects and HEM WAVE.** Each plug-in window is now the HEM frame (the same
