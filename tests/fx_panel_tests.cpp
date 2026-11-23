@@ -284,8 +284,8 @@ void testFxPanelFramed() {
         const std::uint8_t* well = px(w.cx(), w.cy());   // where a knob sits: a soft shadow on the board
         CHECK(well[1] < 110 && well[1] > 40);
         const ui::Rect& bay = F.sections.front().bay;
-        const std::uint8_t* open = px(bay.x + 30, bay.cy());   // no box round the controls: the board shows unchanged
-        CHECK(open[0] == 120 && open[1] == 124 && open[2] == 130);
+        const std::uint8_t* glass = px(bay.x + 40, bay.cy());   // clear glass plate: the board shows through, barely darker
+        CHECK(glass[1] >= 115 && glass[1] <= 124);
         const ui::Rect& v = F.knobs.front().value;
         const std::uint8_t* slot = px(v.cx(), v.cy());   // value window: a dark slot so the number reads
         CHECK(slot[1] < 70);

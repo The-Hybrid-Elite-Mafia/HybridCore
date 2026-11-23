@@ -544,9 +544,69 @@ Image renderFxPlateFramed(const PanelLayout& L, const FxPalette& pal, float ppu,
                 o[3] = 255;
             }
     };
-    // (no boxed glass plates round the controls: Steven turned them down — the controls sit straight on his board)
+    // Chamfered rectangle (cut corners), signed distance: negative inside.
+    auto sdChamfer = [](float x, float y, Rect r, float cut) {
+        const float cx = r.cx(), cy = r.cy(), hx = r.w * 0.5f, hy = r.h * 0.5f;
+        const float qx = std::fabs(x - cx), qy = std::fabs(y - cy);
+        const float box = std::max(qx - hx, qy - hy);
+        const float diag = (qx + qy - (hx + hy - cut)) * 0.70710678f;
+        return std::max(box, diag);
+    };
+    const float cyan[3] = {0.0f, 0.78f, 1.0f}, amber[3] = {1.0f, 0.34f, 0.01f};   // neon (linear)
 
-    // 2) knobs: a soft shadow where the knob sits, and a tick scale round it (the knob itself is a live part)
+    // 2) Steven's reference: each control group on a CLEAR glass plate — the board shows through untouched —
+    //    with cut corners, a thin steel lip, a thin neon line (cyan top-left, amber bottom-right) and small screws.
+    //    Meter windows get a chrome bezel and darker glass so the LEDs read.
+    std::vector<std::pair<Rect, bool>> plates;   // rect, meter window
+    for (const PanelSection& sec : L.sections) plates.push_back({sec.bay, false});
+    if (L.meterBay.w > 0) plates.push_back({L.meterBay, true});
+    for (const auto& [r, meterWin] : plates) {
+        const float cut = std::min({(meterWin ? 22.0f : 40.0f) * s, r.w * 0.22f, r.h * 0.22f}), reach = 16.0f;
+        paint(r.inset(-reach - 2), [&](float x, float y, float* c) {
+            const float d = sdChamfer(x, y, r, cut);
+            const float t = ((x - r.x) / r.w + (y - r.y) / r.h) * 0.5f;   // 0 top-left .. 1 bottom-right
+            const float mixA = std::clamp((t - 0.46f) / 0.08f, 0.0f, 1.0f);
+            float nc[3];
+            for (int k = 0; k < 3; ++k) nc[k] = cyan[k] * (1.0f - mixA) + amber[k] * mixA;
+            const float bevelW = meterWin ? 9.0f : 6.0f;   // steel bevel band just inside the edge
+            if (d < 0.0f) {
+                if (meterWin && d < -bevelW) for (int k = 0; k < 3; ++k) c[k] *= 0.50f;   // darker glass so the LEDs read
+                else if (!meterWin) for (int k = 0; k < 3; ++k) c[k] *= 0.93f;           // clear: the board shows through
+                if (d >= -bevelW) {   // brushed steel, lit from the top-left
+                    const float u = -d / bevelW;   // 0 at the edge .. 1 at the inner side
+                    const float light = 0.5f + 0.5f * std::clamp(1.0f - 2.0f * t, -1.0f, 1.0f);
+                    const float v = 0.06f + 0.16f * light * (1.0f - 0.5f * u) + 0.05f * std::sin(u * 3.14159f);
+                    for (int k = 0; k < 3; ++k) c[k] = v * (k == 2 ? 1.08f : 1.0f);
+                }
+            }
+            if (std::fabs(d) < 1.2f) for (int k = 0; k < 3; ++k) c[k] *= 0.35f;   // dark seam where plate meets board
+            // the neon line just inside the bevel, with a soft glow over the glass — colour only, no white
+            const float line = std::fabs(d + bevelW + 2.0f);
+            const float core = std::clamp(1.0f - line / 2.2f, 0.0f, 1.0f), glow = std::exp(-line / 7.0f) * 0.30f;
+            const float g = d < -bevelW ? core * 1.2f + glow : core * 1.2f + glow * 0.4f;
+            for (int k = 0; k < 3; ++k) c[k] += nc[k] * g;
+            if (d >= 0.0f) {   // faint contact shadow on the board just outside
+                const float sh = 0.86f + 0.14f * std::clamp(d / reach, 0.0f, 1.0f);
+                for (int k = 0; k < 3; ++k) c[k] *= sh;
+            }
+        });
+        // small corner screws
+        const float sr = std::clamp(6.0f * s, 6.0f, 11.0f), in = cut * 0.45f + sr + 8.0f;
+        for (auto [sx, sy] : {std::pair{r.x + in, r.y + in}, std::pair{r.right() - in, r.y + in}, std::pair{r.x + in, r.bottom() - in},
+                                    std::pair{r.right() - in, r.bottom() - in}}) {
+            paint({sx - sr - 4, sy - sr - 4, 2 * sr + 8, 2 * sr + 8}, [&](float x, float y, float* c) {
+                const float dx = x - sx, dy = y - sy, d = std::sqrt(dx * dx + dy * dy);
+                if (d > sr + 2.0f) return;
+                if (d > sr) { for (int k = 0; k < 3; ++k) c[k] *= 0.55f; return; }   // shadow ring
+                const float n = (-dx * 0.6f - dy * 0.8f) / sr;                      // lit from the top-left
+                float v = 0.12f + 0.20f * std::max(0.0f, n);
+                if (std::fabs((dx - dy) * 0.7071f) < sr * 0.16f && d < sr * 0.8f) v *= 0.25f;   // the slot
+                c[0] = v; c[1] = v * 1.02f; c[2] = v * 1.06f;
+            });
+        }
+    }
+
+    // 3) knobs: a soft shadow where the knob sits, and a tick scale round it (the knob itself is a live part)
     for (const PanelKnob& k : L.knobs) {
         const Rect w = k.well;
         const float cx = w.cx(), cy = w.cy(), R = w.w * 0.5f;
@@ -570,7 +630,7 @@ Image renderFxPlateFramed(const PanelLayout& L, const FxPalette& pal, float ppu,
         });
     }
 
-    // 3) value windows and selector boxes: dark slots cut into the glass, a chrome rim, the text stays easy to read
+    // 4) value windows and selector boxes: dark slots cut into the glass, a chrome rim, the text stays easy to read
     std::vector<Rect> slots;
     for (const PanelKnob& k : L.knobs) slots.push_back(k.value);
     for (const PanelSelector& sel : L.selectors) slots.push_back(sel.box);
