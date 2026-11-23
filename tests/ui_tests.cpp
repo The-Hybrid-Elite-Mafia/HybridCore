@@ -195,10 +195,12 @@ void testUiParts() {
                 static_cast<double>(a.texture.bytes()) / 1048576.0, ms);
     CHECK(a.texture.width <= 1024 && a.texture.height <= 1024);
     int bad = 0;
-    for (std::size_t i = 0; i < ui::kSpriteCount; ++i) {
+    // the built-in parts (Steven's parts-sheet sprites come after them and are only there when the sheet is given)
+    const std::size_t builtIn = static_cast<std::size_t>(ui::Sprite::HemKnobCyan);
+    for (std::size_t i = 0; i < builtIn; ++i) {
         const ui::SpriteInfo& s = a.sprites[i];
         if (!(s.width > 0 && s.height > 0 && s.u0 >= 0 && s.v0 >= 0 && s.u1 <= 1 && s.v1 <= 1 && s.u1 > s.u0 && s.v1 > s.v0)) ++bad;
-        for (std::size_t j = i + 1; j < ui::kSpriteCount; ++j) {
+        for (std::size_t j = i + 1; j < builtIn; ++j) {
             const ui::SpriteInfo& o = a.sprites[j];
             if (s.u0 < o.u1 && o.u0 < s.u1 && s.v0 < o.v1 && o.v0 < s.v1) ++bad;   // overlap
         }

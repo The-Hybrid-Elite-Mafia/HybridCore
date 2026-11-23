@@ -1,3 +1,14 @@
+## The Hybrid Core — 0.16.0: the HEM board look on every HEM plug-in
+
+- **New look for all 22 HEM effects and HEM WAVE**, built from Steven's own backplate and parts sheet:
+  the circuit board under clear glass, chrome knobs with tick marks, capsule buttons, the round power
+  button for bypass, and LED-column meters that fill their window.
+- Each group of controls sits on a clear glass plate (the board shows through) with a thin steel edge
+  and a thin neon line, cyan top-left and amber bottom-right.
+- **Nothing else changed.** Same knobs, same buttons, same meters, same sound. Only the looks changed.
+
+---
+
 ## The Hybrid Core — 0.15.1: meters that move in Audacity, no knob glow
 
 - **Fixed: plug-in meters stayed still in Audacity** (HEM ECHO's time readout, the gain-reduction meters).

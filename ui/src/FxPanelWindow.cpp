@@ -20,7 +20,8 @@ struct SharedArt {
     std::filesystem::path     dir;
     std::optional<FontSet>    fonts;
     std::optional<PartsAtlas> parts;
-    std::shared_ptr<const Image> frame;   // HEM-Frame-4K.jpg (empty if missing: plain dark chassis)
+    std::shared_ptr<const Image> frame;   // HEM-Board-4K.jpg, Steven's backplate (empty if missing: plain dark chassis)
+    bool hemParts = false;                // Steven's parts sheet (assets/parts) loaded into the atlas
 };
 SharedArt& shared() {
     static SharedArt s;
@@ -28,7 +29,7 @@ SharedArt& shared() {
 }
 
 bool loadShared(const std::filesystem::path& assetDir, FontSet& fontsOut, PartsAtlas& partsOut, std::shared_ptr<const Image>& frameOut,
-                std::string* error) {
+                bool& hemOut, std::string* error) {
     SharedArt& s = shared();
     std::lock_guard lock(s.mutex);
     if (!s.fonts || !s.parts || s.dir != assetDir) {
@@ -36,8 +37,10 @@ bool loadShared(const std::filesystem::path& assetDir, FontSet& fontsOut, PartsA
         if (!fonts) return false;
         auto art = loadFaceplateArt(assetDir / "faceplates" / "Main-Faceplate.png", error);
         if (!art) return false;
-        s.parts = buildPartsAtlas(art->master);
-        auto frame = loadImageFile(assetDir / "faceplates" / "HEM-Frame-4K.jpg", nullptr);
+        const HemPartImages hem = loadHemParts(assetDir / "parts");
+        s.hemParts = hem.complete();
+        s.parts = buildPartsAtlas(art->master, s.hemParts ? &hem : nullptr);
+        auto frame = loadImageFile(assetDir / "faceplates" / "HEM-Board-4K.jpg", nullptr);
         s.frame = std::make_shared<const Image>(frame ? std::move(*frame) : Image{});
         s.fonts = std::move(*fonts);
         s.dir = assetDir;
@@ -45,6 +48,7 @@ bool loadShared(const std::filesystem::path& assetDir, FontSet& fontsOut, PartsA
     fontsOut = *s.fonts;
     partsOut = *s.parts;
     frameOut = s.frame;
+    hemOut = s.hemParts;
     return true;
 }
 
@@ -78,7 +82,9 @@ bool FxPanelWindow::setUp(const PanelSpec& spec, PanelHost& host, const std::fil
     FontSet fonts;
     PartsAtlas parts;
     std::shared_ptr<const Image> frameArt;
-    if (!loadShared(assetDir, fonts, parts, frameArt, error)) return false;
+    bool hemParts = false;
+    if (!loadShared(assetDir, fonts, parts, frameArt, hemParts, error)) return false;
+    view_->setHemParts(hemParts);
     if (!renderer_.init(4, error)) return false;
     if (!renderer_.setParts(parts, error)) return false;
     w_ = w;
@@ -91,7 +97,7 @@ bool FxPanelWindow::setUp(const PanelSpec& spec, PanelHost& host, const std::fil
     canvas_.pixelH = static_cast<float>(h_);
     if (!font_.bake(fonts, canvas_.scale)) { if (error) *error = "could not bake the Poppins atlas"; return false; }
     if (!renderer_.setFont(font_, error)) return false;
-    // The plate (HEM frame + glass panels + machined pockets) at exactly the window's pixel density
+    // The plate (Steven's board + neon-edged glass plates + tick scales + value slots) at exactly the window's pixel density
     // (capped at the 4096 px texture limit).
     const float ppu = std::min({canvas_.scale, 4096.0f / layout_->width, 4096.0f / layout_->height});
     if (!renderer_.setPanel(buildMips(premultiply(renderFxPlateFramed(*layout_, hemFramePalette(), ppu, frameArt ? *frameArt : Image{}))), error))

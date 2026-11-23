@@ -16,6 +16,7 @@
 #include "hybrid/ui/Image.hpp"
 
 #include <array>
+#include <filesystem>
 #include <cstddef>
 #include <cstdint>
 
@@ -55,6 +56,17 @@ enum class Sprite : std::uint8_t {
     IconPause,
     IconStop,
     IconLoop,
+    // Steven's HEM parts sheet (assets/parts/*.png, ChatGPT art he supplied). Empty when the files are missing.
+    HemKnobCyan,     // chrome knob, cyan ring, pointer straight up (rotates as a whole)
+    HemKnobAmber,
+    HemPowerOn,      // round power button, lit cyan (plug-in running)
+    HemPowerOff,     // round power button, unlit (bypassed)
+    HemSquareOn,     // square push button, lit cyan
+    HemSquareOff,    // square push button, unlit
+    HemCapsuleCyan,  // lit capsule bar (9-slice: the chrome ends stay, the middle stretches)
+    HemCapsuleAmber,
+    HemLedOn,        // LED meter column, every segment lit (clipped to the level)
+    HemLedOff,       // the same column, segments dark
     Count
 };
 inline constexpr std::size_t kSpriteCount = static_cast<std::size_t>(Sprite::Count);
@@ -71,8 +83,28 @@ struct PartsAtlas {
     [[nodiscard]] const SpriteInfo& operator[](Sprite s) const noexcept { return sprites[static_cast<std::size_t>(s)]; }
 };
 
-// `faceplate` is the 3840×2160 master (FaceplateArt::master).
-[[nodiscard]] PartsAtlas buildPartsAtlas(const Image& faceplate);
+// The HEM parts sheet pictures (straight-alpha sRGB). Any empty image leaves its sprite empty.
+struct HemPartImages {
+    Image knobCyan, knobAmber, powerOn, powerOff, squareOn, squareOff, capsuleCyan, capsuleAmber, ledOn, ledOff;
+    [[nodiscard]] bool complete() const noexcept {
+        for (const Image* i : {&knobCyan, &knobAmber, &powerOn, &powerOff, &squareOn, &squareOff, &capsuleCyan, &capsuleAmber, &ledOn, &ledOff})
+            if (i->empty()) return false;
+        return true;
+    }
+};
+// The LED column pictures: where the segments sit, as fractions of the picture height (top, bottom).
+namespace hempart {
+inline constexpr float kLedTop = 0.186f, kLedBottom = 0.840f;
+// one LED (gap middle to gap middle) cut from the column, and the caps above and below the LEDs; fractions of the 236 px height
+inline constexpr float kLedCapTop = 38.5f / 236.0f, kLedUnitTop = 174.0f / 236.0f, kLedUnitBottom = 187.55f / 236.0f,
+                       kLedCapBottom = 201.5f / 236.0f;
+inline constexpr float kCapsuleEnd = 34.0f;   // 9-slice inset of the capsule ends, in sprite pixels
+} // namespace hempart
+// Loads <dir>/knob-cyan.png ... led-column-off.png. Missing files stay empty.
+[[nodiscard]] HemPartImages loadHemParts(const std::filesystem::path& dir);
+
+// `faceplate` is the 3840×2160 master (FaceplateArt::master). `hem`: Steven's parts sheet, added when given.
+[[nodiscard]] PartsAtlas buildPartsAtlas(const Image& faceplate, const HemPartImages* hem = nullptr);
 
 // Knob proportions, as fractions of the SOCKET OUTER RADIUS (the knob widget radius).
 namespace knob {

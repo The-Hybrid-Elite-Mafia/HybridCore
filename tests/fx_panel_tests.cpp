@@ -5,6 +5,7 @@
 #include "hybrid/fx/Effects.hpp"
 #include "hybrid/synth/Wave.hpp"
 #include "hybrid/ui/FxPanel.hpp"
+#include "hybrid/ui/Parts.hpp"
 
 #include <cmath>
 #include <cstdio>
@@ -209,7 +210,7 @@ bool within(const ui::Rect& a, const ui::Rect& box) {
 // same parameters, same order; nothing under the emblem, nothing outside the bed, the top-strip
 // bypass where the frame has room for it, and clicks still land on the right control.
 void testFxPanelFramed() {
-    std::printf("[ui] plug-in faceplates in the HEM frame: all 22 effects + HEM WAVE fit the glass bed\n");
+    std::printf("[ui] plug-in faceplates on the HEM board: all 22 effects + HEM WAVE fit the glass\n");
     std::vector<ui::PanelSpec> specs;
     for (const fx::EffectInfo& info : fx::effects()) {
         auto e = info.create();
@@ -280,14 +281,48 @@ void testFxPanelFramed() {
         const std::uint8_t* corner = px(60, 60);   // the chrome frame, outside the bed
         CHECK(corner[0] == 120 && corner[1] == 124 && corner[2] == 130 && corner[3] == 255);
         const ui::Rect& w = F.knobs.front().well;
-        const std::uint8_t* well = px(w.cx(), w.cy());   // a knob well: machined obsidian, far darker than the art
-        CHECK(well[1] < 60);
+        const std::uint8_t* well = px(w.cx(), w.cy());   // where a knob sits: a soft shadow on the board
+        CHECK(well[1] < 110 && well[1] > 40);
         const ui::Rect& bay = F.sections.front().bay;
-        const std::uint8_t* glass = px(bay.x + 12, bay.bottom() - 12);   // smoked glass panel: darker than the art, not black
-        CHECK(glass[1] < 100 && glass[1] > 5);
+        const std::uint8_t* glass = px(bay.x + 40, bay.cy());   // clear glass plate: the board shows through, barely darker
+        CHECK(glass[1] >= 115 && glass[1] <= 124);
+        const ui::Rect& v = F.knobs.front().value;
+        const std::uint8_t* slot = px(v.cx(), v.cy());   // value window: a dark slot so the number reads
+        CHECK(slot[1] < 70);
         const ui::Image none = ui::renderFxPlateFramed(F, ui::hemFramePalette(), ppu, ui::Image{});   // no art on disk: still a plate
         CHECK(none.width == 960 && none.height == 540 && none.rgba[3] == 255);
     }
+}
+
+
+// Steven's parts sheet (assets/parts): every picture is there and lands in the parts atlas.
+void testHemParts() {
+    std::printf("[ui] HEM parts sheet: knobs, power, buttons, capsules, LED columns in the atlas\n");
+    const ui::HemPartImages hem = ui::loadHemParts(assetDir() / "parts");
+    CHECK(hem.complete());
+    if (!hem.complete()) return;
+    ui::Image fp;
+    fp.width = 3840; fp.height = 2160;
+    fp.rgba.assign(static_cast<std::size_t>(fp.width) * fp.height * 4, 128);
+    const ui::PartsAtlas a = ui::buildPartsAtlas(fp, &hem);
+    int ok = 0;
+    for (ui::Sprite s : {ui::Sprite::HemKnobCyan, ui::Sprite::HemKnobAmber, ui::Sprite::HemPowerOn, ui::Sprite::HemPowerOff, ui::Sprite::HemSquareOn,
+                         ui::Sprite::HemSquareOff, ui::Sprite::HemCapsuleCyan, ui::Sprite::HemCapsuleAmber, ui::Sprite::HemLedOn, ui::Sprite::HemLedOff})
+        ok += a[s].width > 0 && a[s].u1 > a[s].u0 && a[s].v1 > a[s].v0;
+    CHECK(ok == 10);
+    int overlap = 0;   // no two parts share atlas pixels
+    for (std::size_t i = 0; i < ui::kSpriteCount; ++i)
+        for (std::size_t j = i + 1; j < ui::kSpriteCount; ++j) {
+            const ui::SpriteInfo& s = a.sprites[i];
+            const ui::SpriteInfo& o = a.sprites[j];
+            if (s.width > 0 && o.width > 0 && s.u0 < o.u1 && o.u0 < s.u1 && s.v0 < o.v1 && o.v0 < s.v1) ++overlap;
+        }
+    CHECK(overlap == 0);
+    CHECK(a.texture.width <= 4096 && a.texture.height <= 4096);
+    CHECK(a[ui::Sprite::HemCapsuleCyan].slice[0] == ui::hempart::kCapsuleEnd);
+    CHECK(a[ui::Sprite::HemKnobCyan].width == a[ui::Sprite::HemKnobCyan].height);   // square: turns about its centre
+    const ui::PartsAtlas plain = ui::buildPartsAtlas(fp);                            // without the sheet: those sprites stay empty
+    CHECK(plain[ui::Sprite::HemKnobCyan].width == 0);
 }
 
 } // namespace hc::test
