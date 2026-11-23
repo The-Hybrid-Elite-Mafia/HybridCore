@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <mutex>
+#include <memory>
 #include <optional>
 
 namespace hc::ui {
@@ -19,13 +20,15 @@ struct SharedArt {
     std::filesystem::path     dir;
     std::optional<FontSet>    fonts;
     std::optional<PartsAtlas> parts;
+    std::shared_ptr<const Image> frame;   // HEM-Frame-4K.jpg (empty if missing: plain dark chassis)
 };
 SharedArt& shared() {
     static SharedArt s;
     return s;
 }
 
-bool loadShared(const std::filesystem::path& assetDir, FontSet& fontsOut, PartsAtlas& partsOut, std::string* error) {
+bool loadShared(const std::filesystem::path& assetDir, FontSet& fontsOut, PartsAtlas& partsOut, std::shared_ptr<const Image>& frameOut,
+                std::string* error) {
     SharedArt& s = shared();
     std::lock_guard lock(s.mutex);
     if (!s.fonts || !s.parts || s.dir != assetDir) {
@@ -34,28 +37,31 @@ bool loadShared(const std::filesystem::path& assetDir, FontSet& fontsOut, PartsA
         auto art = loadFaceplateArt(assetDir / "faceplates" / "Main-Faceplate.png", error);
         if (!art) return false;
         s.parts = buildPartsAtlas(art->master);
+        auto frame = loadImageFile(assetDir / "faceplates" / "HEM-Frame-4K.jpg", nullptr);
+        s.frame = std::make_shared<const Image>(frame ? std::move(*frame) : Image{});
         s.fonts = std::move(*fonts);
         s.dir = assetDir;
     }
     fontsOut = *s.fonts;
     partsOut = *s.parts;
+    frameOut = s.frame;
     return true;
 }
 
 } // namespace
 
 void FxPanelWindow::sizeFor(const PanelSpec& spec, float scale, int& width, int& height) {
-    const PanelLayout L = layoutFxPanel(spec);
+    const PanelLayout L = layoutFxPanelFramed(spec);
     width = std::max(320, static_cast<int>(std::lround(L.width * scale)));
     height = std::max(200, static_cast<int>(std::lround(L.height * scale)));
 }
 
 float FxPanelWindow::defaultScale(const PanelSpec& spec) noexcept {
     const UINT dpi = ::GetDpiForSystem();
-    float scale = 0.62f * static_cast<float>(dpi ? dpi : 96) / 96.0f;
+    float scale = 0.45f * static_cast<float>(dpi ? dpi : 96) / 96.0f;
     RECT work{};
     if (::SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0)) {
-        const PanelLayout L = layoutFxPanel(spec);
+        const PanelLayout L = layoutFxPanelFramed(spec);
         const float fitW = 0.9f * static_cast<float>(work.right - work.left) / L.width;
         const float fitH = 0.85f * static_cast<float>(work.bottom - work.top) / L.height;
         scale = std::max(0.3f, std::min({scale, fitW, fitH}));
@@ -66,12 +72,13 @@ float FxPanelWindow::defaultScale(const PanelSpec& spec) noexcept {
 bool FxPanelWindow::setUp(const PanelSpec& spec, PanelHost& host, const std::filesystem::path& assetDir, int w, int h, std::string* error) {
     spec_ = &spec;
     host_ = &host;
-    layout_ = std::make_unique<PanelLayout>(layoutFxPanel(spec));
-    view_ = std::make_unique<FxPanelView>(*layout_, spec);
+    layout_ = std::make_unique<PanelLayout>(layoutFxPanelFramed(spec));
+    view_ = std::make_unique<FxPanelView>(*layout_, spec, hemFramePalette());
     controller_ = std::make_unique<FxPanelController>(*layout_, spec, host);
     FontSet fonts;
     PartsAtlas parts;
-    if (!loadShared(assetDir, fonts, parts, error)) return false;
+    std::shared_ptr<const Image> frameArt;
+    if (!loadShared(assetDir, fonts, parts, frameArt, error)) return false;
     if (!renderer_.init(4, error)) return false;
     if (!renderer_.setParts(parts, error)) return false;
     w_ = w;
@@ -84,9 +91,11 @@ bool FxPanelWindow::setUp(const PanelSpec& spec, PanelHost& host, const std::fil
     canvas_.pixelH = static_cast<float>(h_);
     if (!font_.bake(fonts, canvas_.scale)) { if (error) *error = "could not bake the Poppins atlas"; return false; }
     if (!renderer_.setFont(font_, error)) return false;
-    // The obsidian plate at exactly the window's pixel density (capped at the 4096 px texture limit).
+    // The plate (HEM frame + glass panels + machined pockets) at exactly the window's pixel density
+    // (capped at the 4096 px texture limit).
     const float ppu = std::min({canvas_.scale, 4096.0f / layout_->width, 4096.0f / layout_->height});
-    if (!renderer_.setPanel(buildMips(premultiply(renderFxPlate(*layout_, FxPalette{}, ppu))), error)) return false;
+    if (!renderer_.setPanel(buildMips(premultiply(renderFxPlateFramed(*layout_, hemFramePalette(), ppu, frameArt ? *frameArt : Image{}))), error))
+        return false;
     if (!renderer_.setTargetSize(w_, h_, error)) return false;
     renderer_.beginStatic(canvas_);
     renderer_.panel({0, 0, layout_->width, layout_->height});

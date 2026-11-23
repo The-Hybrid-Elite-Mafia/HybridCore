@@ -31,6 +31,8 @@ private:
     void drawButton(Renderer& r, Rect b, const std::string& text, bool lit, bool hot, Rgba colour) const;
     void drawMeter(Renderer& r, const PanelMeterSlot& m, float value, float ox, float oy) const;
     void drawCrown(Renderer& r, Rect area) const;
+    // HEM frame look: name, blurb and brand in the frame's top strip; accent light pipes on the panels.
+    void drawFrameStrip(Renderer& r, float ox, float oy) const;
     // The text style for `base` at this plate's zoom, and the largest one that fits `width`.
     [[nodiscard]] TextStyle ts(TextStyle base) const;
     [[nodiscard]] TextStyle fit(const Renderer& r, TextStyle base, std::string_view text, float width) const;

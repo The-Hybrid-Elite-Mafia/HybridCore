@@ -3,11 +3,13 @@
 // hc_fx_snapshot in CI).
 #include "TestHarness.hpp"
 #include "hybrid/fx/Effects.hpp"
+#include "hybrid/synth/Wave.hpp"
 #include "hybrid/ui/FxPanel.hpp"
 
 #include <cmath>
 #include <cstdio>
 #include <string>
+#include <vector>
 
 namespace hc::test {
 namespace {
@@ -166,6 +168,126 @@ void testFxPanel() {
     const double n = static_cast<double>(img.rgba.size() / 4), mean = sum / n, sd = std::sqrt(std::max(0.0, sq / n - mean * mean));
     std::printf("  plate %ux%u: mean %.1f, spread %.1f (8-bit green)\n", img.width, img.height, mean, sd);
     CHECK(opaque && mean > 3.0 && mean < 90.0 && sd > 2.0);
+}
+
+
+namespace {
+// HEM WAVE's faceplate description (same groups as the plug-in and the snapshot tool).
+ui::PanelSpec framedWaveSpec() {
+    ui::PanelSpec s;
+    s.name = "HEM WAVE";
+    s.blurb = "Morphing wavetable synth: 8 tables, unison, sub, filter, two envelopes, LFO";
+    s.hasBypass = false;
+    for (const synth::ParamInfo& p : synth::WaveSynth::params()) {
+        ui::PanelParam pp;
+        pp.name = p.name;
+        if (p.taper == synth::Taper::Toggle) pp.kind = ui::PanelParam::Kind::Toggle;
+        else if (p.taper == synth::Taper::Choice) {
+            pp.kind = ui::PanelParam::Kind::Choice;
+            for (int c = 0; c <= static_cast<int>(p.max); ++c) pp.choices.emplace_back(p.choices ? p.choices[c] : std::to_string(c));
+        }
+        pp.defNormalized = synth::toNormalized(p, p.def);
+        s.params.push_back(std::move(pp));
+    }
+    ui::PanelParam preset;
+    preset.name = "Preset";
+    preset.kind = ui::PanelParam::Kind::Choice;
+    for (int i = 0; i < synth::WaveSynth::presetCount(); ++i) preset.choices.emplace_back(synth::WaveSynth::presetName(i));
+    s.params.push_back(std::move(preset));
+    using P = synth::Param;
+    s.groups = {{"OSCILLATOR", P::Table, P::FilterType - P::Table}, {"FILTER", P::FilterType, P::AmpAttack - P::FilterType},
+                {"AMP ENVELOPE", P::AmpAttack, P::ModAttack - P::AmpAttack}, {"MOD ENVELOPE", P::ModAttack, P::LfoShape - P::ModAttack},
+                {"LFO", P::LfoShape, P::VelAmp - P::LfoShape}, {"VOICE", P::VelAmp, P::kParamCount - P::VelAmp + 1}};
+    return s;
+}
+bool within(const ui::Rect& a, const ui::Rect& box) {
+    return a.x >= box.x - 0.5f && a.y >= box.y - 0.5f && a.right() <= box.right() + 0.5f && a.bottom() <= box.bottom() + 0.5f;
+}
+} // namespace
+
+// The HEM frame look (Steven's template): every faceplate scaled into the glass bed. Same controls,
+// same parameters, same order; nothing under the emblem, nothing outside the bed, the top-strip
+// bypass where the frame has room for it, and clicks still land on the right control.
+void testFxPanelFramed() {
+    std::printf("[ui] plug-in faceplates in the HEM frame: all 22 effects + HEM WAVE fit the glass bed\n");
+    std::vector<ui::PanelSpec> specs;
+    for (const fx::EffectInfo& info : fx::effects()) {
+        auto e = info.create();
+        specs.push_back(ui::panelSpecFor(info, *e));
+    }
+    specs.push_back(framedWaveSpec());
+    int clean = 0;
+    float smallest = 99.0f, largest = 0.0f;
+    for (const ui::PanelSpec& spec : specs) {
+        const ui::PanelLayout F = ui::layoutFxPanelFramed(spec);
+        const ui::PanelLayout A = ui::layoutFxPanel(spec);
+        bool ok = F.framed && F.width == ui::fxframe::kW && F.height == ui::fxframe::kH && F.zoom > 0.3f && F.zoom <= ui::fxframe::kMaxScale + 1e-4f;
+        smallest = std::min(smallest, F.zoom);
+        largest = std::max(largest, F.zoom);
+        // same controls in the same order
+        ok = ok && F.knobs.size() == A.knobs.size() && F.buttons.size() == A.buttons.size() && F.selectors.size() == A.selectors.size()
+                && F.meters.size() == A.meters.size() && F.captions.size() == A.captions.size() && F.sections.size() == A.sections.size();
+        for (std::size_t i = 0; ok && i < F.knobs.size(); ++i) ok = F.knobs[i].param == A.knobs[i].param;
+        for (std::size_t i = 0; ok && i < F.buttons.size(); ++i) ok = F.buttons[i].param == A.buttons[i].param && F.buttons[i].choice == A.buttons[i].choice;
+        for (std::size_t i = 0; ok && i < F.selectors.size(); ++i) ok = F.selectors[i].param == A.selectors[i].param;
+        // inside the content box, clear of the emblem, no two controls on top of each other
+        std::vector<ui::Rect> controls;
+        for (const auto& k : F.knobs) { controls.push_back(k.well); controls.push_back(k.value); }
+        for (const auto& b : F.buttons) controls.push_back(b.rect);
+        for (const auto& sel : F.selectors) { controls.push_back(sel.box); controls.push_back(sel.prev); controls.push_back(sel.next); }
+        for (const auto& m : F.meters) { controls.push_back(m.bar); controls.push_back(m.value); controls.push_back(m.caption); }
+        for (const auto& sec : F.sections) ok = ok && within(sec.bay, ui::fxframe::kContent) && !overlaps(sec.bay, ui::fxframe::kEmblem);
+        if (F.meterBay.w > 0) ok = ok && within(F.meterBay, ui::fxframe::kContent);
+        for (std::size_t i = 0; i < controls.size(); ++i) {
+            ok = ok && within(controls[i], ui::fxframe::kContent) && !overlaps(controls[i], ui::fxframe::kEmblem);
+            for (std::size_t j = i + 1; j < controls.size(); ++j) ok = ok && !overlaps(controls[i], controls[j]);
+        }
+        for (const auto& p : F.pockets) ok = ok && (within(p.r, ui::fxframe::kBed) || (spec.hasBypass && within(p.r, ui::fxframe::kBypass.inset(-7))));
+        // bypass in the top strip (effects only), never on a control
+        if (spec.hasBypass) {
+            ok = ok && F.bypass.x == ui::fxframe::kBypass.x && F.bypass.w == ui::fxframe::kBypass.w;
+            for (const auto& c : controls) ok = ok && !overlaps(c, F.bypass);
+        } else {
+            ok = ok && F.bypass.w == 0;
+        }
+        // clicks land on the right control
+        for (std::size_t i = 0; ok && i < F.knobs.size(); ++i) {
+            const ui::PanelHit h = ui::hitTestPanel(F, F.knobs[i].well.cx(), F.knobs[i].well.cy());
+            ok = h.kind == ui::PanelHit::Kind::Knob && h.index == static_cast<int>(i);
+        }
+        for (std::size_t i = 0; ok && i < F.buttons.size(); ++i) {
+            const ui::PanelHit h = ui::hitTestPanel(F, F.buttons[i].rect.cx(), F.buttons[i].rect.cy());
+            ok = h.kind == ui::PanelHit::Kind::Button && h.index == static_cast<int>(i);
+        }
+        if (spec.hasBypass) ok = ok && ui::hitTestPanel(F, ui::fxframe::kBypass.cx(), ui::fxframe::kBypass.cy()).kind == ui::PanelHit::Kind::Bypass;
+        if (!ok) std::printf("  FAIL detail: %s framed layout (zoom %.2f)\n", spec.name.c_str(), F.zoom);
+        clean += ok;
+    }
+    std::printf("  %zu faceplates framed; control scale %.2f .. %.2f\n", specs.size(), smallest, largest);
+    CHECK(clean == static_cast<int>(specs.size()));
+
+    // the framed plate: frame size, the art untouched outside the bed, pockets cut into the bed
+    {
+        const ui::PanelLayout F = ui::layoutFxPanelFramed(specs.front());
+        ui::Image art;
+        art.width = 384; art.height = 216;
+        art.rgba.assign(static_cast<std::size_t>(art.width) * art.height * 4, 255);
+        for (std::size_t i = 0; i < art.rgba.size(); i += 4) { art.rgba[i] = 120; art.rgba[i + 1] = 124; art.rgba[i + 2] = 130; }
+        const float ppu = 0.25f;
+        const ui::Image img = ui::renderFxPlateFramed(F, ui::hemFramePalette(), ppu, art);
+        CHECK(img.width == 960 && img.height == 540);
+        auto px = [&](float x, float y) { return img.at(static_cast<std::uint32_t>(x * ppu), static_cast<std::uint32_t>(y * ppu)); };
+        const std::uint8_t* corner = px(60, 60);   // the chrome frame, outside the bed
+        CHECK(corner[0] == 120 && corner[1] == 124 && corner[2] == 130 && corner[3] == 255);
+        const ui::Rect& w = F.knobs.front().well;
+        const std::uint8_t* well = px(w.cx(), w.cy());   // a knob well: machined obsidian, far darker than the art
+        CHECK(well[1] < 60);
+        const ui::Rect& bay = F.sections.front().bay;
+        const std::uint8_t* glass = px(bay.x + 12, bay.bottom() - 12);   // smoked glass panel: darker than the art, not black
+        CHECK(glass[1] < 100 && glass[1] > 5);
+        const ui::Image none = ui::renderFxPlateFramed(F, ui::hemFramePalette(), ppu, ui::Image{});   // no art on disk: still a plate
+        CHECK(none.width == 960 && none.height == 540 && none.rgba[3] == 255);
+    }
 }
 
 } // namespace hc::test

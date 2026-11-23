@@ -27,7 +27,7 @@ public:
 
     // Pixel size the panel wants at a given scale (pixels per panel design unit).
     static void sizeFor(const PanelSpec& spec, float scale, int& width, int& height);
-    // Scale for an editor on this computer: ~0.62 px per unit at 100 % Windows scaling, smaller if
+    // Scale for an editor on this computer: ~0.45 px per frame pixel at 100 % Windows scaling, smaller if
     // the panel would not fit on the screen (keeps 10 % of the work area free).
     [[nodiscard]] static float defaultScale(const PanelSpec& spec) noexcept;
 

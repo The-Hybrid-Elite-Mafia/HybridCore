@@ -32,8 +32,8 @@ target_compile_definitions(HybridCoreVST3 PRIVATE HC_VERSION_STR="${PROJECT_VERS
 target_link_libraries(HybridCoreVST3 PRIVATE sdk hc::params hc::dsp)
 
 # HEM Suite: every HEM effect (hc::fx) in one bundle, one plug-in per effect.
-# Faceplates (hc::ui, OpenGL) need the Poppins fonts and the console faceplate (knob parts) at run
-# time: they ship inside each bundle's Resources folder.
+# Faceplates (hc::ui, OpenGL) need the Poppins fonts, the console faceplate (knob parts) and the HEM
+# frame art at run time: they ship inside each bundle's Resources folder.
 function(hc_add_faceplate_resources target)
     # Copied after the build into <bundle>/Contents/Resources (the SDK's per-file resource rules
     # don't cope with a space in the bundle name under MSBuild).
@@ -45,7 +45,7 @@ function(hc_add_faceplate_resources target)
                 "${PROJECT_SOURCE_DIR}/assets/fonts/Poppins-Bold.ttf" "${PROJECT_SOURCE_DIR}/assets/fonts/OFL.txt"
                 "${pkg}/Contents/Resources/fonts/"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different "${PROJECT_SOURCE_DIR}/assets/faceplates/Main-Faceplate.png"
-                "${pkg}/Contents/Resources/faceplates/"
+                "${PROJECT_SOURCE_DIR}/assets/faceplates/HEM-Frame-4K.jpg" "${pkg}/Contents/Resources/faceplates/"
         VERBATIM)
 endfunction()
 

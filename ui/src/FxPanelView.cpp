@@ -65,6 +65,51 @@ void FxPanelView::drawCrown(Renderer& r, Rect a) const {
     r.fillRound({x0, base + 8 * z, w, 6 * z}, 3 * z, pal_.violet, Blend::Over, true);
 }
 
+void FxPanelView::drawFrameStrip(Renderer& r, float ox, float oy) const {
+    const PanelLayout& L = layout_;
+    // title like Steven's EQ example: "HEM" in amber, the plug-in name in engraved silver
+    std::string head = "HEM", rest = L.name;
+    if (rest.rfind("HEM ", 0) == 0) rest = rest.substr(4); else head.clear();
+    float x = fxframe::kTitleX + ox;
+    const float base = fxframe::kTitleBase + oy, right = fxframe::kTitleX + fxframe::kTitleMaxW + ox;
+    if (!head.empty()) {
+        r.text(TextStyle::Display, head, x, base, pal_.lime, Align::Left, TextFx::NeonCrisp);
+        x += r.textWidth(TextStyle::Display, head + "  ");
+    }
+    r.text(TextStyle::Display, rest, x, base, rgb8(0xB9C0CA), Align::Left, TextFx::Shadowed, right - x);
+    // what it does: one line if it fits, else two smaller lines, shortened only as a last resort
+    {
+        const float bx = fxframe::kTitleX + 4 + ox, room = fxframe::kBlurbMaxW;
+        const float b0 = fxframe::kBlurbBase + oy;
+        if (r.textWidth(TextStyle::Sub, L.blurb) <= room) {
+            r.text(TextStyle::Sub, L.blurb, bx, b0 + 14, kText, Align::Left, TextFx::Shadowed);
+        } else {
+            const TextStyle two = TextStyle::Caption;
+            std::size_t cut = std::string::npos;
+            for (std::size_t p = L.blurb.find(' '); p != std::string::npos; p = L.blurb.find(' ', p + 1))
+                if (r.textWidth(two, std::string_view(L.blurb).substr(0, p)) <= room) cut = p;
+            std::string a = cut == std::string::npos ? L.blurb : L.blurb.substr(0, cut);
+            std::string b = cut == std::string::npos ? std::string() : L.blurb.substr(cut + 1);
+            while (b.size() > 8 && r.textWidth(two, b) > room) b = b.substr(0, b.size() - 4) + "...";
+            r.text(two, a, bx, b0, kText, Align::Left, TextFx::Shadowed, room);
+            if (!b.empty()) r.text(two, b, bx, b0 + 36, kText, Align::Left, TextFx::Shadowed, room);
+        }
+    }
+    // brand, chrome-white, right of the emblem
+    r.text(TextStyle::Heading, "HYBRID ELITE MAFIA", fxframe::kBrandR + ox, fxframe::kBrandBase + oy, rgb8(0xDCE6F2), Align::Right,
+           TextFx::Shadowed, fxframe::kBrandMaxW);
+    // a short accent light pipe on the top edge of every panel
+    auto pipe = [&](const Rect& bay) {
+        if (bay.w <= 0) return;
+        const float lw = std::min(bay.w * 0.5f, 440.0f);
+        const Rect p{bay.cx() - lw * 0.5f + ox, bay.y - 2 + oy, lw, 4};
+        r.glow(p, 2.0f, 14, pal_.violet.withAlpha(0.25f), true);
+        r.fillRound(p, 2.0f, pal_.violet.withAlpha(0.75f), Blend::Over, true);
+    };
+    for (const PanelSection& s : L.sections) pipe(s.bay);
+    pipe(L.meterBay);
+}
+
 void FxPanelView::drawKnob(Renderer& r, const PanelKnob& k, const PanelHost& host, bool hot, float ox, float oy) const {
     const PanelParam& prm = spec_.params[static_cast<std::size_t>(k.param)];
     const Rect well = at(k.well, ox, oy);
@@ -174,7 +219,9 @@ void FxPanelView::draw(Renderer& r, const PanelHost& host, PanelHit hover, Panel
         r.polyline(xs, ys, 2, 4.0f * z, c, Blend::Over, true);
         r.polyline(xs, ys, 2, 1.6f * z, {1, 1, 1, 0.75f}, Blend::Add, true);
     }
-    // header: crown, name, blurb
+    if (L.framed) drawFrameStrip(r, ox, oy);
+    // header: crown, name, blurb (the stand-alone plate; the frame has its own emblem and top strip)
+    if (!L.framed) {
     drawCrown(r, at(L.logo, ox, oy).inset(12 * z));
     const Rect ta = at(L.titleArea, ox, oy);
     const TextStyle nameStyle = fit(r, TextStyle::Display, L.name, ta.w);
@@ -196,6 +243,7 @@ void FxPanelView::draw(Renderer& r, const PanelHost& host, PanelHit hover, Panel
             r.text(two, a, ta.x + 4 * z, ta.y + 130 * z, kText, Align::Left, TextFx::Shadowed);
             if (!b.empty()) r.text(two, b, ta.x + 4 * z, ta.y + 160 * z, kText, Align::Left, TextFx::Shadowed);
         }
+    }
     }
     // section captions
     for (const PanelSection& s : L.sections)
@@ -271,6 +319,7 @@ void FxPanelView::draw(Renderer& r, const PanelHost& host, PanelHit hover, Panel
     // meters
     for (const PanelMeterSlot& m : L.meters) drawMeter(r, m, host.meter(m.meter), ox, oy);
     // footer: brand, how to use the knobs (when there is room), bypass
+    if (!L.framed) {
     const Rect ft = at(L.footer, ox, oy);
     const TextStyle fs = ts(TextStyle::Label);
     const std::string brand = "HYBRID ELITE MAFIA  -  STUDIO PLUG-INS";
@@ -282,6 +331,7 @@ void FxPanelView::draw(Renderer& r, const PanelHost& host, PanelHit hover, Panel
         const TextStyle hs = ts(TextStyle::Caption);
         if (x1 - x0 >= r.textWidth(hs, hint))
             r.text(hs, hint, (x0 + x1) * 0.5f, ft.cy() + r.capHeight(hs) * 0.5f, kTextDim, Align::Center, TextFx::Shadowed);
+    }
     }
     if (host.hasBypass() && L.hasBypass) {
         const bool byp = host.bypassed();

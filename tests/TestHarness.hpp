@@ -52,6 +52,7 @@ void testFxTone();
 void testFxNew();
 void testFxRack();
 void testFxPanel();
+void testFxPanelFramed();
 void testSynth();
 void testExport();
 void testLoudness();

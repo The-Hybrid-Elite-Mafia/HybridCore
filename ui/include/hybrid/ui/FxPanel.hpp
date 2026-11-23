@@ -119,6 +119,7 @@ struct PanelLayout {
     std::vector<PanelCaption>   captions;
     std::vector<std::array<float, 2>> screws;   // chrome screw centres
     Rect meterBay;
+    bool framed = false;   // layoutFxPanelFramed(): coordinates are HEM frame pixels (3840 × 2160)
 };
 
 inline constexpr float kPanelCellW = 230.0f, kPanelCellH = 270.0f;
@@ -131,6 +132,29 @@ inline constexpr int   kPanelMaxCols = 6;
 // ---- the obsidian slab ------------------------------------------------------------------
 // Straight-alpha sRGB, opaque, `pixelsPerUnit` × the layout size. Deterministic.
 [[nodiscard]] Image renderFxPlate(const PanelLayout& layout, const FxPalette& palette, float pixelsPerUnit = 1.0f);
+
+// ---- the HEM frame look (Steven's template, same as the Dark Matter Series) ----------------
+// assets/faceplates/HEM-Frame-4K.jpg: chrome frame, 3D emblem on top, glass bed over the circuit
+// board. The plug-in's controls are scaled into the bed; the name, blurb and bypass sit in the top
+// strip. Same controls, same parameters, same hit-testing: only where things are drawn changes.
+namespace fxframe {
+inline constexpr float kW = 3840.0f, kH = 2160.0f;
+inline constexpr Rect  kBed{265, 482, 3455, 1456};        // the glass bed in the art
+inline constexpr Rect  kEmblem{1716, 168, 457, 458};      // 3D emblem (hangs into the top of the bed)
+inline constexpr Rect  kContent{340, 650, 3300, 1250};    // where the controls go (clear of the emblem)
+inline constexpr float kTitleX = 395, kTitleBase = 335, kTitleMaxW = 1290;
+inline constexpr float kBlurbBase = 412, kBlurbMaxW = 1290;
+inline constexpr float kBrandR = 3540, kBrandBase = 335, kBrandMaxW = 1300;
+inline constexpr Rect  kBypass{3450, 362, 240, 112};
+inline constexpr float kMaxScale = 2.2f;                   // knobs never grow past this
+} // namespace fxframe
+inline FxPalette hemFramePalette() { return {rgb8(0x00F0FF), rgb8(0xFF8A1E)}; }   // cyan (sections, keys), amber (values, arcs)
+
+// Picks the column count / row width that fills the bed best. width × height = 3840 × 2160.
+[[nodiscard]] PanelLayout layoutFxPanelFramed(const PanelSpec& spec);
+// The frame art with this plug-in's smoked-glass panels and machined pockets cut into the bed.
+// Empty frameArt: a plain dark chassis (the controls still work).
+[[nodiscard]] Image renderFxPlateFramed(const PanelLayout& layout, const FxPalette& palette, float pixelsPerUnit, const Image& frameArt);
 
 // ---- interaction ----------------------------------------------------------------------
 class PanelHost {

@@ -86,7 +86,7 @@ void layoutCell(PanelLayout& L, const PanelSpec& spec, int param, float x, float
 } // namespace
 
 namespace {
-PanelLayout layoutAtOne(const PanelSpec& spec, int maxColsOverride);
+PanelLayout layoutAtOne(const PanelSpec& spec, int maxColsOverride, float rowMaxWOverride = 0.0f);
 Rect zr(Rect r, float z) { return {r.x * z, r.y * z, r.w * z, r.h * z}; }
 } // namespace
 
@@ -110,7 +110,7 @@ PanelLayout layoutFxPanel(const PanelSpec& spec, float zoom, int maxCols) {
 }
 
 namespace {
-PanelLayout layoutAtOne(const PanelSpec& spec, int maxColsOverride) {
+PanelLayout layoutAtOne(const PanelSpec& spec, int maxColsOverride, float rowMaxWOverride) {
     PanelLayout L;
     L.name = spec.name;
     L.blurb = spec.blurb;
@@ -122,7 +122,7 @@ PanelLayout layoutAtOne(const PanelSpec& spec, int maxColsOverride) {
     const int  maxCols = maxColsOverride > 0 ? std::clamp(maxColsOverride, 1, 12) : single ? kPanelMaxCols : 4;
     struct Placed { Rect bay; int g; int cols; };
     std::vector<Placed> placed;
-    const float rowMaxW = single ? 1e9f : 2000.0f;
+    const float rowMaxW = rowMaxWOverride > 0.0f ? rowMaxWOverride : single ? 1e9f : 2000.0f;
     float x = kMargin, y = kMargin + kHeaderH, rowH = 0, widest = 0;
     for (std::size_t g = 0; g < groups.size(); ++g) {
         const int cells = groups[g].count;
@@ -214,6 +214,79 @@ PanelLayout layoutAtOne(const PanelSpec& spec, int maxColsOverride) {
     return L;
 }
 } // namespace
+
+// =============================================================================================
+//  The HEM frame look: the same layout, scaled into the glass bed of Steven's frame
+// =============================================================================================
+namespace {
+Rect bodyOf(const PanelLayout& L) {   // the section bays and the meter bay together
+    float x0 = 1e9f, y0 = 1e9f, x1 = -1e9f, y1 = -1e9f;
+    auto add = [&](const Rect& r) {
+        if (r.w <= 0 || r.h <= 0) return;
+        x0 = std::min(x0, r.x); y0 = std::min(y0, r.y); x1 = std::max(x1, r.right()); y1 = std::max(y1, r.bottom());
+    };
+    for (const PanelSection& sec : L.sections) add(sec.bay);
+    add(L.meterBay);
+    return x1 > x0 ? Rect{x0, y0, x1 - x0, y1 - y0} : Rect{};
+}
+} // namespace
+
+PanelLayout layoutFxPanelFramed(const PanelSpec& spec) {
+    using namespace fxframe;
+    const Rect C = kContent;
+    const float wantAspect = C.w / C.h;
+    // Try every column count and row width; keep the one that makes the controls biggest
+    // (a tie goes to the shape closest to the bed's own shape).
+    PanelLayout best;
+    Rect bestBody;
+    float bestS = -1.0f, bestAspectErr = 1e9f;
+    for (const float rowW : {0.0f, 1400.0f, 2000.0f, 2600.0f, 3200.0f, 4200.0f, 1e9f}) {
+        for (int cols = 1; cols <= 12; ++cols) {
+            PanelLayout L = layoutAtOne(spec, cols, rowW);
+            const Rect b = bodyOf(L);
+            if (b.w <= 0 || b.h <= 0) continue;
+            const float s = std::min({C.w / b.w, C.h / b.h, kMaxScale});
+            const float aspectErr = std::fabs(std::log((b.w / b.h) / wantAspect));
+            if (s > bestS + 1e-3f || (std::fabs(s - bestS) <= 1e-3f && aspectErr < bestAspectErr - 1e-4f)) {
+                bestS = s; bestAspectErr = aspectErr; bestBody = b; best = std::move(L);
+            }
+        }
+    }
+    PanelLayout L = std::move(best);
+    if (bestS <= 0) bestS = 1.0f;
+    const float s = bestS;
+    const float ox = C.cx() - bestBody.cx() * s, oy = C.cy() - bestBody.cy() * s;
+    auto T = [&](Rect r) { return Rect{ox + r.x * s, oy + r.y * s, r.w * s, r.h * s}; };
+
+    // The stand-alone plate's header, crown and bypass pockets and its two full-width neon
+    // channels are the first ones laid out; the frame has its own top strip instead.
+    const std::size_t chrome = std::min<std::size_t>(L.hasBypass ? 3 : 2, L.pockets.size());
+    L.pockets.erase(L.pockets.begin(), L.pockets.begin() + static_cast<std::ptrdiff_t>(chrome));
+    L.grooves.erase(L.grooves.begin(), L.grooves.begin() + static_cast<std::ptrdiff_t>(std::min<std::size_t>(2, L.grooves.size())));
+
+    for (auto& p : L.pockets) { p.r = T(p.r); p.radius *= s; }
+    for (auto& g : L.grooves) { g.x0 = ox + g.x0 * s; g.y0 = oy + g.y0 * s; g.x1 = ox + g.x1 * s; g.y1 = oy + g.y1 * s; }
+    for (auto& sec : L.sections) { sec.bay = T(sec.bay); sec.captionArea = T(sec.captionArea); }
+    for (auto& k : L.knobs) { k.well = T(k.well); k.caption = T(k.caption); k.value = T(k.value); }
+    for (auto& b : L.buttons) b.rect = T(b.rect);
+    for (auto& sel : L.selectors) { sel.caption = T(sel.caption); sel.box = T(sel.box); sel.prev = T(sel.prev); sel.next = T(sel.next); }
+    for (auto& m : L.meters) { m.bar = T(m.bar); m.caption = T(m.caption); m.value = T(m.value); }
+    for (auto& c : L.captions) c.r = T(c.r);
+    if (L.meterBay.w > 0) L.meterBay = T(L.meterBay);
+
+    L.zoom = s;
+    L.width = kW;
+    L.height = kH;
+    L.header = {0, 0, kW, kBed.y};
+    L.titleArea = {kTitleX, kTitleBase - 110, kTitleMaxW, 200};
+    L.footer = {};
+    L.logo = kEmblem;
+    L.bypass = L.hasBypass ? kBypass : Rect{};
+    if (L.hasBypass) addRectPocket(L, kBypass.inset(-6), 16, kButtonDepth);
+    L.screws.clear();
+    L.framed = true;
+    return L;
+}
 
 // =============================================================================================
 //  The obsidian slab
@@ -440,6 +513,86 @@ Image renderFxPlate(const PanelLayout& L, const FxPalette& pal, float ppu) {
             // a little violet light spills out of the neon channels onto the slab
             std::uint8_t* o = &img.rgba[(static_cast<std::size_t>(py) * W + px) * 4];
             o[0] = linearToSrgb8(c.x); o[1] = linearToSrgb8(c.y); o[2] = linearToSrgb8(c.z); o[3] = 255;
+        }
+    }
+    return img;
+}
+
+Image renderFxPlateFramed(const PanelLayout& L, const FxPalette& pal, float ppu, const Image& frameArt) {
+    const auto W = static_cast<std::uint32_t>(std::lround(L.width * ppu)), H = static_cast<std::uint32_t>(std::lround(L.height * ppu));
+    // 1) the frame art at the output size
+    Image img = frameArt.empty() || W == 0 || H == 0 ? Image{} : resizeSrgb(frameArt, W, H);
+    if (img.empty() || img.width != W || img.height != H) {   // no art on disk: plain dark chassis
+        img = Image{};
+        img.width = W; img.height = H;
+        img.rgba.assign(static_cast<std::size_t>(W) * H * 4, 255);
+        for (std::size_t i = 0; i < img.rgba.size(); i += 4) { img.rgba[i] = img.rgba[i + 1] = 14; img.rgba[i + 2] = 17; }
+    }
+    if (W == 0 || H == 0) return img;
+
+    // 2) the big panels (sections, meter bay): smoked glass cut into the bed, the board faintly showing
+    auto same = [](const Rect& a, const Rect& b) {
+        return std::fabs(a.x - b.x) < 0.01f && std::fabs(a.y - b.y) < 0.01f && std::fabs(a.w - b.w) < 0.01f && std::fabs(a.h - b.h) < 0.01f;
+    };
+    auto isBay = [&](const PanelPocket& p) {
+        if (p.circle) return false;
+        for (const PanelSection& sec : L.sections) if (same(p.r, sec.bay)) return true;
+        return L.meterBay.w > 0 && same(p.r, L.meterBay);
+    };
+    auto lit = [](float nx, float ny) { return std::max(0.0f, -(nx * 0.6f + ny * 0.8f)); };   // light from the top-left
+    for (const PanelPocket& p : L.pockets) {
+        if (!isBay(p)) continue;
+        const float margin = 26.0f;   // soft contact shadow round each panel
+        const int x0 = std::max(0, static_cast<int>((p.r.x - margin) * ppu)), x1 = std::min(static_cast<int>(W), static_cast<int>((p.r.right() + margin) * ppu) + 1);
+        const int y0 = std::max(0, static_cast<int>((p.r.y - margin) * ppu)), y1 = std::min(static_cast<int>(H), static_cast<int>((p.r.bottom() + margin) * ppu) + 1);
+        for (int py = y0; py < y1; ++py) {
+            for (int px = x0; px < x1; ++px) {
+                const float ux = (static_cast<float>(px) + 0.5f) / ppu, uy = (static_cast<float>(py) + 0.5f) / ppu;
+                const float d = sdRound(ux, uy, p.r, p.radius);
+                std::uint8_t* o = &img.rgba[(static_cast<std::size_t>(py) * W + static_cast<std::size_t>(px)) * 4];
+                float R = srgb8ToLinear(o[0]), G = srgb8ToLinear(o[1]), B = srgb8ToLinear(o[2]);
+                if (d >= 0.0f) {
+                    const float k = 0.42f + 0.58f * std::clamp(d / margin, 0.0f, 1.0f);
+                    R *= k; G *= k; B *= k;
+                } else {
+                    const float e = 0.75f;
+                    float nx = sdRound(ux + e, uy, p.r, p.radius) - sdRound(ux - e, uy, p.r, p.radius);
+                    float ny = sdRound(ux, uy + e, p.r, p.radius) - sdRound(ux, uy - e, p.r, p.radius);
+                    const float l = std::sqrt(nx * nx + ny * ny) + 1e-6f;
+                    nx /= l; ny /= l;
+                    const float t = std::clamp((uy - p.r.y) / p.r.h, 0.0f, 1.0f);
+                    const float rim = std::clamp(1.0f + d / 4.0f, 0.0f, 1.0f);   // 4 px bevel at the cut edge
+                    const float li = lit(-nx, -ny);
+                    const float k = 0.30f;
+                    R = R * k + 0.0045f; G = G * k + 0.0055f; B = B * k + 0.0075f;
+                    const float sheen = 0.010f * (1.0f - t) * (1.0f - t);
+                    R += sheen; G += sheen; B += sheen * 1.15f;
+                    R += rim * (0.10f * li + 0.012f); G += rim * (0.11f * li + 0.014f); B += rim * (0.12f * li + 0.018f);
+                }
+                o[0] = linearToSrgb8(std::min(1.0f, R)); o[1] = linearToSrgb8(std::min(1.0f, G)); o[2] = linearToSrgb8(std::min(1.0f, B)); o[3] = 255;
+            }
+        }
+    }
+
+    // 3) every knob well, value window, button and meter pocket: the machined obsidian insert,
+    //    exactly as the stand-alone plate renders it (same chamfers, milled floors, shadows)
+    const Image obs = renderFxPlate(L, pal, ppu);
+    for (const PanelPocket& p : L.pockets) {
+        if (isBay(p)) continue;
+        const Rect bb = p.r.inset(-2);
+        const int x0 = std::max(0, static_cast<int>(bb.x * ppu)), x1 = std::min(static_cast<int>(W), static_cast<int>(bb.right() * ppu) + 1);
+        const int y0 = std::max(0, static_cast<int>(bb.y * ppu)), y1 = std::min(static_cast<int>(H), static_cast<int>(bb.bottom() * ppu) + 1);
+        for (int py = y0; py < y1; ++py) {
+            for (int px = x0; px < x1; ++px) {
+                const float ux = (static_cast<float>(px) + 0.5f) / ppu, uy = (static_cast<float>(py) + 0.5f) / ppu;
+                const float a = std::clamp(pocketInside(p, ux, uy) * ppu + 0.5f, 0.0f, 1.0f);   // 1-pixel soft edge
+                if (a <= 0.0f) continue;
+                const std::size_t i = (static_cast<std::size_t>(py) * W + static_cast<std::size_t>(px)) * 4;
+                for (int ch = 0; ch < 3; ++ch) {
+                    const float v = srgb8ToLinear(img.rgba[i + static_cast<std::size_t>(ch)]) * (1.0f - a) + srgb8ToLinear(obs.rgba[i + static_cast<std::size_t>(ch)]) * a;
+                    img.rgba[i + static_cast<std::size_t>(ch)] = linearToSrgb8(std::min(1.0f, v));
+                }
+            }
         }
     }
     return img;
