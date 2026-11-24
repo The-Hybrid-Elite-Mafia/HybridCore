@@ -1,3 +1,10 @@
+## The Hybrid Core — 0.16.1: plug-in screens fit any DAW
+
+- Plug-in screens now follow the DAW: they shrink and grow when the DAW asks (display scaling or a dragged window) and keep the board's shape, so nothing is cut off. Knobs stay under the mouse at any size.
+- Nothing else changed: same controls, same sound.
+
+---
+
 ## The Hybrid Core — 0.16.0: the HEM board look on every HEM plug-in
 
 - **New look for all 22 HEM effects and HEM WAVE**, built from Steven's own backplate and parts sheet:
