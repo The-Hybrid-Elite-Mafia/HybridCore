@@ -89,25 +89,63 @@ bool FxPanelWindow::setUp(const PanelSpec& spec, PanelHost& host, const std::fil
     if (!renderer_.setParts(parts, error)) return false;
     w_ = w;
     h_ = h;
-    canvas_ = Canvas{};
-    canvas_.scale = std::min(static_cast<float>(w_) / layout_->width, static_cast<float>(h_) / layout_->height);
-    canvas_.offsetX = std::round((static_cast<float>(w_) - layout_->width * canvas_.scale) * 0.5f);
-    canvas_.offsetY = std::round((static_cast<float>(h_) - layout_->height * canvas_.scale) * 0.5f);
-    canvas_.pixelW = static_cast<float>(w_);
-    canvas_.pixelH = static_cast<float>(h_);
-    if (!font_.bake(fonts, canvas_.scale)) { if (error) *error = "could not bake the Poppins atlas"; return false; }
-    if (!renderer_.setFont(font_, error)) return false;
-    // The plate (Steven's board + neon-edged glass plates + tick scales + value slots) at exactly the window's pixel density
-    // (capped at the 4096 px texture limit).
-    const float ppu = std::min({canvas_.scale, 4096.0f / layout_->width, 4096.0f / layout_->height});
-    if (!renderer_.setPanel(buildMips(premultiply(renderFxPlateFramed(*layout_, hemFramePalette(), ppu, frameArt ? *frameArt : Image{}))), error))
-        return false;
+    fonts_ = fonts;
+    frameArt_ = frameArt;
+    placeCanvas();
+    if (!bakeFont(error)) return false;
+    if (!buildPlate(error)) return false;
     if (!renderer_.setTargetSize(w_, h_, error)) return false;
     renderer_.beginStatic(canvas_);
     renderer_.panel({0, 0, layout_->width, layout_->height});
     renderer_.endStatic();
     open_ = true;
     return true;
+}
+
+void FxPanelWindow::placeCanvas() {
+    canvas_ = Canvas{};
+    canvas_.scale = std::min(static_cast<float>(w_) / layout_->width, static_cast<float>(h_) / layout_->height);
+    canvas_.offsetX = std::round((static_cast<float>(w_) - layout_->width * canvas_.scale) * 0.5f);
+    canvas_.offsetY = std::round((static_cast<float>(h_) - layout_->height * canvas_.scale) * 0.5f);
+    canvas_.pixelW = static_cast<float>(w_);
+    canvas_.pixelH = static_cast<float>(h_);
+}
+
+bool FxPanelWindow::bakeFont(std::string* error) {
+    if (!font_.bake(fonts_, canvas_.scale)) { if (error) *error = "could not bake the Poppins atlas"; return false; }
+    fontScale_ = canvas_.scale;
+    return renderer_.setFont(font_, error);
+}
+
+// The plate (Steven's board + neon-edged glass plates + tick scales + value slots) at exactly the window's pixel density
+// (capped at the 4096 px texture limit).
+bool FxPanelWindow::buildPlate(std::string* error) {
+    const float ppu = std::min({canvas_.scale, 4096.0f / layout_->width, 4096.0f / layout_->height});
+    if (!renderer_.setPanel(buildMips(premultiply(renderFxPlateFramed(*layout_, hemFramePalette(), ppu, frameArt_ ? *frameArt_ : Image{}))), error))
+        return false;
+    plateScale_ = canvas_.scale;
+    plateStale_ = false;
+    return true;
+}
+
+void FxPanelWindow::resize(int w, int h) {
+    w = std::max(64, w);
+    h = std::max(36, h);
+    if (!open_ || !child_ || (w == w_ && h == h_)) return;
+    window_.makeCurrent();
+    window_.resizeChild(w, h);
+    w_ = w;
+    h_ = h;
+    placeCanvas();
+    std::string err;
+    if (canvas_.scale > fontScale_ * 1.06f || canvas_.scale < fontScale_ * 0.8f) (void)bakeFont(&err);
+    (void)renderer_.setTargetSize(w_, h_, &err);
+    renderer_.beginStatic(canvas_);
+    renderer_.panel({0, 0, layout_->width, layout_->height});
+    renderer_.endStatic();
+    plateStale_ = std::fabs(canvas_.scale / std::max(1e-6f, plateScale_) - 1.0f) > 0.15f;
+    resizedAt_ = std::chrono::steady_clock::now();
+    window_.restoreContext();
 }
 
 bool FxPanelWindow::openChild(void* parentHwnd, const PanelSpec& spec, PanelHost& host, const std::filesystem::path& assetDir,
@@ -170,6 +208,15 @@ void FxPanelWindow::draw() {
 void FxPanelWindow::frame() {
     if (!open_) return;
     window_.makeCurrent();
+    if (plateStale_ && std::chrono::steady_clock::now() - resizedAt_ > std::chrono::milliseconds(300)) {
+        std::string err;   // resizing has settled: redraw the faceplate sharp at the new size
+        if (buildPlate(&err)) {
+            renderer_.beginStatic(canvas_);
+            renderer_.panel({0, 0, layout_->width, layout_->height});
+            renderer_.endStatic();
+        }
+        plateStale_ = false;
+    }
     handleInput();
     draw();
     renderer_.endFrame(0);
