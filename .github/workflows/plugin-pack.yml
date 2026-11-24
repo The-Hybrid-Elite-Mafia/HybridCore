@@ -1,0 +1,167 @@
+name: Plug-in pack (every HEM VST3 in one zip)
+
+# Manual. Puts every HEM VST3 plug-in in one zip, for people to drop into their DAW:
+#   HEM Suite (22) + HEM WAVE (1)  from HybridCore       release <suite>
+#   HEM-Elite-Rack (120)           from HEM-Elite-Rack   release <rack>  (the plug-ins-only installer)
+#   HEM Dark Matter (13)           from HEM-Dark-Matter-Series release <darkmatter>
+# The zip holds exactly the files those released installers put in Common Files\VST3: each installer is
+# downloaded, installed silently on this clean Windows machine, and the installed bundles are packed.
+# Every bundle's moduleinfo.json is counted (156 plug-ins in all) before anything is packed.
+# The zip goes on a DRAFT release (not public) of this repository; it is made public only by hand.
+on:
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: "HybridCore release tag"
+        default: "v0.16.2"
+        required: true
+      rack:
+        description: "HEM-Elite-Rack plug-ins-only release tag"
+        default: "vst3-v0.56.2"
+        required: true
+      darkmatter:
+        description: "HEM-Dark-Matter-Series release tag"
+        default: "v0.4.2-build.37"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  pack:
+    name: Install the released installers, pack the VST3s, check, draft release
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download the released installers (the exact published files)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force dl | Out-Null
+          gh release download '${{ inputs.suite }}'      -R The-Hybrid-Elite-Mafia/HybridCore             -p 'HybridCore-Setup-*.exe'            -D dl
+          gh release download '${{ inputs.rack }}'       -R The-Hybrid-Elite-Mafia/HEM-Elite-Rack         -p 'HEM-Elite-Rack-VST3-Setup-*.exe'   -D dl
+          gh release download '${{ inputs.darkmatter }}' -R The-Hybrid-Elite-Mafia/HEM-Dark-Matter-Series -p 'HEM-Dark-Matter-Setup-*.exe'       -D dl
+          Get-ChildItem dl | ForEach-Object { "{0}  {1:N0} bytes  SHA-256 {2}" -f $_.Name, $_.Length, (Get-FileHash $_.FullName -Algorithm SHA256).Hash }
+
+      - name: Install them silently (as a user would)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $common = '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-'
+          foreach ($i in Get-ChildItem dl -Filter *.exe) {
+            $a = $common
+            if ($i.Name -like 'HybridCore-Setup-*') { $a = $common + '/TASKS=vst3' }
+            Write-Host "installing $($i.Name)"
+            $p = Start-Process $i.FullName -ArgumentList $a -Wait -PassThru
+            if ($p.ExitCode -ne 0) { throw "$($i.Name) exit code $($p.ExitCode)" }
+          }
+          Get-ChildItem "$env:CommonProgramFiles\VST3" | Format-Table Name, LastWriteTime -AutoSize
+
+      - name: Pack, count the plug-ins, write the read-me
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vst3 = "$env:CommonProgramFiles\VST3"
+          $want = [ordered]@{ 'HEM Suite.vst3' = 22; 'HEM WAVE.vst3' = 1; 'HEM-Elite-Rack.vst3' = 120; 'HEM Dark Matter.vst3' = 13 }
+          $name = "HEM-All-156-Plugins-VST3-Windows-x64"
+          $root = Join-Path $PWD "pack\$name"
+          New-Item -ItemType Directory -Force "$root\VST3", "$root\Licences" | Out-Null
+          $total = 0
+          $lines = @()
+          foreach ($b in $want.Keys) {
+            $src = Join-Path $vst3 $b
+            if (-not (Test-Path $src)) { throw "$b was not installed" }
+            $mi = Get-ChildItem $src -Recurse -Filter moduleinfo.json | Select-Object -First 1
+            if (-not $mi) { throw "$b has no moduleinfo.json: cannot count its plug-ins" }
+            # moduleinfo.json is JSON5-ish (trailing commas): count the audio classes by their category line
+            $n = (Select-String -Path $mi.FullName -Pattern '"Category"\s*:\s*"Audio Module Class"').Count
+            Write-Host "$b : $n plug-ins (expected $($want[$b]))"
+            if ($n -ne $want[$b]) { throw "$b has $n plug-ins, expected $($want[$b])" }
+            $total += $n
+            Copy-Item $src "$root\VST3\$b" -Recurse
+            $lines += "  $b   ($n plug-ins)"
+          }
+          if ($total -ne 156) { throw "total $total, expected 156" }
+          Write-Host "TOTAL: $total plug-ins"
+
+          # licences: the GPLv3 of the three projects, their third-party notices, and the installed licence files
+          Copy-Item LICENSE "$root\Licences\HEM-GPLv3.txt"
+          Copy-Item installer\THIRD-PARTY-NOTICES.txt "$root\Licences\THIRD-PARTY-NOTICES-HybridCore.txt"
+          foreach ($f in Get-ChildItem "$env:ProgramFiles", "${env:ProgramFiles(x86)}" -Recurse -File -Include 'THIRD-PARTY-NOTICES.txt', 'Steinberg-VST3-SDK-LICENSE.txt', '*-OFL.txt', 'stb-LICENSE.txt', 'dr_libs-LICENSE.txt' -ErrorAction SilentlyContinue |
+                   Where-Object { $_.FullName -match 'HEM|Hybrid' -and $_.FullName -notmatch '\\VST3\\' }) {
+            $dest = Join-Path "$root\Licences" $f.Name
+            if ($f.Name -eq 'THIRD-PARTY-NOTICES.txt') { $dest = Join-Path "$root\Licences" ("THIRD-PARTY-NOTICES-" + ($f.Directory.Name -replace '[^A-Za-z0-9-]', '') + ".txt") }
+            if (-not (Test-Path $dest)) { Copy-Item $f.FullName $dest }
+          }
+          Get-ChildItem "$root\Licences" | ForEach-Object { Write-Host "licence: $($_.Name)" }
+          if (-not (Test-Path "$root\Licences\Steinberg-VST3-SDK-LICENSE.txt")) { throw "Steinberg VST3 SDK licence not found" }
+
+          $readme = @"
+          HEM - Hybrid Elite Mafia: all 156 plug-ins (VST3, Windows 64-bit)
+          ==================================================================
+
+          What is inside
+          $($lines -join "`r`n")
+            156 plug-ins in all.
+
+          How to install
+            1. Close your DAW.
+            2. Copy the four .vst3 folders from the VST3 folder in this zip into
+               C:\Program Files\Common Files\VST3
+               (Windows asks for permission: click Continue.)
+            3. Open your DAW and let it scan for new plug-ins (or press Rescan in its plug-in settings).
+            The plug-ins show up under the maker name "Hybrid Elite Mafia".
+
+          To remove them, delete those four folders again.
+
+          Needs: Windows 10 or 11, 64-bit, a DAW that loads VST3 plug-ins.
+
+          Versions in this pack
+            HEM Suite + HEM WAVE: The Hybrid Core ${{ inputs.suite }}
+            HEM-Elite-Rack:       ${{ inputs.rack }}
+            HEM Dark Matter:      ${{ inputs.darkmatter }}
+
+          Licence
+            Free software under the GNU General Public License v3 (Licences\HEM-GPLv3.txt).
+            The full source code of this exact build:
+              https://github.com/The-Hybrid-Elite-Mafia/HybridCore/tree/${{ inputs.suite }}
+              https://github.com/The-Hybrid-Elite-Mafia/HEM-Elite-Rack/tree/${{ inputs.rack }}
+              https://github.com/The-Hybrid-Elite-Mafia/HEM-Dark-Matter-Series/tree/${{ inputs.darkmatter }}
+            Third-party parts and their licences are in the Licences folder.
+            VST is a trademark of Steinberg Media Technologies GmbH, registered in Europe and other countries.
+          "@
+          ($readme -split "`n" | ForEach-Object { $_ -replace '^          ', '' }) -join "`r`n" | Set-Content -Encoding utf8 "$root\READ-ME-FIRST.txt"
+
+          $zip = Join-Path $PWD "pack\$name.zip"
+          Compress-Archive -Path $root -DestinationPath $zip -CompressionLevel Optimal
+          $sha = (Get-FileHash $zip -Algorithm SHA256).Hash
+          "{0}  {1:N0} bytes  SHA-256 {2}" -f (Split-Path $zip -Leaf), (Get-Item $zip).Length, $sha
+          "ZIP=$zip" | Out-File -Append $env:GITHUB_ENV
+          "SHA=$sha" | Out-File -Append $env:GITHUB_ENV
+
+      - name: Check the zip (unpack it again and count the plug-ins)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $t = Join-Path $env:RUNNER_TEMP 'unzip'
+          Expand-Archive $env:ZIP $t
+          $n = 0
+          foreach ($mi in Get-ChildItem $t -Recurse -Filter moduleinfo.json) { $n += (Select-String -Path $mi.FullName -Pattern '"Category"\s*:\s*"Audio Module Class"').Count }
+          $dlls = @(Get-ChildItem $t -Recurse -Filter *.vst3 -File)
+          Write-Host "unpacked: $n plug-ins, $($dlls.Count) plug-in binaries: $($dlls.Name -join ', ')"
+          if ($n -ne 156 -or $dlls.Count -ne 4) { throw "the zip does not hold all 156 plug-ins" }
+
+      - name: Put the zip on a draft release (not public)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = "plugins-all-${{ inputs.suite }}-${{ inputs.rack }}-${{ inputs.darkmatter }}"
+          $notes = "Every HEM VST3 plug-in in one zip (156). Built from the published installers: HybridCore ${{ inputs.suite }}, HEM-Elite-Rack ${{ inputs.rack }}, HEM Dark Matter ${{ inputs.darkmatter }}.`n`nSHA-256: $env:SHA"
+          gh release create $tag $env:ZIP --draft --title "HEM: all 156 plug-ins (VST3, Windows)" --notes $notes --target $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { throw "gh release create failed ($LASTEXITCODE)" }
