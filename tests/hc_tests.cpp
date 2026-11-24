@@ -3,6 +3,8 @@
 // retire / telemetry path including concurrent processor hot-swaps, and main().
 #include "TestHarness.hpp"
 
+#include <string_view>
+
 #include "hybrid/core/Config.hpp"
 #include "hybrid/core/SpscRing.hpp"
 #include "hybrid/engine/Engine.hpp"
@@ -198,6 +200,10 @@ void testEngine() {
 int main(int argc, char** argv) {
     using namespace hc::test;
     hc::test::setExePath(argc > 0 ? argv[0] : "");
+    if (argc > 1 && std::string_view(argv[1]) == "--qa") {   // QA pass only: report, never fails
+        runQaReport();
+        return 0;
+    }
     testRing();
     testConvert();
     testEngine();

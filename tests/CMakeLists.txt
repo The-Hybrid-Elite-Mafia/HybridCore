@@ -15,6 +15,7 @@ add_executable(hc_tests
     fx_rack_tests.cpp
     fx_panel_tests.cpp
     synth_tests.cpp
+    qa_report.cpp
     AllocTracker.cpp)
 target_include_directories(hc_tests PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}"

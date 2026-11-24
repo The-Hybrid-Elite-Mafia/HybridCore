@@ -58,6 +58,7 @@ void testSynth();
 void testExport();
 void testLoudness();
 void testAnalyzer();
+void runQaReport();   // hc_tests --qa
 void testLimiter();
 void testStripInMatrix();
 void testStripParams();

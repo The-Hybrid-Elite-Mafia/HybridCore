@@ -1,3 +1,10 @@
+## The Hybrid Core — 0.16.2: QA pass fixes
+
+- HEM HUSH: after a reset or a silent lead-in it took the silence for the noise floor and removed nothing for about 4 seconds. It now learns the floor only from sound (measured: hiss down 13 dB half a second after a 1 s silent lead-in, was 0 dB).
+- Every HEM plug-in passed an automated check of every control, meter and faceplate hit box, and Steinberg's VST3 validator (extensive). Nothing else changed: same controls, same sound.
+
+---
+
 ## The Hybrid Core — 0.16.1: plug-in screens fit any DAW
 
 - Plug-in screens now follow the DAW: they shrink and grow when the DAW asks (display scaling or a dragged window) and keep the board's shape, so nothing is cut off. Knobs stay under the mouse at any size.

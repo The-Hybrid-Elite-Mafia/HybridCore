@@ -1,0 +1,63 @@
+name: QA pass (report only)
+
+# Two-stage QA of every plug-in: stage 1 = the headless QA test (stability, parameter sweep, meters,
+# faceplate hit boxes) -> qa_report_*.csv; stage 2 = Steinberg's VST3 validator (-e) on every bundle.
+# Report only: nothing is released, no step fails the run. Runs on pushes to the qa-pass branch or by hand.
+on:
+  push:
+    branches: [qa-pass]
+  workflow_dispatch:
+
+jobs:
+  qa:
+    name: QA pass, HEM Suite + HEM WAVE
+    runs-on: windows-2022
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v5
+
+
+      - name: Configure
+        run: cmake --preset rig-public
+
+      - name: Build tests + VST3 bundles (Steinberg's validator also runs after each bundle links)
+        continue-on-error: true
+        run: cmake --build --preset rig-public-release --target hc_tests HemSuite HemWave --parallel
+
+      - name: Unit tests (hc_tests, the normal suite)
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem build\rig-public -Recurse -Filter 'hc_tests.exe' -File | Where-Object { $_.FullName -match '\\Release\\' } | Select-Object -First 1
+          Push-Location $exe.DirectoryName
+          & $exe.FullName 2>&1 | Select-Object -Last 15
+          Write-Host "UNIT TESTS EXIT: $LASTEXITCODE"
+          Pop-Location
+          exit 0
+
+      - name: Stage 1 - headless QA test
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force qa-out | Out-Null
+          $env:HEM_QA_DIR = (Resolve-Path qa-out).Path
+          $exe = Get-ChildItem build\rig-public -Recurse -Filter 'hc_tests.exe' -File | Where-Object { $_.FullName -match '\\Release\\' } | Select-Object -First 1
+          if (-not $exe) { 'test executable not built' | Tee-Object qa-out\stage1-log.txt; exit 0 }
+          Push-Location $exe.DirectoryName
+          & $exe.FullName --qa 2>&1 | Tee-Object (Join-Path $env:HEM_QA_DIR 'stage1-log.txt')
+          Pop-Location
+          Get-ChildItem $env:HEM_QA_DIR -Filter 'qa_report_*.csv' | ForEach-Object { Write-Host "=== $($_.Name)"; Get-Content $_.FullName | ForEach-Object { Write-Host "CSV| $_" } }
+          exit 0
+
+      - name: Stage 2 - Steinberg VST3 validator (extensive)
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          & .\tools\ci\qa-validate.ps1 -BuildDir build\rig-public -Bundles 'HEM Suite.vst3','HEM WAVE.vst3' -OutDir qa-out
+
+      - name: Upload QA reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-hybridcore
+          path: qa-out
