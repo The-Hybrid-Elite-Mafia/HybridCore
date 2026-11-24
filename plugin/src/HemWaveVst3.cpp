@@ -20,6 +20,7 @@
 #include "pluginterfaces/vst/ivstparameterchanges.h"
 #include "pluginterfaces/vst/vsttypes.h"
 #include "public.sdk/source/common/pluginview.h"
+#include "ScalableView.hpp"
 #include "public.sdk/source/main/pluginfactory.h"
 #include "public.sdk/source/vst/vstaudioeffect.h"
 #include "public.sdk/source/vst/vsteditcontroller.h"
@@ -332,30 +333,34 @@ private:
     Vst::EditController& c_;
 };
 
-class WaveView final : public CPluginView {
+// The editor: an OpenGL child window inside the host's window. It follows the host's display scaling and
+// can be resized; the faceplate keeps its shape (see ScalableView.hpp).
+class WaveView final : public vst3view::ScalableView {
 public:
-    WaveView(const ui::PanelSpec& spec, ui::PanelHost& host) : spec_(spec), host_(host) {
-        scale_ = ui::FxPanelWindow::defaultScale(spec_);
-        int w = 0, h = 0;
-        ui::FxPanelWindow::sizeFor(spec_, scale_, w, h);
-        ViewRect r(0, 0, w, h);
-        setRect(r);
-    }
+    WaveView(const ui::PanelSpec& spec, ui::PanelHost& host)
+        : ScalableView(baseW(spec), baseH(spec), ui::FxPanelWindow::defaultScale(spec)), spec_(spec), host_(host) {}
     tresult PLUGIN_API isPlatformTypeSupported(FIDString type) SMTG_OVERRIDE {
         return std::strcmp(type, kPlatformTypeHWND) == 0 ? kResultTrue : kResultFalse;
     }
     void attachedToParent() SMTG_OVERRIDE {
         std::string err;
-        if (!window_.openChild(systemWindow, spec_, host_, bundleResources(), scale_, &err))
+        if (!window_.openChild(systemWindow, spec_, host_, bundleResources(), scale(), &err))
             ::OutputDebugStringA(("HEM WAVE: faceplate failed: " + err + "\n").c_str());
+        else
+            window_.resize(rect.getWidth(), rect.getHeight());   // exactly the size the host was given
     }
     void removedFromParent() SMTG_OVERRIDE { window_.close(); }
 
+protected:
+    void resized(int width, int height) override { window_.resize(width, height); }
+
 private:
+    static float baseW(const ui::PanelSpec& spec) { int w = 0, h = 0; ui::FxPanelWindow::sizeFor(spec, 1.0f, w, h); return static_cast<float>(w); }
+    static float baseH(const ui::PanelSpec& spec) { int w = 0, h = 0; ui::FxPanelWindow::sizeFor(spec, 1.0f, w, h); return static_cast<float>(h); }
+
     const ui::PanelSpec& spec_;
     ui::PanelHost&       host_;
     ui::FxPanelWindow    window_;
-    float                scale_ = 0.62f;
 };
 
 class Controller final : public Vst::EditController, public Vst::IMidiMapping {
