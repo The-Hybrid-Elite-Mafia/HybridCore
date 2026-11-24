@@ -20,13 +20,13 @@ double toneAmp(const std::vector<float>& x, double hz, std::size_t from, double 
     return 2.0 * std::sqrt(s * s + c * c) / static_cast<double>(std::max<std::size_t>(1, x.size() - from));
 }
 double db(double v) { return 20.0 * std::log10(std::max(v, 1e-12)); }
-double highEnergy(const std::vector<float>& x, std::size_t from, double hz) {
+double highEnergy(const std::vector<float>& x, std::size_t from, double hz, std::size_t len = static_cast<std::size_t>(-1)) {
     fx::Biquad a, b;
     a.c = b.c = fx::BiquadCoefs::make(fx::BiquadCoefs::Type::HighPass, 48000.0, hz, 0.7071);
     double e = 0;
     for (std::size_t i = 0; i < x.size(); ++i) {
         const float y = b.tick(a.tick(x[i]));
-        if (i >= from) e += static_cast<double>(y) * y;
+        if (i >= from && i - from < len) e += static_cast<double>(y) * y;
     }
     return e;
 }
@@ -167,6 +167,21 @@ void testFxNew() {
         std::printf("  hiss above 4 kHz %+.2f dB, 1 kHz tone %+.2f dB, noise floor meter %.1f dBFS\n", drop, tone, e->meter(0));
         CHECK(drop < -6.0);
         CHECK(std::fabs(tone) < 1.0);
+    }
+    std::printf("[fx] HEM HUSH: after 1 s of digital silence the hiss still comes down at once (silence is not the floor)\n");
+    {
+        auto e = make(&fx::makeHush);
+        set(*e, "amount", 60.0f); set(*e, "reduction", 18.0f);
+        e->reset();
+        Stereo x = noise(4.0, 0.01f, 33);
+        const std::size_t lead = 48000;
+        for (std::size_t i = 0; i < lead; ++i) x.l[i] = x.r[i] = 0.0f;   // a silent lead-in
+        const Stereo in = x;
+        run(*e, x);
+        const std::size_t from = lead + 24000;   // 0.5 .. 1.0 s after the music starts
+        const double drop = 10 * std::log10(highEnergy(x.l, from, 4000, 24000) / highEnergy(in.l, from - e->latency(), 4000, 24000));
+        std::printf("  hiss above 4 kHz 0.5-1.0 s after a silent lead-in %+.2f dB (it used to take about 4 s)\n", drop);
+        CHECK(drop < -6.0);
     }
     // ---------------------------------------------------------------- DE-ESS
     std::printf("[fx] HEM DE-ESS: a loud 8 kHz 'ess' goes down, 500 Hz at the same level stays\n");

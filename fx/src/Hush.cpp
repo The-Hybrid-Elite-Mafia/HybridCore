@@ -32,6 +32,7 @@ const ParamInfo kParams[kCount] = {
 const MeterInfo kMeters[] = {{"NOISE FLOOR", "dBFS", -120.0f, 0.0f}, {"REMOVED", "dB", -24.0f, 0.0f}};
 constexpr int kSlots = 8;
 constexpr float kBias = 1.6f, kEps = 1e-14f;
+constexpr int kSilentRun = 32;   // this many samples in a row at digital zero = silence (a zero crossing is not)
 
 class Hush final : public Effect {
 public:
@@ -60,6 +61,7 @@ public:
         for (auto* v : {&power_, &smooth_, &noise_, &slotMin_, &curMin_}) std::fill(v->begin(), v->end(), 0.0f);
         std::fill(gain_.begin(), gain_.end(), 1.0f);
         pos_ = hopCount_ = slotFrame_ = slot_ = slotsFilled_ = 0;
+        zeroRun_ = sinceSilence_ = 0;   // the buffers start empty: learn once a whole frame of sound is in
         removedAvg_ = 0.0f;
         outGain_.prepare(fs_, 30, dbToGain(p(Output)));
         publishMeter(0, -120.0f); publishMeter(1, 0.0f);
@@ -71,6 +73,8 @@ public:
         for (std::uint32_t i = 0; i < n; ++i) {
             const auto ps = static_cast<std::size_t>(pos_);
             in_[0][ps] = L[i]; in_[1][ps] = R[i];
+            if (L[i] == 0.0f && R[i] == 0.0f) { if (++zeroRun_ >= kSilentRun) sinceSilence_ = 0; }
+            else { zeroRun_ = 0; if (sinceSilence_ < n_) ++sinceSilence_; }
             const float g = outGain_.next(oT);
             L[i] = out_[0][ps] * g; R[i] = out_[1][ps] * g;
             out_[0][ps] = out_[1][ps] = 0.0f;
@@ -99,7 +103,10 @@ private:
             power_[k] = 0.6f * power_[k] + 0.4f * pw;
             if (power_[k] < 1e-30f) power_[k] = 0.0f;
         }
-        if (learn) {
+        // Digital silence (a song's lead-in, a gap, the empty buffer after reset) is not a noise floor: a frame
+        // that holds any of it would set the floor far too low for the next ~4 s, so nothing would be removed.
+        // The floor is only learned from frames that are all sound; it holds otherwise.
+        if (learn && sinceSilence_ >= n_) {
             for (std::size_t k = 0; k < B; ++k) {
                 std::array<float, 13> v{};
                 for (int j = -6; j <= 6; ++j)
@@ -162,6 +169,7 @@ private:
 
     double fs_ = 48000;
     int n_ = 2048, hop_ = 512, pos_ = 0, hopCount_ = 0;
+    int zeroRun_ = 0, sinceSilence_ = 0;   // samples at digital zero in a row / samples of sound since the last silence
     Fft fft_;
     std::vector<float> win_, in_[2], out_[2];
     std::vector<std::complex<float>> buf_[2];

@@ -24,6 +24,17 @@ jobs:
         continue-on-error: true
         run: cmake --build --preset rig-public-release --target hc_tests HemSuite HemWave --parallel
 
+      - name: Unit tests (hc_tests, the normal suite)
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem build\rig-public -Recurse -Filter 'hc_tests.exe' -File | Where-Object { $_.FullName -match '\\Release\\' } | Select-Object -First 1
+          Push-Location $exe.DirectoryName
+          & $exe.FullName 2>&1 | Select-Object -Last 15
+          Write-Host "UNIT TESTS EXIT: $LASTEXITCODE"
+          Pop-Location
+          exit 0
+
       - name: Stage 1 - headless QA test
         continue-on-error: true
         shell: pwsh
@@ -35,6 +46,7 @@ jobs:
           Push-Location $exe.DirectoryName
           & $exe.FullName --qa 2>&1 | Tee-Object (Join-Path $env:HEM_QA_DIR 'stage1-log.txt')
           Pop-Location
+          Get-ChildItem $env:HEM_QA_DIR -Filter 'qa_report_*.csv' | ForEach-Object { Write-Host "=== $($_.Name)"; Get-Content $_.FullName | ForEach-Object { Write-Host "CSV| $_" } }
           exit 0
 
       - name: Stage 2 - Steinberg VST3 validator (extensive)

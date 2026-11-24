@@ -34,7 +34,8 @@ void auditDsp(const fx::EffectInfo& info, hemqa::Report& rep) {
     const std::string name = info.name;
     auto e = info.create();
     const std::span<const fx::ParamInfo> ps = e->params();
-    const Stereo full = hemqa::testAudio(1.0), sweep = hemqa::testAudio(1.0), silence(static_cast<std::size_t>(0.5 * hemqa::kRate));
+    const Stereo full = hemqa::testAudio(1.0), sweep = hemqa::testAudio(1.0), voice = hemqa::voiceAudio(1.0),
+                 silence(static_cast<std::size_t>(0.5 * hemqa::kRate));
 
     // ---- stability: defaults, 1 s of the test signal
     e->prepare(hemqa::kRate, hemqa::kBlock);
@@ -45,21 +46,33 @@ void auditDsp(const fx::EffectInfo& info, hemqa::Report& rep) {
     // ---- parameter sweep
     // A control can be silent at the default settings for a good reason (a band's frequency while its gain is 0 dB,
     // a ratio while the threshold is above the signal). So a control is only DEAD_WIRE when the output stays
-    // bit-identical in four settings of all the other controls: defaults, all at minimum, all at maximum, all at
-    // the middle of their range. Switches that silence or pass audio straight through (bypass / solo / listen /
-    // mute / freeze) stay at their defaults in those settings.
+    // bit-identical in every one of these settings of the other controls: defaults, all at min, all at max, all at
+    // the middle; each other control moved on its own; 8 seeded random settings; the control pressed while the
+    // music plays; each of them with the test mix and with a single gliding voice (pitch tools need one).
+    // Switches that silence or pass audio straight through stay at their defaults.
     auto keepAtDefault = [&](const fx::ParamInfo& p) {
         const std::string id = p.id;
         for (const char* k : {"bypass", "solo", "listen", "mute", "freeze", "delta", "audition"})
             if (id.find(k) != std::string::npos) return true;
         return false;
     };
-    auto setContext = [&](int skip, int mode) {   // 0 defaults, 1 min, 2 max, 3 middle
+    constexpr int kRandomSettings = 8;
+    int pairK = 0;
+    float pairV = 0;
+    bool useVoice = false;
+    // 0 defaults, 1 all min, 2 all max, 3 all middle, 5 one other control (pairK) at pairV, 6 pressed while playing,
+    // 7.. a seeded random setting of all the other controls
+    auto setContext = [&](int skip, int mode) {
         e->setDefaults();
-        if (mode == 0) return;
+        if (mode == 0 || mode == 6) return;
+        if (mode == 5) { if (pairK != skip) e->set(pairK, pairV); return; }
+        std::uint32_t r = 0x9E3779B9u * static_cast<std::uint32_t>(mode);
         for (std::size_t k = 0; k < ps.size(); ++k) {
+            r = r * 1664525u + 1013904223u;
             if (static_cast<int>(k) == skip || keepAtDefault(ps[k])) continue;
-            const float v = mode == 1 ? ps[k].min : mode == 2 ? ps[k].max : fx::toPlain(ps[k], 0.5f);
+            const float u = static_cast<float>(r >> 8) / 16777216.0f;
+            float v = mode == 1 ? ps[k].min : mode == 2 ? ps[k].max : fx::toPlain(ps[k], 0.5f);
+            if (mode >= 7) v = stepped(ps[k]) ? std::floor(ps[k].min + u * (ps[k].max - ps[k].min + 1.0f)) : fx::toPlain(ps[k], u);
             e->set(static_cast<int>(k), v);
         }
     };
@@ -67,12 +80,27 @@ void auditDsp(const fx::EffectInfo& info, hemqa::Report& rep) {
     auto stateHash = [&](int mode, int param, float value, bool& blewUp, bool& getOk) {
         if (fresh) { e = info.create(); e->prepare(hemqa::kRate, hemqa::kBlock); }
         setContext(param, mode);
-        if (param >= 0) {
+        const Stereo& in = useVoice ? voice : sweep;
+        Stereo o;
+        if (mode == 6 && param >= 0) {   // pressed while playing: half at its default, then the new value
+            e->reset();
+            Stereo a(in.size() / 2), b(in.size() - in.size() / 2);
+            std::copy_n(in.l.data(), a.size(), a.l.data()); std::copy_n(in.r.data(), a.size(), a.r.data());
+            std::copy_n(in.l.data() + a.size(), b.size(), b.l.data()); std::copy_n(in.r.data() + a.size(), b.size(), b.r.data());
+            const Stereo oa = run(*e, a);
             e->set(param, value);
-            getOk = hemqa::closeTo(e->get(param), fx::clampPlain(ps[static_cast<std::size_t>(param)], value));
+            const Stereo ob = run(*e, b);
+            o = Stereo(in.size());
+            std::copy_n(oa.l.data(), oa.size(), o.l.data()); std::copy_n(oa.r.data(), oa.size(), o.r.data());
+            std::copy_n(ob.l.data(), ob.size(), o.l.data() + oa.size()); std::copy_n(ob.r.data(), ob.size(), o.r.data() + oa.size());
+        } else {
+            if (param >= 0) {
+                e->set(param, value);
+                getOk = hemqa::closeTo(e->get(param), fx::clampPlain(ps[static_cast<std::size_t>(param)], value));
+            }
+            e->reset();
+            o = run(*e, in);
         }
-        e->reset();
-        const Stereo o = run(*e, sweep);
         blewUp = !hemqa::finite(o);
         hemqa::Hash h;
         h.add(o);
@@ -107,9 +135,9 @@ void auditDsp(const fx::EffectInfo& info, hemqa::Report& rep) {
         bool sampled = false;
         const std::vector<float> values = hemqa::sweepValues(p.min, p.def, p.max, stepped(p), &sampled);
         if (sampled) rep.note(name, std::string(p.id) + ": stepped control with more than 64 steps, 64 sampled");
-        bool blew = false, mism = false, live = false;
+        bool blew = false, mism = false, live = !deterministic;
         std::string blewAt, mismAt;
-        for (int mode = 0; mode <= 3 && !live; ++mode) {
+        auto liveIn = [&](int mode) {
             std::set<std::uint64_t> hashes;
             for (float v : values) {
                 bool b = false, g = true;
@@ -117,41 +145,86 @@ void auditDsp(const fx::EffectInfo& info, hemqa::Report& rep) {
                 if (b && !blew) { blew = true; blewAt = fx::formatValue(p, fx::clampPlain(p, v)); }
                 if (!g && !mism) { mism = true; mismAt = hemqa::fmt("%g", v); }
             }
-            live = hashes.size() > 1;
-            if (!deterministic) live = true;
+            return hashes.size() > 1;
+        };
+        for (int pass = 0; pass < 2 && !live; ++pass) {   // the test mix, then a single voice
+            useVoice = pass == 1;
+            for (int mode = 0; mode <= 3 && !live; ++mode) live = liveIn(mode);
+            if (!live) live = liveIn(6);
+            for (int seed = 7; seed < 7 + kRandomSettings && !live; ++seed) live = liveIn(seed);
+            for (std::size_t k = 0; k < ps.size() && !live; ++k) {
+                if (k == i || keepAtDefault(ps[k])) continue;
+                for (float o : hemqa::sweepValues(ps[k].min, ps[k].def, ps[k].max, stepped(ps[k]))) {
+                    if (o == ps[k].def) continue;
+                    pairK = static_cast<int>(k); pairV = o;
+                    if ((live = liveIn(5))) break;
+                }
+            }
         }
+        useVoice = false;
         if (blew) rep.add(name, "DSP", "NAN_OR_INF_SWEEP", p.id, "non-finite output at " + blewAt);
         if (mism) rep.add(name, "DSP", "GET_SET_MISMATCH", p.id, "get() != set() at " + mismAt);
         if (!live)
             rep.add(name, "DSP", "DEAD_WIRE", p.id, "audio + meters bit-identical at all " + std::to_string(values.size()) +
-                    " values, with the other controls at default / min / max / middle");
+                    " values, in every setting of the other controls tried (default / min / max / middle, each one moved,"
+                    " 8 random, pressed while playing), with the test mix and with a single voice");
     }
 
-    // ---- meters: silence, then hot signal; every faceplate meter must be finite and move
-    // (in at least one of the four settings of the controls, so a GR meter at a threshold above the signal is not flagged)
+    // ---- meters: silence, then the signal, read after every block (as the faceplate reads them). A meter must be
+    // finite and move with the sound in at least one setting of the controls. One that only follows a control
+    // (a delay-time readout) is reported as a note, not as stuck.
     const ui::PanelSpec spec = ui::panelSpecFor(info, *e);
     ui::EffectPanelHost host(*e);
     std::vector<int> moved(spec.meters.size(), 0), bad(spec.meters.size(), 0);
     std::vector<float> lastHot(spec.meters.size(), 0.0f);
-    for (int mode = 0; mode <= 3; ++mode) {
+    std::vector<std::set<float>> seen(spec.meters.size());
+    auto meterPass = [&](int mode) {
         setContext(-1, mode);
         e->reset();
         (void)run(*e, silence);
         std::vector<float> quiet;
         for (int m = 0; m < static_cast<int>(spec.meters.size()); ++m) quiet.push_back(host.meter(m));
-        (void)run(*e, full);
-        for (std::size_t m = 0; m < spec.meters.size(); ++m) {
-            const float hot = host.meter(static_cast<int>(m));
-            if (!std::isfinite(hot) || !std::isfinite(quiet[m])) bad[m] = 1;
-            else if (quiet[m] != hot) moved[m] = 1;
-            lastHot[m] = hot;
+        const Stereo& in = useVoice ? voice : full;
+        Stereo blk(hemqa::kBlock);
+        for (std::size_t pos = 0; pos < in.size(); pos += hemqa::kBlock) {
+            const std::size_t nb = std::min<std::size_t>(hemqa::kBlock, in.size() - pos);
+            std::copy_n(in.l.data() + pos, nb, blk.l.data());
+            std::copy_n(in.r.data() + pos, nb, blk.r.data());
+            e->process(blk.l.data(), blk.r.data(), static_cast<std::uint32_t>(nb));
+            for (std::size_t m = 0; m < spec.meters.size(); ++m) {
+                const float hot = host.meter(static_cast<int>(m));
+                if (!std::isfinite(hot) || !std::isfinite(quiet[m])) bad[m] = 1;
+                else if (quiet[m] != hot) moved[m] = 1;
+                lastHot[m] = hot;
+            }
+        }
+        for (std::size_t m = 0; m < spec.meters.size(); ++m) seen[m].insert(lastHot[m]);
+    };
+    auto allMoved = [&] { return std::all_of(moved.begin(), moved.end(), [](int x) { return x != 0; }); };
+    e->prepare(hemqa::kRate, hemqa::kBlock);
+    for (int pass = 0; pass < 2 && !allMoved(); ++pass) {
+        useVoice = pass == 1;
+        for (int mode = 0; mode <= 3; ++mode) meterPass(mode);
+        for (int seed = 7; seed < 7 + kRandomSettings && !allMoved(); ++seed) meterPass(seed);
+        for (std::size_t k = 0; k < ps.size() && !allMoved(); ++k) {
+            if (keepAtDefault(ps[k])) continue;
+            for (float o : hemqa::sweepValues(ps[k].min, ps[k].def, ps[k].max, stepped(ps[k]))) {
+                if (o == ps[k].def) continue;
+                pairK = static_cast<int>(k); pairV = o;
+                meterPass(5);
+                if (allMoved()) break;
+            }
         }
     }
+    useVoice = false;
     for (std::size_t m = 0; m < spec.meters.size(); ++m) {
         const std::string mn = spec.meters[m].name;
         if (bad[m]) rep.add(name, "METER", "METER_NAN_OR_INF", mn, "non-finite meter value");
-        if (!moved[m]) rep.add(name, "METER", "METER_STUCK", mn, "reads " + hemqa::fmt("%g", lastHot[m]) +
-                               " for both silence and hot signal, with the controls at default / min / max / middle");
+        if (moved[m]) continue;
+        if (seen[m].size() > 1) { rep.note(name, mn + ": a readout of a setting (follows the controls, not the sound): " + std::to_string(seen[m].size()) + " values seen"); continue; }
+        rep.add(name, "METER", "METER_STUCK", mn, "reads " + hemqa::fmt("%g", lastHot[m]) +
+                " for both silence and the signal (read after every block), in every setting of the controls tried, with"
+                " the test mix and with a single voice");
     }
 }
 

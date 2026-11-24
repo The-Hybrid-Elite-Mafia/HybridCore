@@ -65,6 +65,25 @@ inline Stereo testAudio(double seconds) {
     return s;
 }
 
+// A single sung-like voice for pitch tools: a bright sawtooth (8 harmonics) gliding up one octave,
+// 196 Hz (G3) to 392 Hz (G4), with 5 Hz vibrato, -12 dBFS, the same on both sides. Deterministic.
+inline Stereo voiceAudio(double seconds) {
+    const std::size_t n = static_cast<std::size_t>(seconds * kRate);
+    Stereo s(n);
+    const double tau = 6.283185307179586;
+    double phase = 0;
+    for (std::size_t i = 0; i < n; ++i) {
+        const double t = static_cast<double>(i) / kRate;
+        const double hz = 196.0 * std::pow(2.0, t / seconds) * std::pow(2.0, 0.3 / 12.0 * std::sin(tau * 5.0 * t));
+        phase += hz / kRate;
+        phase -= std::floor(phase);
+        double y = 0;
+        for (int h = 1; h <= 8; ++h) y += std::sin(tau * h * phase) / h;
+        s.l[i] = s.r[i] = static_cast<float>(0.25 * 0.5 * y);
+    }
+    return s;
+}
+
 [[nodiscard]] inline bool finite(const Stereo& s) noexcept {
     for (std::size_t i = 0; i < s.size(); ++i)
         if (!std::isfinite(s.l[i]) || !std::isfinite(s.r[i])) return false;
