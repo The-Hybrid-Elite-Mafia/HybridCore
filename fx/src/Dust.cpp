@@ -18,13 +18,13 @@ namespace {
 
 enum P { Wow, Flutter, Bits, Rate, Vinyl, Tone, Mix, Output, kCount };
 const ParamInfo kParams[kCount] = {
-    {"wow",     "Wow",         "%", 0.0f, 100.0f, 20.0f},
-    {"flutter", "Flutter",     "%", 0.0f, 100.0f, 15.0f},
+    {"wow",     "Wow",         "%", 0.0f, 100.0f, 0.0f},
+    {"flutter", "Flutter",     "%", 0.0f, 100.0f, 0.0f},
     {"bits",    "Bits",        "bit", 4.0f, 16.0f, 16.0f},
     {"rate",    "Sample Rate", "Hz", 2000.0f, 48000.0f, 48000.0f, Taper::Log},
-    {"vinyl",   "Vinyl",       "%", 0.0f, 100.0f, 20.0f},
+    {"vinyl",   "Vinyl",       "%", 0.0f, 100.0f, 0.0f},
     {"tone",    "Tone",        "Hz", 1000.0f, 20000.0f, 12000.0f, Taper::Log},
-    {"mix",     "Mix",         "%", 0.0f, 100.0f, 100.0f},
+    {"mix",     "Mix",         "%", 0.0f, 100.0f, 0.0f},
     {"output",  "Output",      "dB", -24.0f, 12.0f, 0.0f},
 };
 constexpr double kQ = 0.7071067811865476;

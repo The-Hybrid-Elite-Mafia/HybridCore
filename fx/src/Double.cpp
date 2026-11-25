@@ -14,7 +14,7 @@ namespace {
 enum P { Amount, Width, Delay, Drift, Voices, LowCut, Output, kCount };
 const char* const kVoices[] = {"2 VOICES", "4 VOICES"};
 const ParamInfo kParams[kCount] = {
-    {"amount", "Amount",  "%", 0.0f, 100.0f, 50.0f},
+    {"amount", "Amount",  "%", 0.0f, 100.0f, 0.0f},
     {"width",  "Width",   "%", 0.0f, 100.0f, 100.0f},
     {"delay",  "Delay",   "ms", 5.0f, 40.0f, 18.0f, Taper::Log},
     {"drift",  "Drift",   "%", 0.0f, 100.0f, 40.0f},

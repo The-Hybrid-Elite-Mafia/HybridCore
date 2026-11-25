@@ -42,7 +42,8 @@ public:
     Steinberg::tresult PLUGIN_API setContentScaleFactor(ScaleFactor factor) SMTG_OVERRIDE {
         if (!(factor > 0.0f) || !std::isfinite(factor)) return Steinberg::kInvalidArgument;
         content_ = factor;
-        applyScale(logical_ * factor);
+        // never larger than the screen's work area (a host that reports a bigger factor, or a laptop screen)
+        applyScale(std::min(logical_ * factor, screenFit()));
         return Steinberg::kResultOk;
     }
 
@@ -73,6 +74,14 @@ protected:
 
     // Smallest and largest faceplate, as pixels per faceplate pixel.
     static constexpr float kMinScale = 0.12f, kMaxScale = 1.0f;
+    // The largest scale whose window fits 90 % of the work area's width and 85 % of its height (the host's
+    // title bar and buttons go around it): the same rule the faceplates open with.
+    [[nodiscard]] float screenFit() const noexcept {
+        RECT work{};
+        if (!::SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0) || work.right <= work.left || work.bottom <= work.top) return kMaxScale;
+        return std::max(kMinScale, std::min(0.9f * static_cast<float>(work.right - work.left) / baseW_,
+                                            0.85f * static_cast<float>(work.bottom - work.top) / baseH_));
+    }
 
 private:
     [[nodiscard]] float clampScale(float s) const noexcept { return std::clamp(s, kMinScale, kMaxScale); }

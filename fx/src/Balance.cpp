@@ -22,7 +22,7 @@ const char* const kSpeeds[] = {"SLOW", "MEDIUM", "FAST"};
 const char* const kBandNames[] = {"31", "63", "125", "250", "500", "1K", "2K", "4K", "8K", "16K"};
 const char* const kOnOff[] = {"OFF", "ON"};
 const ParamInfo kParams[kCount] = {
-    {"amount", "Amount",    "%", 0.0f, 100.0f, 50.0f},
+    {"amount", "Amount",    "%", 0.0f, 100.0f, 0.0f},
     {"tilt",   "Tilt",      "dB/oct", -6.0f, 3.0f, -1.5f},
     {"range",  "Range",     "dB", 1.0f, 12.0f, 6.0f},
     {"speed",  "Speed",     "", 0.0f, 2.0f, 1.0f, Taper::Choice, kSpeeds},
@@ -55,6 +55,7 @@ public:
         }
         updateEvery_ = std::max(64, static_cast<int>(std::lround(256.0 * fs / 48000.0)));
         reset();
+        clean_.prepare(fs, latency());
     }
     void reset() noexcept override {
         for (auto& b : bp_) b.clear();
@@ -65,9 +66,15 @@ public:
         warm_ = 0.0;
         out_.prepare(fs_, 30, dbToGain(p(Output)));
         for (int b = 0; b < kBands; ++b) publishMeter(b, 0.0f);
+        clean_.reset(isClean());
     }
 
     void process(float* L, float* R, std::uint32_t n) noexcept override {
+        clean_.push(L, R, n, latency());
+        processInner(L, R, n);
+        clean_.apply(L, R, n, isClean());
+    }
+    void processInner(float* L, float* R, std::uint32_t n) noexcept {
         const float env = onePoleCoef(fs_, secondsFor(static_cast<int>(p(Speed))) * 1000.0);
         const bool freeze = p(Freeze) >= 0.5f;
         const float oT = dbToGain(p(Output));
@@ -91,6 +98,9 @@ public:
     }
 
 private:
+    // colour controls all at zero: the sound passes untouched (see CleanPass)
+    bool isClean() const noexcept { return p(Amount) <= 0.0f && p(Output) == 0.0f; }
+    CleanPass clean_;
     void update(bool freeze) noexcept {
         const int lo = static_cast<int>(p(LowBand)), hi = std::min(static_cast<int>(p(HighBand)), nyqOk_ - 1);
         if (!freeze && warm_ > 0.5 * fs_ && hi >= lo) {

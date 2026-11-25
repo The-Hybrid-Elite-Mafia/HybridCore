@@ -66,6 +66,7 @@ void testFxRack() {
         rack.prepare(48000.0, kBlock);
         CHECK(rack.setEffect(0, 0, typeOf("HEM DESK")));
         rack.effect(0, 0)->set(fxt::param(*rack.effect(0, 0), "drive"), 18.0f);
+        rack.effect(0, 0)->set(fxt::param(*rack.effect(0, 0), "mix"), 100.0f);   // DESK loads at mix 0 (clean)
         const auto plain = render(plainM, nullptr, stems);
         const auto wet = render(m, &rack, stems);
         const std::uint32_t lat = rack.latency();

@@ -26,7 +26,7 @@ const ParamInfo kParams[kCount] = {
     {"pingpong", "Ping-Pong", "%", 0.0f, 100.0f, 0.0f},
     {"wobble",   "Wobble",    "%", 0.0f, 100.0f, 0.0f},
     {"duck",     "Duck",      "%", 0.0f, 100.0f, 0.0f},
-    {"mix",      "Mix",       "%", 0.0f, 100.0f, 25.0f},
+    {"mix",      "Mix",       "%", 0.0f, 100.0f, 0.0f},
 };
 const MeterInfo kMeters[] = {{"ECHO", "ms", 0.0f, 2000.0f}};
 constexpr double kMaxSeconds = 4.0, kQ = 0.7071067811865476;

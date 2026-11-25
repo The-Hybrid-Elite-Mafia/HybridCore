@@ -23,7 +23,7 @@ const ParamInfo kParams[kCount] = {
     {"speed",   "Speed",      "", 0.0f, 2.0f, 1.0f, Taper::Choice, kSpeeds},
     {"focus",   "Focus",      "", 0.0f, 1.0f, 1.0f, Taper::Toggle, kOnOff},
     {"guard",   "Clip Guard", "", 0.0f, 1.0f, 1.0f, Taper::Toggle, kOnOff},
-    {"mix",     "Mix",        "%", 0.0f, 100.0f, 100.0f},
+    {"mix",     "Mix",        "%", 0.0f, 100.0f, 0.0f},
     {"output",  "Output",     "dB", -24.0f, 12.0f, 0.0f},
 };
 const MeterInfo kMeters[] = {{"SHAPE", "dB", -15.0f, 15.0f, true}};

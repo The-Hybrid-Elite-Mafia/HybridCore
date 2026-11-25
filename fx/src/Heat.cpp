@@ -16,10 +16,10 @@ const char* const kModes[] = {"TAPE", "TUBE", "TRANSISTOR"};
 const char* const kOnOff[] = {"OFF", "ON"};
 const ParamInfo kParams[kCount] = {
     {"mode",     "Character", "", 0.0f, 2.0f, 0.0f, Taper::Choice, kModes},
-    {"drive",    "Drive",     "dB", 0.0f, 36.0f, 6.0f},
+    {"drive",    "Drive",     "dB", 0.0f, 36.0f, 0.0f},
     {"tone",     "Tone",      "%", -100.0f, 100.0f, 0.0f},
     {"autogain", "Auto Gain", "", 0.0f, 1.0f, 1.0f, Taper::Toggle, kOnOff},
-    {"mix",      "Mix",       "%", 0.0f, 100.0f, 100.0f},
+    {"mix",      "Mix",       "%", 0.0f, 100.0f, 0.0f},
     {"output",   "Output",    "dB", -24.0f, 12.0f, 0.0f},
 };
 

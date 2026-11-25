@@ -16,7 +16,7 @@ enum P { Width, MonoBelow, SideTone, Safe, Output, kCount };
 const char* const kOnOff[] = {"OFF", "ON"};
 const ParamInfo kParams[kCount] = {
     {"width",     "Width",      "%", 0.0f, 200.0f, 100.0f},
-    {"monobelow", "Mono Below", "Hz", 20.0f, 500.0f, 120.0f, Taper::Log},
+    {"monobelow", "Mono Below", "Hz", 20.0f, 500.0f, 20.0f, Taper::Log},
     {"sidetone",  "Side Tone",  "%", -100.0f, 100.0f, 0.0f},
     {"safe",      "Safe",       "", 0.0f, 1.0f, 0.0f, Taper::Toggle, kOnOff},
     {"output",    "Output",     "dB", -24.0f, 12.0f, 0.0f},
@@ -37,6 +37,7 @@ public:
         safeCoef_ = onePoleCoef(fs, 150.0);
         tiltLp_ = static_cast<float>(std::exp(-2.0 * std::numbers::pi * 2000.0 / fs));
         reset();
+        clean_.prepare(fs, latency());
     }
     void reset() noexcept override {
         hp1_.clear(); hp2_.clear();
@@ -47,9 +48,15 @@ public:
         tone_.prepare(fs_, 30, p(SideTone) * 0.01f);
         out_.prepare(fs_, 30, dbToGain(p(Output)));
         publishMeter(0, 1.0f); publishMeter(1, 0.0f);
+        clean_.reset(isClean());
     }
 
     void process(float* L, float* R, std::uint32_t n) noexcept override {
+        clean_.push(L, R, n, latency());
+        processInner(L, R, n);
+        clean_.apply(L, R, n, isClean());
+    }
+    void processInner(float* L, float* R, std::uint32_t n) noexcept {
         const float mono = p(MonoBelow);
         if (mono != lastMono_) {
             const auto c = BiquadCoefs::make(BiquadCoefs::Type::HighPass, fs_, mono, kQ);
@@ -101,6 +108,9 @@ public:
     }
 
 private:
+    // colour controls all at zero: the sound passes untouched (see CleanPass)
+    bool isClean() const noexcept { return p(Width) == 100.0f && p(MonoBelow) <= 20.0f && p(SideTone) == 0.0f && p(Output) == 0.0f; }
+    CleanPass clean_;
     double fs_ = 48000;
     Biquad hp1_, hp2_;
     float lastMono_ = -1, tiltLp_ = 0, tiltZ_ = 0, safeCoef_ = 0, safeCorr_ = 1;

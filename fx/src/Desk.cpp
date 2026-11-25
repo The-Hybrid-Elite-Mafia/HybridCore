@@ -19,10 +19,10 @@ namespace {
 enum P { Drive, Character, Crosstalk, Mix, Output, kCount };
 const char* const kDesks[] = {"CLEAN DESK", "BRITISH IRON", "AMERICAN PUNCH", "TUBE BUS"};
 const ParamInfo kParams[kCount] = {
-    {"drive",     "Drive",     "dB", 0.0f, 18.0f, 6.0f},
+    {"drive",     "Drive",     "dB", 0.0f, 18.0f, 0.0f},
     {"character", "Character", "", 0.0f, 3.0f, 1.0f, Taper::Choice, kDesks},
-    {"crosstalk", "Crosstalk", "%", 0.0f, 100.0f, 30.0f},
-    {"mix",       "Mix",       "%", 0.0f, 100.0f, 100.0f},
+    {"crosstalk", "Crosstalk", "%", 0.0f, 100.0f, 0.0f},
+    {"mix",       "Mix",       "%", 0.0f, 100.0f, 0.0f},
     {"output",    "Output",    "dB", -24.0f, 12.0f, 0.0f},
 };
 const MeterInfo kMeters[] = {{"SATURATION", "dB", -12.0f, 0.0f}};

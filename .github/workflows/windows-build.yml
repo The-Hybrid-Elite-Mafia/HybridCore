@@ -101,7 +101,7 @@ jobs:
         if: github.ref != 'refs/heads/main'
         uses: actions/upload-artifact@v6
         with:
-          name: shots-${{ github.ref_name }}
+          name: shots-run-${{ github.run_id }}   # branch names can hold "/", which artifact names cannot
           path: shots/*.png
 
       - name: Publish screenshots to the ci-screenshots branch (other branches - ci-screenshots-dev)

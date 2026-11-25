@@ -2,6 +2,7 @@
 // HEM-board faceplate (layoutFxPanelFramed). Report only — writes qa_report_hybridcore.csv and never fails
 // the test run. Run it with: hc_tests --qa
 #include "QaCommon.hpp"
+#include "ColouredStart.hpp"
 #include "TestHarness.hpp"
 #include "hybrid/fx/Effects.hpp"
 #include "hybrid/ui/FxPanel.hpp"
@@ -66,6 +67,13 @@ void auditDsp(const fx::EffectInfo& info, hemqa::Report& rep) {
         e->setDefaults();
         if (mode == 0 || mode == 6) return;
         if (mode == 5) { if (pairK != skip) e->set(pairK, pairV); return; }
+        if (mode < 0) {   // -1: the old coloured defaults (the effect loads untouched now); -2: those + ONE other control
+            for (const auto& [cid, cv] : colourstart::forName(name))
+                for (std::size_t k = 0; k < ps.size(); ++k)
+                    if (static_cast<int>(k) != skip && std::string(ps[k].id) == cid) e->set(static_cast<int>(k), cv);
+            if (mode == -2 && pairK != skip) e->set(pairK, pairV);
+            return;
+        }
         std::uint32_t r = 0x9E3779B9u * static_cast<std::uint32_t>(mode);
         for (std::size_t k = 0; k < ps.size(); ++k) {
             r = r * 1664525u + 1013904223u;
@@ -151,13 +159,14 @@ void auditDsp(const fx::EffectInfo& info, hemqa::Report& rep) {
             useVoice = pass == 1;
             for (int mode = 0; mode <= 3 && !live; ++mode) live = liveIn(mode);
             if (!live) live = liveIn(6);
+            if (!live) live = liveIn(-1);   // zero colour on load: many controls act once the colour is up
             for (int seed = 7; seed < 7 + kRandomSettings && !live; ++seed) live = liveIn(seed);
             for (std::size_t k = 0; k < ps.size() && !live; ++k) {
                 if (k == i || keepAtDefault(ps[k])) continue;
                 for (float o : hemqa::sweepValues(ps[k].min, ps[k].def, ps[k].max, stepped(ps[k]))) {
                     if (o == ps[k].def) continue;
                     pairK = static_cast<int>(k); pairV = o;
-                    if ((live = liveIn(5))) break;
+                    if ((live = liveIn(5) || liveIn(-2))) break;
                 }
             }
         }
@@ -205,6 +214,7 @@ void auditDsp(const fx::EffectInfo& info, hemqa::Report& rep) {
     for (int pass = 0; pass < 2 && !allMoved(); ++pass) {
         useVoice = pass == 1;
         for (int mode = 0; mode <= 3; ++mode) meterPass(mode);
+        meterPass(-1);   // the old coloured defaults (zero colour on load)
         for (int seed = 7; seed < 7 + kRandomSettings && !allMoved(); ++seed) meterPass(seed);
         for (std::size_t k = 0; k < ps.size() && !allMoved(); ++k) {
             if (keepAtDefault(ps[k])) continue;
@@ -212,6 +222,7 @@ void auditDsp(const fx::EffectInfo& info, hemqa::Report& rep) {
                 if (o == ps[k].def) continue;
                 pairK = static_cast<int>(k); pairV = o;
                 meterPass(5);
+                if (!allMoved()) meterPass(-2);
                 if (allMoved()) break;
             }
         }

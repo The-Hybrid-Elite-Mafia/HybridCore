@@ -32,7 +32,7 @@ class SubStack final : public Effect {
 public:
     SubStack() { setDefaults(); }
     std::span<const ParamInfo> params() const noexcept override { return kParams; }
-    void prepare(double fs, std::uint32_t) override { fs_ = fs; reset(); }
+    void prepare(double fs, std::uint32_t) override { fs_ = fs; reset(); clean_.prepare(fs, latency()); }
     void reset() noexcept override {
         freq_.prepare(fs_, 30.0, p(Freq));
         subDbS_.prepare(fs_, 20.0, p(Sub));
@@ -48,9 +48,15 @@ public:
         env_.set(fs_, 1.0, 250.0);
         counter_ = 0;
         publishReduction(0.0f);
+        clean_.reset(isClean());
     }
 
     void process(float* L, float* R, std::uint32_t n) noexcept override {
+        clean_.push(L, R, n, latency());
+        processInner(L, R, n);
+        clean_.apply(L, R, n, isClean());
+    }
+    void processInner(float* L, float* R, std::uint32_t n) noexcept {
         const float fT = p(Freq), sDbT = p(Sub), hT = p(Harmonics) * 0.01f, mT = p(MonoBelow), oT = dbToGain(p(Output));
         for (std::uint32_t i = 0; i < n; ++i) {
             (void)freq_.next(fT);
@@ -82,6 +88,9 @@ public:
     }
 
 private:
+    // colour controls all at zero: the sound passes untouched (see CleanPass)
+    bool isClean() const noexcept { return p(Sub) == 0.0f && p(Harmonics) <= 0.0f && p(MonoBelow) < 0.5f && p(Output) == 0.0f; }
+    CleanPass clean_;
     void update() noexcept {
         using T = BiquadCoefs::Type;
         const double f = freq_.cur;

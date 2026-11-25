@@ -1,0 +1,139 @@
+name: Visual gallery (all 156 faceplates)
+
+# Renders every HEM plug-in's real faceplate (knobs, meters, labels, drawn by the plug-in's own UI code with
+# Mesa's software OpenGL) exactly as it loads (--defaults, zero colour), at the native 3840 x 2160 frame size,
+# and builds HEM-156-Visual-Gallery.zip: the 156 PNGs + an offline index.html. Nothing is installed or shipped.
+# Each pack is built from its own repo at the same branch name as this run (main on main).
+on:
+  push:
+    branches: [fix/zero-colour]
+    paths: ['.github/workflows/visual-gallery.yml', 'tools/ci/build-visual-gallery.py']
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch / tag to render in all three repos"
+        default: "main"
+
+permissions:
+  contents: write
+
+env:
+  REF: ${{ inputs.ref || github.ref_name }}
+
+jobs:
+  hybridcore:
+    name: HybridCore 22 + HEM WAVE
+    runs-on: windows-2022
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+        with: { ref: "${{ env.REF }}" }
+      - run: cmake --preset rig-public
+      - run: cmake --build --preset rig-public-release --target hc_fx_snapshot --parallel
+      - name: Software OpenGL (Mesa llvmpipe, CI only)
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: pwsh -NoProfile -File tools\ci\fetch-mesa.ps1 -TargetDirs build\rig-public\tools\fx_snapshot\Release
+      - name: Render (defaults, 3840 wide)
+        shell: pwsh
+        env: { GALLIUM_DRIVER: llvmpipe }
+        run: |
+          & .\build\rig-public\tools\fx_snapshot\Release\hc_fx_snapshot.exe --out shots --scale 1 --defaults 2>&1 | Tee-Object log.txt
+          "exit code $LASTEXITCODE" | Tee-Object log.txt -Append
+          exit 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shots-hybridcore
+          path: |
+            shots
+            log.txt
+
+  rack:
+    name: HEM-Elite-Rack 120
+    runs-on: windows-2022
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+        with: { repository: The-Hybrid-Elite-Mafia/HEM-Elite-Rack, ref: "${{ env.REF }}", submodules: true }
+      - run: pwsh -NoProfile -File external\HybridCore\tools\fetch-asio-sdk.ps1
+      - run: cmake --preset rack
+      - run: cmake --build --preset rack-release --target hem_rack_snapshot --parallel
+      - name: Software OpenGL (Mesa llvmpipe, CI only)
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: pwsh -NoProfile -File tools\ci\fetch-mesa.ps1 -TargetDirs build\rack\tools\rack_snapshot\Release
+      - name: Render (defaults, 3840 wide)
+        shell: pwsh
+        env: { GALLIUM_DRIVER: llvmpipe }
+        run: |
+          & .\build\rack\tools\rack_snapshot\Release\hem_rack_snapshot.exe --out shots --width 3840 --defaults 2>&1 | Tee-Object log.txt
+          "exit code $LASTEXITCODE" | Tee-Object log.txt -Append
+          exit 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shots-rack
+          path: |
+            shots
+            log.txt
+
+  darkmatter:
+    name: HEM Dark Matter 13
+    runs-on: windows-2022
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+        with: { repository: The-Hybrid-Elite-Mafia/HEM-Dark-Matter-Series, ref: "${{ env.REF }}" }
+      - run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DDM_BUILD_VST3=OFF
+      - run: cmake --build build --config Release --target dm_faceplate_snapshot --parallel
+      - name: Software OpenGL (Mesa llvmpipe, CI only)
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: pwsh -NoProfile -File tools\ci\fetch-mesa.ps1 -TargetDirs build\Release
+      - name: Render (defaults, 3840 wide)
+        shell: pwsh
+        env: { GALLIUM_DRIVER: llvmpipe }
+        run: |
+          & .\build\Release\dm_faceplate_snapshot.exe --out shots --width 3840 --assets build\Release\assets --defaults 2>&1 | Tee-Object log.txt
+          "exit code $LASTEXITCODE" | Tee-Object log.txt -Append
+          exit 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shots-darkmatter
+          path: |
+            shots
+            log.txt
+
+  gallery:
+    name: Build HEM-156-Visual-Gallery.zip
+    needs: [hybridcore, rack, darkmatter]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with: { ref: "${{ env.REF }}" }
+      - uses: actions/download-artifact@v4
+        with: { path: in }
+      - run: pip install pillow
+      - name: Build the gallery (fails only after the zip is made, if anything is missing)
+        id: build
+        run: |
+          set +e
+          python3 tools/ci/build-visual-gallery.py --out HEM-156-Visual-Gallery \
+            --pack "HybridCore=in/shots-hybridcore/shots=in/shots-hybridcore/log.txt" \
+            --pack "Elite Rack=in/shots-rack/shots=in/shots-rack/log.txt" \
+            --pack "Dark Matter=in/shots-darkmatter/shots=in/shots-darkmatter/log.txt" \
+            --note "Rendered by GitHub Actions run ${{ github.run_id }} from '${{ env.REF }}' (HybridCore ${GITHUB_SHA::7}). Each plug-in as it loads, with a test song playing so meters move." | tee gallery-log.txt
+          echo "code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+          for d in hybridcore rack darkmatter; do cp in/shots-$d/log.txt HEM-156-Visual-Gallery/render-log-$d.txt 2>/dev/null; done
+          zip -qr HEM-156-Visual-Gallery.zip HEM-156-Visual-Gallery || exit 1
+          ls -la HEM-156-Visual-Gallery.zip
+      - uses: actions/upload-artifact@v4
+        with: { name: HEM-156-Visual-Gallery, path: HEM-156-Visual-Gallery.zip, compression-level: 0 }
+      - name: Publish as a release asset (visual-gallery pre-release, replaced each run)
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          notes="All 156 HEM faceplates as they load (zero colour), 3840 x 2160, with an offline gallery page. Unzip, double-click index.html. Built from '${REF}' by run ${{ github.run_id }}."
+          if gh release view visual-gallery >/dev/null 2>&1; then
+            gh release upload visual-gallery HEM-156-Visual-Gallery.zip --clobber && gh release edit visual-gallery --notes "$notes"
+          else
+            gh release create visual-gallery HEM-156-Visual-Gallery.zip --prerelease --title "HEM 156 Visual Gallery" --notes "$notes" --target "$GITHUB_SHA"
+          fi
+      - name: Result
+        run: exit ${{ steps.build.outputs.code }}

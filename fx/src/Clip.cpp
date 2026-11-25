@@ -16,7 +16,7 @@ const ParamInfo kParams[kCount] = {
     {"knee",    "Knee",    "%", 0.0f, 100.0f, 30.0f},
     {"link",    "Stereo Link", "", 0.0f, 1.0f, 0.0f, Taper::Toggle, kLinkNames},
     {"output",  "Output",  "dB", -24.0f, 12.0f, 0.0f},
-    {"mix",     "Mix",     "%", 0.0f, 100.0f, 100.0f},
+    {"mix",     "Mix",     "%", 0.0f, 100.0f, 0.0f},
 };
 
 // Clipping curve, x and result in units of the ceiling (|y| <= 1 always).

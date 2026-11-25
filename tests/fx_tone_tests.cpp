@@ -83,7 +83,7 @@ void testFxEq6() {
 
 void testFxSubStack() {
     std::printf("[fx] HEM SUBSTACK: transparent at rest, Sub moves the low end, Harmonics add 2nd/3rd\n");
-    auto e = fx::makeSubStack();
+    auto e = coloured(fx::makeSubStack());
     e->prepare(48000.0, 512);
     {   // Untouched: output = input exactly.
         Stereo s = noise(0.5, 0.5f), ref = s;
@@ -132,7 +132,7 @@ void testFxSubStack() {
 void testFxCalm() {
     std::printf("[fx] HEM CALM: the ringing tone goes down, the rest hardly; Depth 0 transparent; Delta = what's removed\n");
     auto make = [](float depth, bool delta) {
-        auto e = fx::makeCalm();
+        auto e = coloured(fx::makeCalm());
         e->prepare(48000.0, 512);
         setP(*e, "depth", depth);
         setP(*e, "delta", delta ? 1.0f : 0.0f);
@@ -188,7 +188,7 @@ void testFxCalm() {
 
 void testFxBloom() {
     std::printf("[fx] HEM BLOOM: a click leaves a tail; Duck pulls the wet down under a loud dry\n");
-    auto e = fx::makeBloom();
+    auto e = coloured(fx::makeBloom());
     e->prepare(48000.0, 512);
     setP(*e, "mix", 100.0f);
     setP(*e, "duck", 0.0f);

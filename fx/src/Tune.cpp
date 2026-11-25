@@ -24,7 +24,7 @@ const ParamInfo kParams[kCount] = {
     {"key",    "Key",          "", 0.0f, 11.0f, 0.0f, Taper::Choice, kKeys},
     {"scale",  "Scale",        "", 0.0f, 2.0f, 0.0f, Taper::Choice, kScales},
     {"speed",  "Retune Speed", "ms", 0.0f, 400.0f, 25.0f},
-    {"amount", "Amount",       "%", 0.0f, 100.0f, 100.0f},
+    {"amount", "Amount",       "%", 0.0f, 100.0f, 0.0f},
     {"low",    "Lowest Note",  "Hz", 50.0f, 400.0f, 80.0f, Taper::Log},
     {"high",   "Highest Note", "Hz", 200.0f, 1500.0f, 1000.0f, Taper::Log},
     {"output", "Output",       "dB", -24.0f, 12.0f, 0.0f},
