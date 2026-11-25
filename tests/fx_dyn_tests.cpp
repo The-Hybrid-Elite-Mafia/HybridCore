@@ -30,7 +30,7 @@ void testFxDynamics() {
 
     // ---- BUS PRESS -------------------------------------------------------------------
     {
-        auto e = fx::makeBusPress();
+        auto e = coloured(fx::makeBusPress());
         e->prepare(48000.0, 512);
         e->set(param(*e, "threshold"), -20.0f);
         e->set(param(*e, "ratio"), 2.0f);   // 4:1
@@ -82,27 +82,27 @@ void testFxDynamics() {
 
     // ---- STRIP ----------------------------------------------------------------------
     {
-        auto e = fx::makeStrip();
+        auto e = coloured(fx::makeStrip());
         e->prepare(48000.0, 512);
         CHECK(std::fabs(gainAtDb(*e, 1000.0)) < 0.1);   // defaults: transparent
         const struct { const char* id; double hz; } bands[] = {{"low", 50.0}, {"mid", 1000.0}, {"high", 16000.0}};
         for (const auto& b : bands)
             for (float db : {9.0f, -9.0f}) {
-                e->setDefaults();
+                e->setDefaults(); recolour(*e);
                 e->set(param(*e, b.id), db);
                 const double got = gainAtDb(*e, b.hz);
                 if (std::fabs(got - db) > 1.0) std::printf("  STRIP %s %+.0f dB at %.0f Hz: got %.2f\n", b.id, db, b.hz, got);
                 CHECK(std::fabs(got - db) < 1.0);
             }
-        e->setDefaults();
+        e->setDefaults(); recolour(*e);
         e->set(param(*e, "mid"), 9.0f);
         e->set(param(*e, "midfreq"), 3000.0f);
         CHECK(gainAtDb(*e, 3000.0) > 8.0 && gainAtDb(*e, 300.0) < 1.5);
-        e->setDefaults();
+        e->setDefaults(); recolour(*e);
         e->set(param(*e, "lowcut"), 200.0f);
         CHECK(gainAtDb(*e, 50.0) < -20.0 && std::fabs(gainAtDb(*e, 2000.0)) < 0.2);
         // Compressor: 4:1 at -30 dB, sine peak -10 dBFS → 15 dB down.
-        e->setDefaults();
+        e->setDefaults(); recolour(*e);
         e->set(param(*e, "compthr"), -30.0f);
         e->set(param(*e, "ratio"), 4.0f);
         e->set(param(*e, "attack"), 1.0f);
@@ -111,7 +111,7 @@ void testFxDynamics() {
         std::printf("  STRIP comp 4:1, -30 dB, peak -10 dBFS: %.2f dB (expected -15)\n", c);
         CHECK(c < -13.5 && c > -16.5);
         // Gate: -40 dB threshold, 80 dB range. Quiet (-60 dBFS) is shut, loud (-10) passes.
-        e->setDefaults();
+        e->setDefaults(); recolour(*e);
         e->set(param(*e, "gatethr"), -40.0f);
         e->set(param(*e, "gaterange"), 80.0f);
         const double quiet = gainAtDb(*e, 1000.0, 0.001f);
@@ -128,7 +128,7 @@ void testFxDynamics() {
 
     // ---- VOX ONE --------------------------------------------------------------------
     {
-        auto e = fx::makeVoxOne();
+        auto e = coloured(fx::makeVoxOne());
         e->prepare(48000.0, 512);
         e->set(param(*e, "amount"), 0.0f);
         const double t1 = gainAtDb(*e, 1000.0, 0.3f), t2 = gainAtDb(*e, 3000.0, 0.3f), lc = gainAtDb(*e, 30.0, 0.3f);
@@ -136,7 +136,7 @@ void testFxDynamics() {
         CHECK(std::fabs(t1) < 0.2 && std::fabs(t2) < 0.3 && lc < -12.0);
         // Evening out: the loud-quiet difference (20 dB in) shrinks a lot at full amount.
         auto spread = [&](float amount) {
-            e->setDefaults();
+            e->setDefaults(); recolour(*e);
             e->set(param(*e, "amount"), amount);
             e->reset();
             Stereo s = loudQuiet(0.5f, 0.05f);
@@ -147,7 +147,7 @@ void testFxDynamics() {
         std::printf("  VOX ONE loud vs quiet: amount 0 %.1f dB, amount 100 %.1f dB\n", sp0, sp100);
         CHECK(std::fabs(sp0 - 20.0) < 0.5 && sp100 < sp0 - 6.0);
         // De-esser: a 7 kHz burst is turned down more than a 1 kHz one (beyond the presence lift).
-        e->setDefaults();
+        e->setDefaults(); recolour(*e);
         e->set(param(*e, "amount"), 80.0f);
         const double s7 = gainAtDb(*e, 7000.0, 0.3f), s1 = gainAtDb(*e, 1000.0, 0.3f);
         // The leveler treats both the same; take out the presence / air lift (4 kHz +3.2 dB,
@@ -161,7 +161,7 @@ void testFxDynamics() {
         std::printf("  VOX ONE amount 80: 7 kHz %.2f dB, 1 kHz %.2f dB, de-esser on 7 kHz %.2f dB\n", s7, s1, deEss);
         CHECK(deEss < -3.0);
         // Mix 0 % = dry.
-        e->setDefaults();
+        e->setDefaults(); recolour(*e);
         e->set(param(*e, "amount"), 100.0f);
         e->set(param(*e, "mix"), 0.0f);
         CHECK(std::fabs(gainAtDb(*e, 1000.0, 0.3f)) < 0.05);

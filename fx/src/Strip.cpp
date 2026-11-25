@@ -65,7 +65,9 @@ public:
             (void)sLowCut_.next(p(LowCut)); (void)sLow_.next(p(Low)); (void)sMid_.next(p(Mid));
             (void)sMidF_.next(p(MidFreq)); (void)sHigh_.next(p(High));
             if ((tick_++ & 31u) == 0) updateFilters();
-            float l = hpf_.l.tick(L[i]), r = hpf_.r.tick(R[i]);
+            // LOW CUT at its bottom stop (20 Hz) is OFF: the sound passes untouched.
+            float l = L[i], r = R[i];
+            if (sLowCut_.cur > kLowCutOff) { l = hpf_.l.tick(l); r = hpf_.r.tick(r); }
             const float a = std::max(std::fabs(l), std::fabs(r));
             // Gate.
             gateEnv_ = a + (a > gateEnv_ ? gEnvAtt : gEnvRel) * (gateEnv_ - a);
@@ -77,7 +79,8 @@ public:
             }
             gateGain_ = gTarget + (gTarget > gateGain_ ? gOpen : gClose) * (gateGain_ - gTarget);
             // Compressor (detects after the gate).
-            const float target = gainComputer(gainToDb(a * gateGain_), cThr, ratio, kKneeDb);
+            // COMP THRESHOLD at its top stop (0 dB) is OFF (its soft knee would still touch hot peaks).
+            const float target = cThr < kCompOff ? gainComputer(gainToDb(a * gateGain_), cThr, ratio, kKneeDb) : 0.0f;
             gr_ = target + (target < gr_ ? att : rel) * (gr_ - target);
             deepest = std::min(deepest, gr_ + std::max(-80.0f, gainToDb(gateGain_)));   // the meter shows the gate too
             const float g = gateGain_ * dbToGain(gr_);
@@ -99,6 +102,8 @@ private:
         mid_.set(BiquadCoefs::make(T::Bell, fs_, sMidF_.cur, kMidQ, sMid_.cur));
         high_.set(BiquadCoefs::make(T::HighShelf, fs_, kHighHz, 0.7071, sHigh_.cur));
     }
+    static constexpr float kLowCutOff = 20.5f;   // LOW CUT at or below this = OFF
+    static constexpr float kCompOff = -0.05f;    // COMP THRESHOLD at or above this = OFF
     double fs_ = 48000;
     Biquad2 hpf_, low_, mid_, high_;
     Smoothed sLowCut_, sLow_, sMid_, sMidF_, sHigh_, out_;

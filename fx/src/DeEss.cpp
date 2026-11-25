@@ -19,7 +19,7 @@ const char* const kOnOff[] = {"OFF", "ON"};
 const ParamInfo kParams[kCount] = {
     {"freq",      "Frequency", "Hz", 3000.0f, 12000.0f, 6500.0f, Taper::Log},
     {"threshold", "Threshold", "dB", -60.0f, 0.0f, -30.0f},
-    {"range",     "Range",     "dBr", 0.0f, 20.0f, 10.0f},
+    {"range",     "Range",     "dBr", 0.0f, 20.0f, 0.0f},
     {"mode",      "Mode",      "", 0.0f, 1.0f, 0.0f, Taper::Choice, kModes},
     {"listen",    "Listen",    "", 0.0f, 1.0f, 0.0f, Taper::Toggle, kOnOff},
     {"output",    "Output",    "dB", -24.0f, 12.0f, 0.0f},
@@ -39,6 +39,7 @@ public:
         env_.set(fs, 1.0, 60.0);
         grCoef_ = onePoleCoef(fs, 2.0);
         reset();
+        clean_.prepare(fs, latency());
     }
     void reset() noexcept override {
         for (auto* b : {&hpA_, &hpB_, &lpA_, &lpB_, &det_}) b->clear();
@@ -47,9 +48,15 @@ public:
         out_.prepare(fs_, 30, dbToGain(p(Output)));
         publishMeter(0, -120.0f); publishMeter(1, 0.0f);
         publishReduction(0.0f);
+        clean_.reset(isClean());
     }
 
     void process(float* L, float* R, std::uint32_t n) noexcept override {
+        clean_.push(L, R, n, latency());
+        processInner(L, R, n);
+        clean_.apply(L, R, n, isClean());
+    }
+    void processInner(float* L, float* R, std::uint32_t n) noexcept {
         const float f = p(Freq);
         if (f != lastFreq_) {
             const auto hp = BiquadCoefs::make(BiquadCoefs::Type::HighPass, fs_, f * 0.7, kQ);
@@ -91,6 +98,9 @@ public:
     }
 
 private:
+    // colour controls all at zero: the sound passes untouched (see CleanPass)
+    bool isClean() const noexcept { return p(Range) <= 0.0f && p(Output) == 0.0f && p(Listen) < 0.5f; }
+    CleanPass clean_;
     double fs_ = 48000;
     Biquad2 hpA_, hpB_, lpA_, lpB_, det_;
     Envelope env_;

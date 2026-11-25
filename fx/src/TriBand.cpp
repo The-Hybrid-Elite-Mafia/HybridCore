@@ -31,7 +31,7 @@ const ParamInfo kParams[kCount] = {
     {"attack",    "Attack",         "ms", 0.5f, 100.0f, 15.0f, Taper::Log},
     {"release",   "Release",        "ms", 20.0f, 1000.0f, 150.0f, Taper::Log},
     {"listen",    "Listen",         "", 0.0f, 3.0f, 0.0f, Taper::Choice, kListen},
-    {"mix",       "Mix",            "%", 0.0f, 100.0f, 100.0f},
+    {"mix",       "Mix",            "%", 0.0f, 100.0f, 0.0f},
     {"output",    "Output",         "dB", -24.0f, 12.0f, 0.0f},
 };
 const MeterInfo kMeters[] = {{"LOW GR", "dB", -18.0f, 0.0f}, {"MID GR", "dB", -18.0f, 0.0f}, {"HIGH GR", "dB", -18.0f, 0.0f}};
@@ -76,6 +76,7 @@ public:
         lastLo_ = lastHi_ = -1.0f;
         lastAtk_ = lastRel_ = -1.0f;
         reset();
+        clean_.prepare(fs, latency());
     }
     void reset() noexcept override {
         for (int c = 0; c < 2; ++c) { lp1_[c].clear(); hp1_[c].clear(); lp2_[c].clear(); hp2_[c].clear(); apLo_[c].clear(); apHi_[c].clear(); }
@@ -87,9 +88,15 @@ public:
         out_.prepare(fs_, 20, dbToGain(p(Output)));
         for (int b = 0; b < 3; ++b) publishMeter(b, 0.0f);
         publishReduction(0.0f);
+        clean_.reset(isClean());
     }
 
     void process(float* L, float* R, std::uint32_t n) noexcept override {
+        clean_.push(L, R, n, latency());
+        processInner(L, R, n);
+        clean_.apply(L, R, n, isClean());
+    }
+    void processInner(float* L, float* R, std::uint32_t n) noexcept {
         const float lo = p(LowX), hi = std::max(p(HighX), lo * 1.5f);
         if (lo != lastLo_ || hi != lastHi_) {
             const auto lp1 = BiquadCoefs::make(BiquadCoefs::Type::LowPass, fs_, lo, kQ), hp1 = BiquadCoefs::make(BiquadCoefs::Type::HighPass, fs_, lo, kQ);
@@ -144,6 +151,9 @@ public:
     }
 
 private:
+    // colour controls all at zero: the sound passes untouched (see CleanPass)
+    bool isClean() const noexcept { return p(Mix) <= 0.0f && p(Output) == 0.0f; }
+    CleanPass clean_;
     double fs_ = 48000;
     Lr4 lp1_[2], hp1_[2], lp2_[2], hp2_[2], apLo_[2], apHi_[2];
     BandComp comp_[3];

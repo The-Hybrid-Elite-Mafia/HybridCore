@@ -1,3 +1,12 @@
+## The Hybrid Core — 0.16.3: every plug-in loads clean
+
+- **Every HEM effect now passes your audio untouched when you load it.** Mix, amount, drive, depth and the other colour controls start at 0, and while they sit at 0 the output is your input, bit for bit (only delayed by the plug-in's own look-ahead, which the DAW already lines up). Turn any colour control up and the effect fades in over 10 ms.
+- Changed defaults: VOX ONE (amount 0, mix 0), BUS PRESS, CALM (depth 0), CLIP, HEAT (drive 0), BLOOM, PUNCH, TRIBAND (mix 0), HUSH, DOUBLE, BALANCE, SWIRL KILLER, TUNE (amount 0), DESK (drive, crosstalk, mix 0), DUST (wow, flutter, vinyl, mix 0), ECHO (mix 0), CEILING (0 dB), DE-ESS (range 0), WIDE (mono below 20 Hz = off).
+- STRIP: LOW CUT at its bottom (20 Hz) and COMP THRESHOLD at its top (0 dB) now mean off.
+- Plug-in windows never open bigger than 90 % of the screen's width or 85 % of its height, even when a DAW asks for a bigger size.
+
+---
+
 ## The Hybrid Core — 0.16.2: QA pass fixes
 
 - HEM HUSH: after a reset or a silent lead-in it took the silence for the noise floor and removed nothing for about 4 seconds. It now learns the floor only from sound (measured: hiss down 13 dB half a second after a 1 s silent lead-in, was 0 dB).

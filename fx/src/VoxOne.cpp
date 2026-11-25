@@ -19,10 +19,10 @@ namespace {
 enum P { Amount, Mode, Output, Mix, kCount };
 const char* const kModes[] = {"SING", "RAP", "BACKING"};
 const ParamInfo kParams[kCount] = {
-    {"amount", "Amount", "%", 0.0f, 100.0f, 40.0f},
+    {"amount", "Amount", "%", 0.0f, 100.0f, 0.0f},
     {"mode", "Mode", "", 0.0f, 2.0f, 0.0f, Taper::Choice, kModes},
     {"output", "Output", "dB", -24.0f, 12.0f, 0.0f},
-    {"mix", "Mix", "%", 0.0f, 100.0f, 100.0f},
+    {"mix", "Mix", "%", 0.0f, 100.0f, 0.0f},
 };
 
 struct ModeShape { float lowCut, ratioMul, attackMs, presence, air; };

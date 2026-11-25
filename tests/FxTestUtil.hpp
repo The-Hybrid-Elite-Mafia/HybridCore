@@ -1,5 +1,6 @@
 #pragma once
 // Helpers for the HEM effect tests (tests/fx_*_tests.cpp).
+#include "ColouredStart.hpp"
 #include "hybrid/fx/Effects.hpp"
 
 #include <cmath>
@@ -58,6 +59,19 @@ inline int param(const fx::Effect& e, const char* id) {
     return -1;
 }
 // Level (dB) of a sine at hz after the effect, measured over the last half (settled).
+// The effect on its old coloured defaults (from before the zero-colour rule; see ColouredStart.hpp).
+inline void recolour(fx::Effect& e) {
+    for (const auto& info : fx::effects()) {
+        if (info.create()->params().data() != e.params().data()) continue;
+        const auto ps = e.params();
+        for (const auto& [id, v] : colourstart::forName(info.name))
+            for (std::size_t i = 0; i < ps.size(); ++i)
+                if (std::string(ps[i].id) == id) e.set(static_cast<int>(i), v);
+        break;
+    }
+}
+inline std::unique_ptr<fx::Effect> coloured(std::unique_ptr<fx::Effect> e) { recolour(*e); return e; }
+
 inline double gainAtDb(fx::Effect& e, double hz, float amp = 0.1f) {
     e.reset();
     Stereo s = sine(hz, 1.0, amp);

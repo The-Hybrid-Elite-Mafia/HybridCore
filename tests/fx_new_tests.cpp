@@ -43,7 +43,7 @@ double zeroCrossHz(const std::vector<float>& x, std::size_t from, std::size_t to
 }
 void set(fx::Effect& e, const char* id, float v) { e.set(param(e, id), v); }
 std::unique_ptr<fx::Effect> make(std::unique_ptr<fx::Effect> (*f)()) {
-    auto e = f();
+    auto e = coloured(f());   // the old coloured starting point (the effect itself loads untouched)
     e->prepare(48000.0, 512);
     return e;
 }

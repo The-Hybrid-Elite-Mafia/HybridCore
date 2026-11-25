@@ -21,7 +21,7 @@ namespace {
 enum P { Amount, Reduction, From, Tone, Learn, Listen, Output, kCount };
 const char* const kOnOff[] = {"OFF", "ON"};
 const ParamInfo kParams[kCount] = {
-    {"amount",    "Amount",    "%", 0.0f, 100.0f, 50.0f},
+    {"amount",    "Amount",    "%", 0.0f, 100.0f, 0.0f},
     {"reduction", "Reduction", "dBr", 3.0f, 30.0f, 12.0f},
     {"from",      "From",      "Hz", 20.0f, 8000.0f, 20.0f, Taper::Log},
     {"tone",      "Tone",      "%", -100.0f, 100.0f, 0.0f},
@@ -55,6 +55,7 @@ public:
         slotMin_.assign(B * kSlots, 0.0f); curMin_.assign(B, 0.0f);
         framesPerSlot_ = std::max(1, static_cast<int>(std::lround(0.5 * fs / hop_)));
         reset();
+        clean_.prepare(fs, latency());
     }
     void reset() noexcept override {
         for (int c = 0; c < 2; ++c) { std::fill(in_[c].begin(), in_[c].end(), 0.0f); std::fill(out_[c].begin(), out_[c].end(), 0.0f); }
@@ -66,9 +67,15 @@ public:
         outGain_.prepare(fs_, 30, dbToGain(p(Output)));
         publishMeter(0, -120.0f); publishMeter(1, 0.0f);
         publishReduction(0.0f);
+        clean_.reset(isClean());
     }
 
     void process(float* L, float* R, std::uint32_t n) noexcept override {
+        clean_.push(L, R, n, latency());
+        processInner(L, R, n);
+        clean_.apply(L, R, n, isClean());
+    }
+    void processInner(float* L, float* R, std::uint32_t n) noexcept {
         const float oT = dbToGain(p(Output));
         for (std::uint32_t i = 0; i < n; ++i) {
             const auto ps = static_cast<std::size_t>(pos_);
@@ -84,6 +91,9 @@ public:
     }
 
 private:
+    // colour controls all at zero: the sound passes untouched (see CleanPass)
+    bool isClean() const noexcept { return p(Amount) <= 0.0f && p(Output) == 0.0f; }
+    CleanPass clean_;
     void frame() noexcept {
         const int N = n_;
         const auto B = static_cast<std::size_t>(N / 2 + 1);

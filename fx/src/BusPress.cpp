@@ -20,7 +20,7 @@ const ParamInfo kParams[kCount] = {
     {"release", "Release", "ms", 50.0f, 1200.0f, 300.0f, Taper::Log},
     {"auto", "Auto Release", "", 0.0f, 1.0f, 0.0f, Taper::Toggle, kOnOff},
     {"makeup", "Makeup", "dB", -6.0f, 24.0f, 0.0f},
-    {"mix", "Mix", "%", 0.0f, 100.0f, 100.0f},
+    {"mix", "Mix", "%", 0.0f, 100.0f, 0.0f},
     {"sclowcut", "SC Low Cut", "Hz", 20.0f, 300.0f, 20.0f, Taper::Log},
 };
 

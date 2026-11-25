@@ -3,7 +3,8 @@
 // running each effect on a few seconds of test audio so its meters are live, and saves PNGs
 // plus one contact sheet. Used by CI (software OpenGL); works on the rig too.
 //
-//   hc_fx_snapshot [--out <folder>] [--scale 0.62]
+//   hc_fx_snapshot [--out <folder>] [--scale 0.62] [--defaults]
+//   --defaults: change no setting: every faceplate exactly as the plug-in loads.
 // Exit 3 when a faceplate fails to open or comes out blank.
 #include "hybrid/fx/Effects.hpp"
 #include "hybrid/synth/Wave.hpp"
@@ -116,10 +117,12 @@ ui::PanelSpec waveSpec() {
 int main(int argc, char** argv) {
     std::filesystem::path out = "fx-shots";
     float scale = 0.62f;
-    for (int i = 1; i + 1 < argc; ++i) {
+    bool defaults = false;
+    for (int i = 1; i < argc; ++i) {
         const std::string a = argv[i];
-        if (a == "--out") out = argv[++i];
-        else if (a == "--scale") scale = static_cast<float>(std::atof(argv[++i]));
+        if (a == "--out" && i + 1 < argc) out = argv[++i];
+        else if (a == "--scale" && i + 1 < argc) scale = static_cast<float>(std::atof(argv[++i]));
+        else if (a == "--defaults") defaults = true;
     }
     std::filesystem::create_directories(out);
     const auto assets = exeDir() / "assets";
@@ -145,7 +148,7 @@ int main(int argc, char** argv) {
     };
     for (const fx::EffectInfo& info : fx::effects()) {
         auto e = info.create();
-        if (std::string(info.name) == "HEM TUNE") e->set(0, 9.0f);   // key A
+        if (!defaults && std::string(info.name) == "HEM TUNE") e->set(0, 9.0f);   // key A (left at its default with --defaults)
         feed(*e);
         const ui::PanelSpec spec = ui::panelSpecFor(info, *e);
         ui::EffectPanelHost host(*e);

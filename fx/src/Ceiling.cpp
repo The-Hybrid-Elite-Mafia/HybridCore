@@ -19,7 +19,7 @@ enum P { Gain, Ceil, Release, Auto, kCount };
 const char* const kOnOff[] = {"OFF", "ON"};
 const ParamInfo kParams[kCount] = {
     {"gain",    "Gain",       "dB", 0.0f, 24.0f, 0.0f},
-    {"ceiling", "Ceiling",    "dB", -12.0f, 0.0f, -1.0f},
+    {"ceiling", "Ceiling",    "dB", -12.0f, 0.0f, 0.0f},
     {"release", "Release",    "ms", 1.0f, 1000.0f, 80.0f, Taper::Log},
     {"auto",    "Auto Release", "", 0.0f, 1.0f, 1.0f, Taper::Toggle, kOnOff},
 };

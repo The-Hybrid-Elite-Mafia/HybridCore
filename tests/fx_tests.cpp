@@ -6,6 +6,7 @@
 #include "TestHarness.hpp"
 
 #include <cstdio>
+#include <numbers>
 #include <set>
 
 namespace hc::test {
@@ -68,13 +69,13 @@ void testFxCommon() {
         CHECK(e->latency() == lat);
         if (allocs || !finite(s)) std::printf("  FAIL detail: %s allocs %llu finite %d\n", info.name, static_cast<unsigned long long>(allocs), finite(s) ? 1 : 0);
         // Back to defaults + reset: silence again.
-        e->setDefaults();
+        e->setDefaults(); recolour(*e);
         e->reset();
         Stereo z2(24000);
         run(*e, z2);
         CHECK(peak(z2.l) < 1e-4f);
         // Block size never changes the result (1 vs 512 samples).
-        auto a = info.create(), b = info.create();
+        auto a = coloured(info.create()), b = coloured(info.create());   // from the coloured start: real DSP
         a->prepare(48000.0, 512); b->prepare(48000.0, 512);
         Stereo x = noise(0.25, 0.5f, 3), y = x;
         run(*a, x, 512);
@@ -83,6 +84,27 @@ void testFxCommon() {
         for (std::size_t i = 0; i < x.size(); ++i) diff = std::max(diff, static_cast<double>(std::fabs(x.l[i] - y.l[i])));
         CHECK(diff < 1e-3);
         if (diff >= 1e-3) std::printf("  FAIL detail: %s block-size difference %.5f\n", info.name, diff);
+        // Zero colour on load: hot music passes untouched, only delayed by the reported latency.
+        {
+            auto u = info.create();
+            u->prepare(48000.0, 512);
+            const std::uint32_t ul = u->latency();
+            double worst = 0;
+            for (float amp : {0.5f, 0.89f, 1.0f}) {
+                Stereo m = noise(1.0, amp * 0.5f, 11), in = m;
+                for (std::size_t i = 0; i < m.size(); ++i) {   // add a loud 120 Hz / 1 kHz tone mix: peaks at amp
+                    const double t = static_cast<double>(i) / 48000.0;
+                    m.l[i] = in.l[i] = static_cast<float>(0.5 * amp * (0.6 * std::sin(2 * std::numbers::pi * 120 * t) + 0.4 * std::sin(2 * std::numbers::pi * 1000 * t))) + in.l[i] * 0.2f;
+                    m.r[i] = in.r[i] = m.l[i] * 0.9f;
+                }
+                u->reset();
+                run(*u, m);
+                for (std::size_t i = ul; i < m.size(); ++i)
+                    worst = std::max({worst, static_cast<double>(std::fabs(m.l[i] - in.l[i - ul])), static_cast<double>(std::fabs(m.r[i] - in.r[i - ul]))});
+            }
+            CHECK(worst == 0.0);
+            if (worst != 0.0) std::printf("  FAIL detail: %s does not load untouched (max diff %.3g)\n", info.name, worst);
+        }
         std::printf("  %-14s %2zu params  latency %u  ok\n", info.name, ps.size(), lat);
     }
     CHECK(fx::effects().size() == 22);
@@ -90,7 +112,7 @@ void testFxCommon() {
 
 void testFxClip() {
     std::printf("[fx] HEM CLIP: ceiling holds, drive adds loudness, latency lines up the dry\n");
-    auto e = fx::makeClip();
+    auto e = coloured(fx::makeClip());
     e->prepare(48000.0, 512);
     e->set(param(*e, "ceiling"), -3.0f);
     e->set(param(*e, "drive"), 12.0f);
@@ -103,7 +125,7 @@ void testFxClip() {
     CHECK(rmsDb(s.l, 24000) > inRms + 4.5);   // louder: 0.5 driven +12 dB, clipped at -3 dB ≈ +6 dB RMS
     CHECK(e->reductionDb() < -6.0f);   // 2.0 peak into a 0.708 ceiling = 9 dB shaved
     // Below the ceiling it changes nothing (apart from the delay).
-    auto c = fx::makeClip();
+    auto c = coloured(fx::makeClip());
     c->prepare(48000.0, 512);
     Stereo q = sine(1000.0, 0.5, 0.25f), ref = q;
     run(*c, q);
@@ -135,7 +157,7 @@ static float truePeak(const std::vector<float>& x, std::size_t from) {
 void testFxCeiling() {
     std::printf("[fx] HEM CEILING: true-peak ceiling holds, quiet audio untouched, release\n");
     // A sine at fs/4 + phase has inter-sample peaks ~3 dB above its samples: the classic test.
-    auto e = fx::makeCeiling();
+    auto e = coloured(fx::makeCeiling());
     e->prepare(48000.0, 512);
     e->set(param(*e, "ceiling"), -1.0f);
     e->set(param(*e, "gain"), 12.0f);
@@ -157,7 +179,7 @@ void testFxCeiling() {
     CHECK(tpL < ceil * fx::dbToGain(0.1f) && tpR < ceil * fx::dbToGain(0.1f));
     CHECK(e->reductionDb() < -6.0f);
     // Below the ceiling: exact delayed copy.
-    auto q = fx::makeCeiling();
+    auto q = coloured(fx::makeCeiling());
     q->prepare(48000.0, 512);
     Stereo a = sine(440.0, 0.5, 0.3f), ref = a;
     run(*q, a);
@@ -166,7 +188,7 @@ void testFxCeiling() {
     for (std::size_t i = lat; i < a.size(); ++i) err = std::max(err, static_cast<double>(std::fabs(a.l[i] - ref.l[i - lat])));
     CHECK(err < 1e-6);
     // Release: after a burst, gain comes back (80 ms auto) — level 0.5 s later is unity again.
-    auto r = fx::makeCeiling();
+    auto r = coloured(fx::makeCeiling());
     r->prepare(48000.0, 512);
     Stereo b = sine(200.0, 1.5, 0.2f);
     for (std::size_t i = 4800; i < 6000; ++i) { b.l[i] *= 5.0f; b.r[i] *= 5.0f; }
@@ -178,7 +200,7 @@ void testFxCeiling() {
 void testFxHeat() {
     std::printf("[fx] HEM HEAT: harmonics by character, auto gain, mix 0 = dry, tone tilt\n");
     auto harmonics = [](int mode, float driveDb, double& h2, double& h3) {
-        auto e = fx::makeHeat();
+        auto e = coloured(fx::makeHeat());
         e->prepare(48000.0, 512);
         e->set(param(*e, "mode"), static_cast<float>(mode));
         e->set(param(*e, "drive"), driveDb);
@@ -207,7 +229,7 @@ void testFxHeat() {
     CHECK(x3 > -40.0);
     CHECK(std::fabs(tapeLvl) < 4.0 && std::fabs(tubeLvl) < 4.0 && std::fabs(trLvl) < 4.0);   // auto gain keeps the level near
     // Mix 0 % = dry (delayed).
-    auto e = fx::makeHeat();
+    auto e = coloured(fx::makeHeat());
     e->prepare(48000.0, 512);
     e->set(param(*e, "mix"), 0.0f);
     e->set(param(*e, "drive"), 30.0f);
@@ -218,7 +240,7 @@ void testFxHeat() {
     for (std::size_t i = e->latency(); i < a.size(); ++i) err = std::max(err, static_cast<double>(std::fabs(a.l[i] - ref.l[i - e->latency()])));
     CHECK(err < 1e-5);
     // Tone +100: 8 kHz louder than 100 Hz relative to tone 0.
-    auto t = fx::makeHeat();
+    auto t = coloured(fx::makeHeat());
     t->prepare(48000.0, 512);
     t->set(param(*t, "drive"), 0.0f);
     t->set(param(*t, "tone"), 100.0f);

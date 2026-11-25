@@ -26,7 +26,7 @@ const ParamInfo kParams[kCount] = {
     {"width",    "Width",     "%", 0.0f, 150.0f, 100.0f},
     {"duck",     "Duck",      "%", 0.0f, 100.0f, 50.0f},
     {"release",  "Duck Release", "ms", 20.0f, 2000.0f, 250.0f, Taper::Log},
-    {"mix",      "Mix",       "%", 0.0f, 100.0f, 25.0f},
+    {"mix",      "Mix",       "%", 0.0f, 100.0f, 0.0f},
 };
 constexpr int kLines = 8, kBands = 4;
 constexpr double kBaseMs[kLines] = {29.7, 37.1, 41.1, 43.7, 53.0, 59.9, 67.1, 79.3};

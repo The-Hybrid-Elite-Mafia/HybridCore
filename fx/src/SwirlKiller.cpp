@@ -25,7 +25,7 @@ enum P { Amount, From, Protect, Mode, Whistle, Shield, Listen, Output, kCount };
 const char* const kModes[] = {"REMOVE", "REPAIR"};
 const char* const kOnOff[] = {"OFF", "ON"};
 const ParamInfo kParams[kCount] = {
-    {"amount",  "Amount",           "%", 0.0f, 100.0f, 50.0f},
+    {"amount",  "Amount",           "%", 0.0f, 100.0f, 0.0f},
     {"from",    "From",             "Hz", 1000.0f, 16000.0f, 4000.0f, Taper::Log},
     {"protect", "Protect Width",    "%", 0.0f, 100.0f, 40.0f},
     {"mode",    "Mode",             "", 0.0f, 1.0f, 1.0f, Taper::Choice, kModes},
@@ -69,6 +69,7 @@ public:
         sideSlow_.assign(B, 0.0f); whistleGain_.assign(B, 1.0f); whistleTmp_.assign(B, 1.0f);
         hist_.assign(B, {});
         reset();
+        clean_.prepare(fs, latency());
     }
     void reset() noexcept override {
         for (int c = 0; c < 2; ++c) { std::fill(in_[c].begin(), in_[c].end(), 0.0f); std::fill(out_[c].begin(), out_[c].end(), 0.0f); }
@@ -84,9 +85,15 @@ public:
         outGain_.prepare(fs_, 30, dbToGain(p(Output)));
         publishMeter(0, 1.0f); publishMeter(1, 0.0f); publishMeter(2, 0.0f); publishMeter(3, 0.0f);
         publishReduction(0.0f);
+        clean_.reset(isClean());
     }
 
     void process(float* L, float* R, std::uint32_t n) noexcept override {
+        clean_.push(L, R, n, latency());
+        processInner(L, R, n);
+        clean_.apply(L, R, n, isClean());
+    }
+    void processInner(float* L, float* R, std::uint32_t n) noexcept {
         const float oT = dbToGain(p(Output));
         for (std::uint32_t i = 0; i < n; ++i) {
             const auto ps = static_cast<std::size_t>(pos_);
@@ -100,6 +107,9 @@ public:
     }
 
 private:
+    // colour controls all at zero: the sound passes untouched (see CleanPass)
+    bool isClean() const noexcept { return p(Amount) <= 0.0f && p(Whistle) <= 0.0f && p(Listen) < 0.5f && p(Output) == 0.0f; }
+    CleanPass clean_;
     void frame() noexcept {
         const int N = n_, half = N / 2;
         for (int c = 0; c < 2; ++c)
