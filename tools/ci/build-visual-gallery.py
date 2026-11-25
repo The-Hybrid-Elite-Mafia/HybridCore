@@ -9,6 +9,8 @@ Each --pack is NAME=FOLDER=LOG. HEM WAVE is taken out of the HybridCore folder i
 The renderer logs are read for FAIL lines so a plug-in that did not render is named on the page.
 Exit code 0 = all 156 rendered."""
 import argparse
+import base64
+import io
 import json
 import shutil
 import struct
@@ -50,7 +52,6 @@ def main():
     if out.exists():
         shutil.rmtree(out)
     (out / "faceplates").mkdir(parents=True)
-    (out / "previews").mkdir()
 
     cards, problems = [], []
     for spec in a.pack:
@@ -66,9 +67,13 @@ def main():
             shutil.copyfile(p, dst)
             im = Image.open(p).convert("RGB")
             pw = 960
-            im.resize((pw, max(1, round(h * pw / w))), Image.LANCZOS).save(out / "previews" / (slug + ".jpg"), quality=86)
+            buf = io.BytesIO()
+            im.resize((pw, max(1, round(h * pw / w))), Image.LANCZOS).save(buf, "JPEG", quality=86)
+            # the preview lives INSIDE index.html, so the page shows every faceplate even when it is opened
+            # straight from the zip (Windows then copies only index.html to a temp folder)
+            prev = "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
             cards.append({"name": p.stem.replace("_", " "), "pack": pack, "w": w, "h": h,
-                          "full": f"faceplates/{dst.name}", "prev": f"previews/{slug}.jpg",
+                          "full": f"faceplates/{dst.name}", "prev": prev,
                           "kb": round(dst.stat().st_size / 1024)})
 
     counts = {k: sum(1 for c in cards if c["pack"] == k) for k in EXPECTED}
@@ -132,7 +137,7 @@ main{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:
 <div class="bar" id="filters"><input id="q" placeholder="Search plug-in name..." autocomplete="off"><span class="shown" id="shown"></span></div>
 </header>
 <main id="grid"></main>
-<div id="lb"><div id="lbtop"><span class="t" id="lbt"></span><span class="s" id="lbs"></span><span class="hint">Click picture = real size (1 pixel = 1 pixel) &middot; arrow keys = next / previous &middot; Esc = close</span><button id="close">Close</button></div>
+<div id="lb"><div id="lbtop"><span class="t" id="lbt"></span><span class="s" id="lbs"></span><span id="lbwarn" style="display:none;color:#ffb53f">Showing the small picture: for full 3840 &times; 2160 size, right-click the zip &rarr; Extract All, then open index.html from the extracted folder.</span><span class="hint">Click picture = real size (1 pixel = 1 pixel) &middot; arrow keys = next / previous &middot; Esc = close</span><button id="close">Close</button></div>
 <button class="nav" id="prev" title="Previous">&#8249;</button><button class="nav" id="next" title="Next">&#8250;</button>
 <div id="lbwrap"><img id="lbimg" alt=""></div></div>
 <script>
@@ -164,7 +169,11 @@ let cur = 0;
 function open(i) {
   if (!list.length) return;
   cur = (i + list.length) % list.length; const c = list[cur];
-  img.classList.remove('real'); img.src = c.full;
+  img.classList.remove('real'); img.src = c.prev; document.getElementById('lbwarn').style.display = 'none';
+  const big = new Image();
+  big.onload = () => { if (list[cur] === c) img.src = c.full; };
+  big.onerror = () => { if (list[cur] === c) document.getElementById('lbwarn').style.display = 'inline'; };
+  big.src = c.full;
   document.getElementById('lbt').textContent = c.name;
   document.getElementById('lbs').textContent = `${c.pack} · ${c.w} × ${c.h} · ${cur + 1} of ${list.length}`;
   lb.classList.add('open');
